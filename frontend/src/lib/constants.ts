@@ -1,101 +1,203 @@
 export const siteConfig = {
-  name: 'Gtech Global',
-  email: 'gtechglobal.dev@gmail.com',
-  phone: '+234 905 486 7749',
-  social: {
-    whatsapp: 'https://wa.me/2349054867749',
-    linkedin: 'https://www.linkedin.com/in/okoroebube-gtech/',
-    github: 'https://github.com/gtechglobal-dev',
-  },
+  name: 'Shawty Beauty Studio',
+  owner: 'Makeup Artist & Lash Tech Professional',
+  tagline: 'Makeup Available and Reachable for All',
+  email: 'shawtybeautystudio@gmail.com',
+  phone: '+234 916 321 98567',
+  phoneRaw: '+23491632198567',
+  whatsapp: 'https://wa.me/23491632198567',
+  instagram: 'https://instagram.com/shawtys_beauty_studio',
+  instagramHandle: '@shawtys_beauty_studio',
 }
 
-export const webDevPackages = [
+// --- Beauty services (the core business) ---
+export interface Service {
+  title: string
+  desc: string
+  long: string
+  image: string
+}
+
+export const lashServices: Service[] = [
   {
-    id: 'landing-page',
-    title: 'Landing Page Website',
-    desc: 'Personal brands, events, campaigns, product launches',
-    perfectFor: ['Personal portfolio', 'Event website', 'Product launch', 'Restaurant', 'Small business'],
-    priceUsd: 150,
-    features: ['Responsive design', 'Contact form', 'Social media links', 'Basic SEO', '1 page'],
-    delivery: '3–5 days',
-    popular: false,
+    title: 'Classic Lashes',
+    desc: 'Natural, one-to-one lashes that enhance your eyes every day.',
+    long: 'Classic lashes are applied lash-by-lash — one lightweight extension on every natural lash — for a clean, refined enhancement. They are gentle, comfortable and ideal for everyday wear, adding subtle length and definition without ever looking heavy or overdone.',
+    image: '/images/lashes.jpg',
   },
   {
-    id: 'business',
-    title: 'Business Website',
-    desc: 'Companies, schools, churches, hotels, hospitals',
-    perfectFor: ['Schools', 'Churches', 'SMEs', 'NGOs', 'Hotels'],
-    priceUsd: 350,
-    features: ['5–10 pages', 'Mobile responsive', 'Contact forms', 'Google Maps', 'Gallery', 'Basic CMS', 'SEO optimization'],
-    delivery: '1–2 weeks',
-    popular: true,
+    title: 'Hybrid Lashes',
+    desc: 'A textured mix of classic and volume for a soft, fuller look.',
+    long: 'Hybrid lashes blend classic single extensions with volume fans for a textured look that is fuller than classic but still soft and natural. It is the perfect middle ground — a flirty, feathery set that frames the eyes beautifully.',
+    image: '/images/lashes.jpg',
   },
   {
-    id: 'corporate',
-    title: 'Corporate Website',
-    desc: 'Organizations requiring multiple pages and advanced features',
-    perfectFor: ['Large businesses', 'Government organizations', 'Educational institutions'],
-    priceUsd: 700,
-    features: ['Up to 20 pages', 'Admin dashboard', 'Blog', 'Team management', 'Downloads', 'News section', 'Advanced animations', 'Premium UI/UX'],
-    delivery: '2–4 weeks',
-    popular: false,
+    title: 'Volume Lashes',
+    desc: 'Fluffy, dramatic volume lashes for a glam, stand-out finish.',
+    long: 'Volume lashes apply several ultra-fine extensions in a fan onto each natural lash, creating a fluffy, full and dramatically glamorous set. Lightweight yet striking, they are made for anyone who wants a bold, camera-ready look.',
+    image: '/images/lashes.jpg',
   },
   {
-    id: 'ecommerce',
-    title: 'E-Commerce Website',
-    desc: 'Online stores with payment gateway and inventory',
-    perfectFor: ['Fashion stores', 'Supermarkets', 'Electronics', 'Pharmacies'],
-    priceUsd: 1200,
-    features: ['Product management', 'Shopping cart', 'Checkout', 'Paystack/Stripe integration', 'Customer accounts', 'Order management', 'Email notifications', 'Coupons', 'Inventory'],
-    delivery: '3–6 weeks',
-    popular: false,
-  },
-  {
-    id: 'webapp',
-    title: 'Web Application',
-    desc: 'Portals, dashboards, SaaS platforms, management systems',
-    perfectFor: ['School Management System', 'Hospital Management', 'Hotel Booking', 'HR System', 'CRM', 'Learning Management System', 'Real Estate Portal', 'Student Result Portal'],
-    priceUsd: 2500,
-    features: ['Authentication', 'Admin dashboard', 'Database', 'Analytics', 'Role management', 'Reports', 'API integration', 'Cloud deployment', 'Security'],
-    delivery: '1–3 months',
-    popular: false,
-  },
-  {
-    id: 'enterprise',
-    title: 'Custom Enterprise Solution',
-    desc: 'Large-scale custom software with unique requirements',
-    perfectFor: ['Banks', 'Fintech', 'Government', 'Large organizations', 'SaaS startups', 'Multi-tenant platforms'],
-    priceUsd: 5000,
-    features: ['Everything in Web Application', 'Custom integrations', 'High security', 'Scalable architecture', 'Multiple user roles', 'Advanced reporting', 'API development', 'Ongoing support options', 'Dedicated project planning'],
-    delivery: 'Custom timeline',
-    popular: false,
+    title: 'Wispy Set / Bottom Lashes',
+    desc: 'Wispy lash sets and bottom lashes to complete your look.',
+    long: 'Wispy lash sets use varying lengths to create an airy, fluttery finish that looks effortless and textured. Add bottom lashes to open up and fully frame the eyes for an unexpected, striking finish.',
+    image: '/images/lashes.jpg',
   },
 ]
 
-export const webDevAddons = [
-  { service: 'Extra Page', priceUsd: 30 },
-  { service: 'Blog Setup', priceUsd: 100 },
-  { service: 'Booking System', priceUsd: 200 },
-  { service: 'Payment Gateway Integration', priceUsd: 150 },
-  { service: 'Live Chat', priceUsd: 50 },
-  { service: 'WhatsApp Integration', priceUsd: 30 },
-  { service: 'Domain Setup', priceUsd: 30 },
-  { service: 'Hosting Deployment', priceUsd: 80 },
-  { service: 'Business Email Setup', priceUsd: 50 },
-  { service: 'SEO Optimization', priceUsd: 200 },
-  { service: 'Website Maintenance', priceUsd: 50, perMonth: true },
+export const makeupServices: Service[] = [
+  {
+    title: 'Soft Glam',
+    desc: 'Everyday elegant glam that keeps you looking fresh and radiant.',
+    long: 'Soft glam enhances your natural features with luminous skin, neutral shadows and a graceful finish. It is the everyday elegant look — fresh, wearable and radiant enough for any occasion.',
+    image: '/images/makeup1.jpg',
+  },
+  {
+    title: 'Full Glam',
+    desc: 'High-impact, camera-ready glam for events and nights out.',
+    long: 'Full glam is high-impact and unapologetic — sculpted cheeks, defined, smoky eyes and a flawless, long-wearing base built for events, parties and nights out. Every detail is perfected to look stunning in person and on camera.',
+    image: '/images/makeup2.jpg',
+  },
+  {
+    title: 'Bridal Glam',
+    desc: 'Long-lasting bridal makeup designed to glow through your big day.',
+    long: 'Bridal glam is crafted to last from the ceremony to the last dance. We design a timeless, glowing look around your dress and personality, use long-wear products, and make sure every photograph captures your best light.',
+    image: '/images/makeup1.jpg',
+  },
+  {
+    title: 'Photoshoot Makeup',
+    desc: 'Makeup that photographs beautifully for shoots and content.',
+    long: 'Photoshoot makeup is tailored to read beautifully on camera — studio or natural light, video or stills. Skin texture is perfected, shine is controlled and features are sculpted so you look your best in every frame.',
+    image: '/images/makeup2.jpg',
+  },
+  {
+    title: 'Makeup Training (1-on-1)',
+    desc: 'Personal one-on-one lessons to build your own skills and confidence.',
+    long: 'Learn makeup at your own pace with personal, one-on-one coaching. Whether you are starting from zero or brushing up your technique, you will practice on live models and leave with the confidence to do your own makeup — or even client work.',
+    image: '/images/makeup1.jpg',
+  },
 ]
 
-export const DEFAULT_EXCHANGE_RATE = 1540
-
-export function formatNgn(usd: number, rate: number): string {
-  const ngn = Math.round(usd * rate)
-  return ngn.toLocaleString('en-NG')
+// --- The 3-day event (an advert hosted by Shawty Beauty Studio) ---
+export const program = {
+  title: '3-Day Beginner Makeup Class',
+  theme: 'Making Makeup Available and Reachable for All',
+  dates: '4th – 6th February 2027',
+  duration: '3 Days',
+  time: {
+    morning: '9:00 AM',
+    evening: '3:00 PM',
+  },
+  venue: 'Disclosed to registered students after ticket purchase.',
+  whoFor: ['Makeup lovers', 'Beginner makeup artists'],
+  learn: [
+    'How to do your own personal makeup',
+    'How to recreate basic makeup looks on friends',
+    'Fundamental beginner makeup techniques',
+    'The difference between being a Makeup Artist and becoming a Beauty CEO',
+  ],
+  plus: "Participants will also be introduced to the business and mindset side of the beauty industry—understanding the difference between simply being a makeup artist and building yourself into a Beauty CEO.",
+  bring: 'Participants should come with their own personal makeup products/tools.',
 }
 
-export const graphicsPackages = [
-  { id: 'logo', title: 'Logo Design', priceUsd: 7, features: ['3 concepts', 'Vector files', 'Source file', 'Color variations'] },
-  { id: 'flyer', title: 'Flyer Design', priceUsd: 5, features: ['Print ready', 'Social version', 'Source file', '2 revisions'] },
-  { id: 'banner', title: 'Banner Ad', priceUsd: 5, features: ['Multiple sizes', 'Animated option', 'Source file', '2 revisions'] },
-  { id: 'other', title: 'Other Designs', priceUsd: 0, features: ['Custom design', 'Describe your needs', 'Get a quote'] },
+export interface Ticket {
+  id: 'early-bird' | 'student' | 'vip' | 'group'
+  label: string
+  price: number
+  unitName: string
+  includes: string[]
+  highlighted?: boolean
+  slot?: string
+}
+
+export const tickets: Ticket[] = [
+  { id: 'early-bird', label: 'Early Bird', price: 3000, unitName: 'person', includes: ['Full 3-day class'] },
+  { id: 'student', label: 'Student', price: 5000, unitName: 'person', includes: ['Full 3-day class'], highlighted: true },
+  { id: 'vip', label: 'VIP', price: 10000, unitName: 'person', includes: ['Full 3-day class', 'Branded shirt / cap'] },
+  { id: 'group', label: 'Group', price: 10000, unitName: 'group of 4', includes: ['Full 3-day class for 4 persons'] },
+]
+
+export interface SponsorPkg {
+  id: 'supporter' | 'partner' | 'featured' | 'title' | 'product' | 'service'
+  label: string
+  price: number
+  desc: string
+  benefits: string[]
+  slot?: string
+}
+
+export const sponsorPackages: SponsorPkg[] = [
+  {
+    id: 'supporter', label: 'Supporter', price: 20000,
+    desc: 'For individuals, small businesses, and emerging beauty brands that simply want to support the initiative.',
+    benefits: [
+      'Name/logo on the official sponsor appreciation graphic',
+      'Social media appreciation post/story',
+      'Verbal appreciation during the program',
+      'Sponsor recognition on the event’s digital materials',
+    ],
+  },
+  {
+    id: 'partner', label: 'Partner', price: 50000,
+    desc: 'For brands that want more visibility before and during the event.',
+    benefits: [
+      'Everything in Supporter',
+      'Prominent logo placement on event promotional materials',
+      'Dedicated social media feature',
+      'Brand mention during selected event sessions',
+      'Opportunity to provide flyers, discount cards or approved materials',
+      'Brand included in post-event appreciation content',
+    ],
+  },
+  {
+    id: 'featured', label: 'Featured Sponsor', price: 100000,
+    desc: 'For brands that want to be visibly associated with the program.',
+    benefits: [
+      'Everything in Partner',
+      'Featured sponsor status',
+      'Priority logo placement on major event materials',
+      'Dedicated brand spotlight/content feature',
+      'Opportunity for approved product sampling or display',
+      'Opportunity to contribute branded materials/gifts',
+      'Special recognition during the program',
+    ],
+  },
+  {
+    id: 'title', label: 'Title / Major Sponsor', price: 200000, slot: '2 slots only',
+    desc: 'Limited to 2 slots, custom/limited so only true main sponsors claim the positioning.',
+    benefits: [
+      '“In partnership with…” or “Powered by…” positioning',
+      'Highest-priority branding across approved event materials',
+      'Dedicated promotional content',
+      'Product/service activation opportunity',
+      'Opportunity to address participants briefly',
+      'Prominent recognition throughout the event',
+      'Post-event brand feature',
+      'Customized sponsorship benefits based on your objectives',
+    ],
+  },
+  {
+    id: 'product', label: 'Product Sponsor', price: 0,
+    desc: 'Beauty products, brushes, tools, gift items, etc.',
+    benefits: ['Recognition and benefits based on your contributions and agreement'],
+  },
+  {
+    id: 'service', label: 'Service Sponsor', price: 0,
+    desc: 'Photography, videography, printing, refreshments, venue support, branding, etc.',
+    benefits: ['Recognition and benefits based on your contributions and agreement'],
+  },
+]
+
+export function formatNgn(n: number): string {
+  return '₦' + n.toLocaleString('en-NG')
+}
+
+export const apiUrl = '/api'
+
+export const galleryImages = [
+  '/images/makeup1.jpg',
+  '/images/makeup2.jpg',
+  '/images/lashes.jpg',
+  '/images/face.png',
+  '/images/brushes.png',
 ]

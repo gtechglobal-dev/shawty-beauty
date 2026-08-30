@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuid } from 'uuid';
-import { readMessages, writeMessage, markMessageRead, type Message } from '../db.js';
-import { authMiddleware, type AuthRequest } from '../middleware/auth.js';
+import { writeContact, addSubscriber, type ContactMessage } from '../db.js';
 
 const router = Router();
 
@@ -9,50 +8,50 @@ router.post('/', async (req: Request, res: Response) => {
   try {
     const { name, email, subject, message } = req.body;
 
-    if (!name || !email || !subject || !message) {
-      return res.status(400).json({ error: 'All fields are required' });
+    const cleanName = (name || '').trim().slice(0, 100);
+    const cleanEmail = (email || '').trim().toLowerCase().slice(0, 254);
+    const cleanSubject = (subject || '').trim().slice(0, 200);
+    const cleanMessage = (message || '').trim().slice(0, 2000);
+
+    if (!cleanName || !cleanEmail || !cleanMessage) {
+      return res.status(400).json({ error: 'Name, email and message are required' });
+    }
+    if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(cleanEmail)) {
+      return res.status(400).json({ error: 'Invalid email address' });
     }
 
-    const msg: Message = {
+    const msg: ContactMessage = {
       id: uuid(),
-      name,
-      email,
-      subject,
-      message,
+      name: cleanName,
+      email: cleanEmail,
+      subject: cleanSubject || 'General enquiry',
+      message: cleanMessage,
       read: false,
       createdAt: new Date().toISOString(),
     };
 
-    await writeMessage(msg);
-
+    await writeContact(msg);
     res.status(201).json({ success: true, id: msg.id });
   } catch (err: any) {
-    console.error('Failed to save message:', err.message);
-    res.status(500).json({ error: 'Failed to save message' });
+    console.error('Failed to send contact message:', err.message);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
-router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/subscribe', async (req: Request, res: Response) => {
   try {
-    const messages = await readMessages();
-    const unread = messages.filter((m) => !m.read).length;
-    res.json({ messages, unread });
-  } catch (err: any) {
-    console.error('Failed to fetch messages:', err.message);
-    res.status(500).json({ error: 'Failed to fetch messages' });
-  }
-});
-
-router.patch('/:id/read', authMiddleware, async (req: AuthRequest, res: Response) => {
-  try {
-    const updated = await markMessageRead(req.params.id);
-    if (!updated) {
-      return res.status(404).json({ error: 'Message not found' });
+    const email = (req.body.email || '').trim().toLowerCase();
+    if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(email)) {
+      return res.status(400).json({ error: 'Please provide a valid email address' });
     }
-    res.json({ success: true });
+    const added = await addSubscriber(email);
+    res.status(added ? 201 : 200).json({
+      success: true,
+      message: added ? 'Subscribed successfully' : 'You are already subscribed',
+    });
   } catch (err: any) {
-    console.error('Failed to mark message read:', err.message);
-    res.status(500).json({ error: 'Failed to update message' });
+    console.error('Failed to subscribe:', err.message);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 

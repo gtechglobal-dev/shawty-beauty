@@ -3,19 +3,17 @@ import { Routes, Route, useLocation } from 'react-router-dom'
 import Navbar from './components/layout/Navbar'
 import Footer from './components/layout/Footer'
 import Home from './pages/Home'
-import Portfolio from './pages/Portfolio'
-import Pricing from './pages/Pricing'
-import Booking from './pages/Booking'
+import Program from './pages/Program'
+import Register from './pages/Register'
+import PaymentCallback from './pages/PaymentCallback'
+import Sponsor from './pages/Sponsor'
 import Contact from './pages/Contact'
-import Blog from './pages/Blog'
 import Admin from './pages/Admin'
-import Resume from './pages/Resume'
-import Verify from './pages/Verify'
 
 export default function App() {
   const { pathname } = useLocation()
+
   const isAdmin = pathname.startsWith('/admin')
-  const isVerify = pathname.startsWith('/verify')
 
   useEffect(() => { window.scrollTo(0, 0) }, [pathname])
 
@@ -23,24 +21,17 @@ export default function App() {
     return <Admin />
   }
 
-  if (isVerify) {
-    // Pass code extracted from pathname to Verify
-    const code = pathname.split('/verify/')[1] || ''
-    return <Verify code={code} />
-  }
-
   return (
-    <div className="min-h-screen bg-ink text-[#f5f5f5] flex flex-col">
+    <div className="min-h-screen bg-cream text-ink flex flex-col">
       <Navbar />
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/portfolio" element={<Portfolio />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/booking" element={<Booking />} />
+          <Route path="/program" element={<Program />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/register/payment-callback" element={<PaymentCallback />} />
+          <Route path="/sponsor" element={<Sponsor />} />
           <Route path="/contact" element={<Contact />} />
-          <Route path="/blog" element={<Blog />} />
-          <Route path="/resume" element={<Resume />} />
         </Routes>
       </main>
       <Footer />

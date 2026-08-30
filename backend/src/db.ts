@@ -1,6 +1,6 @@
 import { MongoClient, Collection, ObjectId } from 'mongodb';
 
-const DB_NAME = 'gtech-portfolio';
+const DB_NAME = 'shawty-beauty-studio';
 
 let client: MongoClient | null = null;
 let db: ReturnType<MongoClient['db']> | null = null;
@@ -9,7 +9,7 @@ export async function connectDB(): Promise<void> {
   if (db) return;
   const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI || '';
   if (!MONGODB_URI) {
-    console.warn('MONGODB_URI not set — data will not persist');
+    console.warn('MONGODB_URI not set - data will not persist');
     return;
   }
   try {
@@ -17,8 +17,6 @@ export async function connectDB(): Promise<void> {
     await client.connect();
     db = client.db(DB_NAME);
     console.log(`Connected to MongoDB: ${DB_NAME}`);
-    const bookingCount = await db.collection('bookings').countDocuments();
-    console.log(`Existing bookings in DB: ${bookingCount}`);
   } catch (err: any) {
     console.error('MongoDB connection failed:', err.message);
     db = null;
@@ -33,38 +31,88 @@ function getCollection<T extends { _id?: ObjectId }>(name: string): Collection<T
   return db ? db.collection<T>(name) : null;
 }
 
-// ─── Booking ───────────────────────────────────────────────
+// ------------------------------------------------------------------
+// Student Registrations (ticket purchases)
+// ------------------------------------------------------------------
 
-export interface Booking {
+export type TicketType = 'early-bird' | 'student' | 'vip' | 'group';
+
+export type RegistrationStatus =
+  | 'pending'
+  | 'paid'
+  | 'approved'
+  | 'cancelled';
+
+export interface Registration {
   _id?: ObjectId;
   id: string;
-  clientName: string;
-  clientEmail: string;
-  clientPhone: string;
-  clientCountry: string;
-  serviceCategory: 'web-development' | 'graphics-design';
-  package: string;
-  description: string;
-  sampleImages?: string[];
-  status: 'pending' | 'approved' | 'completed' | 'cancelled';
+  fullName: string;
+  phone: string;
+  email: string;
+  instagram: string;
+  experienceLevel: string;
+  emergencyContact: string;
+  ticketType: TicketType;
+  quantity: number;
+  amount: number;
+  status: RegistrationStatus;
+  paystackRef?: string;
+  paystackReference?: string;
+  paymentConfirmation?: string;
+  reason: string;
+  hearAbout: string;
   createdAt: string;
+  unitPrice: number;
 }
 
-export async function readBookings(): Promise<Booking[]> {
-  const col = getCollection<Booking>('bookings');
+export async function readRegistrations(
+  filter?: Partial<Registration>,
+): Promise<Registration[]> {
+  const col = getCollection<Registration>('registrations');
   if (!col) return [];
-  const docs = await col.find().sort({ createdAt: -1 }).toArray();
+  const query: Record<string, any> = {};
+  if (filter?.status) query.status = filter.status;
+  if (filter?.ticketType) query.ticketType = filter.ticketType;
+  const docs = await col.find(query).sort({ createdAt: -1 }).toArray();
   return docs.map(({ _id, ...rest }) => rest);
 }
 
-export async function writeBooking(booking: Booking): Promise<void> {
-  const col = getCollection<Booking>('bookings');
-  if (!col) throw new Error('Database not connected');
-  await col.insertOne(booking as any);
+export async function findRegistration(id: string): Promise<Registration | null> {
+  const col = getCollection<Registration>('registrations');
+  if (!col) return null;
+  const doc = await col.findOne({ id });
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  return rest;
 }
 
-export async function updateBooking(id: string, update: Partial<Booking>): Promise<Booking | null> {
-  const col = getCollection<Booking>('bookings');
+export async function findRegistrationByReference(
+  ref: string,
+): Promise<Registration | null> {
+  const col = getCollection<Registration>('registrations');
+  if (!col) return null;
+  const doc = await col.findOne({
+    $or: [{ paystackRef: ref }, { paystackReference: ref }],
+  });
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  return rest;
+}
+
+export async function writeRegistration(reg: Registration): Promise<void> {
+  const col = getCollection<Registration>('registrations');
+  if (!col) throw new Error('Database not connected');
+  await col.insertOne({
+    ...reg,
+    status: reg.status ?? 'pending',
+  } as any);
+}
+
+export async function updateRegistration(
+  id: string,
+  update: Partial<Registration>,
+): Promise<Registration | null> {
+  const col = getCollection<Registration>('registrations');
   if (!col) return null;
   const doc = await col.findOneAndUpdate(
     { id },
@@ -76,16 +124,89 @@ export async function updateBooking(id: string, update: Partial<Booking>): Promi
   return rest;
 }
 
-export async function deleteBooking(id: string): Promise<boolean> {
-  const col = getCollection<Booking>('bookings');
+export async function deleteRegistration(id: string): Promise<boolean> {
+  const col = getCollection<Registration>('registrations');
   if (!col) return false;
   const result = await col.deleteOne({ id });
   return result.deletedCount > 0;
 }
 
-// ─── Message ───────────────────────────────────────────────
+// ------------------------------------------------------------------
+// Sponsors
+// ------------------------------------------------------------------
 
-export interface Message {
+export type SponsorPackageType =
+  | 'supporter'
+  | 'partner'
+  | 'featured'
+  | 'title'
+  | 'product'
+  | 'service'
+  | 'custom';
+
+export type SponsorStatus = 'pending' | 'confirmed' | 'cancelled';
+
+export interface Sponsor {
+  _id?: ObjectId;
+  id: string;
+  brandName: string;
+  contactName: string;
+  email: string;
+  phone: string;
+  packageType: SponsorPackageType;
+  amount: number;
+  notes: string;
+  status: SponsorStatus;
+  featured: boolean;
+  logoBase64?: string;
+  createdAt: string;
+}
+
+export async function readSponsors(): Promise<Sponsor[]> {
+  const col = getCollection<Sponsor>('sponsors');
+  if (!col) return [];
+  const docs = await col.find().sort({ createdAt: -1 }).toArray();
+  return docs.map(({ _id, ...rest }) => rest);
+}
+
+export async function writeSponsor(sp: Sponsor): Promise<void> {
+  const col = getCollection<Sponsor>('sponsors');
+  if (!col) throw new Error('Database not connected');
+  await col.insertOne({
+    ...sp,
+    status: sp.status ?? 'pending',
+    featured: sp.featured ?? false,
+  } as any);
+}
+
+export async function updateSponsor(
+  id: string,
+  update: Partial<Sponsor>,
+): Promise<Sponsor | null> {
+  const col = getCollection<Sponsor>('sponsors');
+  if (!col) return null;
+  const doc = await col.findOneAndUpdate(
+    { id },
+    { $set: update },
+    { returnDocument: 'after' },
+  );
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  return rest;
+}
+
+export async function deleteSponsor(id: string): Promise<boolean> {
+  const col = getCollection<Sponsor>('sponsors');
+  if (!col) return false;
+  const result = await col.deleteOne({ id });
+  return result.deletedCount > 0;
+}
+
+// ------------------------------------------------------------------
+// Contact / Newsletter
+// ------------------------------------------------------------------
+
+export interface ContactMessage {
   _id?: ObjectId;
   id: string;
   name: string;
@@ -96,274 +217,47 @@ export interface Message {
   createdAt: string;
 }
 
-export async function readMessages(): Promise<Message[]> {
-  const col = getCollection<Message>('messages');
+export async function readContacts(): Promise<ContactMessage[]> {
+  const col = getCollection<ContactMessage>('contacts');
   if (!col) return [];
   const docs = await col.find().sort({ createdAt: -1 }).toArray();
   return docs.map(({ _id, ...rest }) => rest);
 }
 
-export async function writeMessage(msg: Message): Promise<void> {
-  const col = getCollection<Message>('messages');
+export async function writeContact(msg: ContactMessage): Promise<void> {
+  const col = getCollection<ContactMessage>('contacts');
   if (!col) throw new Error('Database not connected');
   await col.insertOne(msg as any);
 }
 
-export async function markMessageRead(id: string): Promise<boolean> {
-  const col = getCollection<Message>('messages');
+export async function markContactRead(id: string): Promise<boolean> {
+  const col = getCollection<ContactMessage>('contacts');
   if (!col) return false;
   const result = await col.updateOne({ id }, { $set: { read: true } });
   return result.modifiedCount > 0;
 }
 
-// ─── Stats helper (used by admin) ──────────────────────────
-
-export async function getBookings(): Promise<Booking[]> {
-  return readBookings();
-}
-
-export async function getMessages(): Promise<Message[]> {
-  return readMessages();
-}
-
-// ─── Book (QR verification) ────────────────────────────────
-
-export interface Book {
+export interface Subscriber {
   _id?: ObjectId;
-  id: string;
-  title: string;
-  author: string;
-  isbn?: string;
-  publisher: string;
-  year?: string;
-  edition?: string;
-  description: string;
-  category: string;
+  email: string;
   createdAt: string;
 }
 
-export async function readBooks(): Promise<Book[]> {
-  const col = getCollection<Book>('books');
+export async function addSubscriber(email: string): Promise<boolean> {
+  const col = getCollection<Subscriber>('subscribers');
+  if (!col) throw new Error('Database not connected');
+  try {
+    await col.insertOne({ email, createdAt: new Date().toISOString() } as any);
+  } catch (e: any) {
+    if (e?.code === 11000) return false;
+    throw e;
+  }
+  return true;
+}
+
+export async function readSubscribers(): Promise<Subscriber[]> {
+  const col = getCollection<Subscriber>('subscribers');
   if (!col) return [];
   const docs = await col.find().sort({ createdAt: -1 }).toArray();
   return docs.map(({ _id, ...rest }) => rest);
-}
-
-export async function findBook(id: string): Promise<Book | null> {
-  const col = getCollection<Book>('books');
-  if (!col) return null;
-  const doc = await col.findOne({ id });
-  if (!doc) return null;
-  const { _id, ...rest } = doc;
-  return rest;
-}
-
-export async function writeBook(book: Book): Promise<void> {
-  const col = getCollection<Book>('books');
-  if (!col) throw new Error('Database not connected');
-  await col.insertOne(book as any);
-}
-
-export async function deleteBook(id: string): Promise<boolean> {
-  const col = getCollection<Book>('books');
-  if (!col) return false;
-  const result = await col.deleteOne({ id });
-  return result.deletedCount > 0;
-}
-
-// ─── QR Code ───────────────────────────────────────────────
-
-export interface ScanRecord {
-  ip: string;
-  at: string;
-  userAgent?: string;
-  device?: string;
-  browser?: string;
-  os?: string;
-  country?: string;
-  city?: string;
-}
-
-export interface QrCode {
-  _id?: ObjectId;
-  id: string;
-  code: string;
-  serial: string;
-  bookId: string;
-  bookTitle: string;
-  status: 'pending' | 'active' | 'revoked';
-  flagged?: boolean;
-  flagReason?: string | null;
-  flaggedAt?: string | null;
-  activatedAt: string | null;
-  verifyCount?: number;
-  lastVerifiedAt?: string | null;
-  recentScans?: ScanRecord[];
-  createdAt: string;
-}
-
-export async function readQrCodes(filter?: Partial<QrCode>): Promise<QrCode[]> {
-  const col = getCollection<QrCode>('qrcodes');
-  if (!col) return [];
-  const query: Record<string, any> = {};
-  if (filter?.bookId) query.bookId = filter.bookId;
-  if (filter?.status) query.status = filter.status;
-  const docs = await col.find(query).sort({ createdAt: 1 }).toArray();
-  return docs.map(({ _id, ...rest }) => rest);
-}
-
-export async function findQrCode(code: string): Promise<QrCode | null> {
-  const col = getCollection<QrCode>('qrcodes');
-  if (!col) return null;
-  const doc = await col.findOne({ code });
-  if (!doc) return null;
-  const { _id, ...rest } = doc;
-  return rest;
-}
-
-export async function writeQrCode(q: QrCode): Promise<void> {
-  const col = getCollection<QrCode>('qrcodes');
-  if (!col) throw new Error('Database not connected');
-  await col.insertOne({
-    ...q,
-    flagged: q.flagged ?? false,
-    flagReason: q.flagReason ?? null,
-    flaggedAt: q.flaggedAt ?? null,
-    verifyCount: q.verifyCount ?? 0,
-    lastVerifiedAt: q.lastVerifiedAt ?? null,
-    recentScans: q.recentScans ?? [],
-  } as any);
-}
-
-export async function activateQrCode(code: string): Promise<QrCode | null> {
-  const col = getCollection<QrCode>('qrcodes');
-  if (!col) return null;
-  const doc = await col.findOneAndUpdate(
-    { code },
-    { $set: { status: 'active', activatedAt: new Date().toISOString() } },
-    { returnDocument: 'after' },
-  );
-  if (!doc) return null;
-  const { _id, ...rest } = doc;
-  return rest;
-}
-
-export async function revokeQrCode(code: string): Promise<QrCode | null> {
-  const col = getCollection<QrCode>('qrcodes');
-  if (!col) return null;
-  const doc = await col.findOneAndUpdate(
-    { code },
-    { $set: { status: 'revoked' } },
-    { returnDocument: 'after' },
-  );
-  if (!doc) return null;
-  const { _id, ...rest } = doc;
-  return rest;
-}
-
-export async function deleteQrCode(code: string): Promise<boolean> {
-  const col = getCollection<QrCode>('qrcodes');
-  if (!col) return false;
-  const result = await col.deleteOne({ code });
-  return result.deletedCount > 0;
-}
-
-const SUSPICION_WINDOW_MS = 24 * 60 * 60 * 1000;
-const MAX_WINDOW_SCANS = 10;
-
-function parseUserAgent(ua: string): { device: string; browser: string; os: string } {
-  let device = 'Unknown';
-  let browser = 'Unknown';
-  let os = 'Unknown';
-
-  if (!ua) return { device, browser, os };
-
-  const uaLower = ua.toLowerCase();
-
-  // Device
-  if (uaLower.includes('mobile') || uaLower.includes('android') || uaLower.includes('iphone') || uaLower.includes('ipad') || uaLower.includes('ipod')) {
-    device = 'Mobile';
-  } else if (uaLower.includes('tablet')) {
-    device = 'Tablet';
-  } else {
-    device = 'Desktop';
-  }
-
-  // Browser
-  if (uaLower.includes('edg/')) browser = 'Edge';
-  else if (uaLower.includes('chrome') || uaLower.includes('crios')) browser = 'Chrome';
-  else if (uaLower.includes('firefox') || uaLower.includes('fxios')) browser = 'Firefox';
-  else if (uaLower.includes('safari') && !uaLower.includes('chrome')) browser = 'Safari';
-  else if (uaLower.includes('opera') || uaLower.includes('opr/')) browser = 'Opera';
-  else if (uaLower.includes('samsungbrowser')) browser = 'Samsung Browser';
-
-  // OS
-  if (uaLower.includes('windows')) os = 'Windows';
-  else if (uaLower.includes('mac os') || uaLower.includes('macos')) os = 'macOS';
-  else if (uaLower.includes('iphone') || uaLower.includes('ipad') || uaLower.includes('ipod')) os = 'iOS';
-  else if (uaLower.includes('android')) os = 'Android';
-  else if (uaLower.includes('linux')) os = 'Linux';
-
-  return { device, browser, os };
-}
-
-export async function recordVerification(code: string, ip: string, userAgent?: string): Promise<QrCode | null> {
-  const col = getCollection<QrCode>('qrcodes');
-  if (!col) return null;
-  const now = new Date().toISOString();
-  const nowMs = Date.now();
-
-  const { device, browser, os } = parseUserAgent(userAgent || '');
-
-  const scan: ScanRecord = {
-    ip,
-    at: now,
-    userAgent,
-    device,
-    browser,
-    os,
-  };
-
-  const doc = await col.findOne({ code });
-  if (!doc) return null;
-
-  const recent = (doc.recentScans || [])
-    .filter((s) => nowMs - new Date(s.at).getTime() <= SUSPICION_WINDOW_MS);
-  recent.push(scan);
-  const capped = recent.slice(-10);
-
-  const distinctIps = new Set(capped.map((s) => s.ip)).size;
-  const scanCount = capped.length;
-
-  const becameFlagged = !doc.flagged && (distinctIps >= 2 || scanCount >= MAX_WINDOW_SCANS);
-
-  const set: Record<string, any> = {
-    verifyCount: (doc.verifyCount || 0) + 1,
-    lastVerifiedAt: now,
-    recentScans: capped,
-  };
-  if (becameFlagged) {
-    set.flagged = true;
-    set.flagReason =
-      distinctIps >= 2
-        ? 'This serial was scanned from multiple locations within a short time — possible unauthorized duplicate.'
-        : 'Unusually high number of scans detected for this serial — possible unauthorized duplicate.';
-    set.flaggedAt = now;
-  }
-
-  const updated = await col.findOneAndUpdate(
-    { code },
-    { $set: set },
-    { returnDocument: 'after' },
-  );
-  if (!updated) return null;
-  const { _id, ...rest } = updated;
-  return rest;
-}
-
-export async function deleteQrCodesByBook(bookId: string): Promise<number> {
-  const col = getCollection<QrCode>('qrcodes');
-  if (!col) return 0;
-  const result = await col.deleteMany({ bookId });
-  return result.deletedCount || 0;
 }

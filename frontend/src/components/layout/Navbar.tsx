@@ -1,100 +1,122 @@
-import { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, ArrowLeft } from 'lucide-react';
+import { useState, useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import { Menu, X, MessageCircle } from 'lucide-react'
+import { siteConfig } from '../../lib/constants'
 
 const links = [
   { to: '/', label: 'Home' },
-  { to: '/portfolio', label: 'Sample Jobs' },
-  { to: '/pricing', label: 'Pricing' },
-  { to: '/booking', label: 'Book' },
-  { to: '/resume', label: 'Resume' },
+  { to: '/#services', label: 'Services', hash: true },
+  { to: '/program', label: 'The Program' },
+  { to: '/sponsor', label: 'Sponsor' },
   { to: '/contact', label: 'Contact' },
-];
-
-const extraLinks = [
-  { to: '/admin', label: 'Admin' },
-];
+]
 
 export default function Navbar() {
-  const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const { pathname } = useLocation();
-  const navigate = useNavigate();
+  const [open, setOpen] = useState(false)
+  const { pathname } = useLocation()
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+    setOpen(false)
+  }, [pathname])
 
-  useEffect(() => { setOpen(false); }, [pathname]);
+  const isActive = (to: string, hash?: boolean) => {
+    if (hash) return false
+    return pathname === to
+  }
 
   return (
-    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-      scrolled ? 'bg-ink shadow-lg shadow-black/20 border-b border-white/[0.06]' : 'bg-ink/85 backdrop-blur-xl'
-    }`}>
-      <div className="container flex items-center justify-between h-16 px-6 md:px-8">
-        <div className="flex items-center gap-2.5">
-          {pathname !== '/' && (
-            <button onClick={() => navigate(-1)}
-              className="p-1.5 -ml-1 rounded-md text-muted hover:text-white hover:bg-white/[0.06] transition-colors">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-          )}
-          <Link to="/" className="flex items-center gap-2.5">
-            <img src="/gtechlogo.png" alt="" className="w-7 md:w-8 object-contain" />
-            <img src="/gtechName2.png" alt="Gtech Global" className="w-[72px] md:w-20 h-auto object-contain hidden sm:block" />
-          </Link>
-        </div>
+    <header className="sticky top-0 z-50 bg-cream/90 backdrop-blur-md border-b border-black/5">
+      <div className="container flex items-center justify-between h-16 md:h-[72px] gap-3">
+        <Link to="/" className="flex items-center gap-2.5 shrink-0" onClick={() => setOpen(false)}>
+          <span className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-rose to-gold flex items-center justify-center text-white font-display text-lg md:text-xl font-bold">
+            S
+          </span>
+          <span className="font-display text-lg md:text-xl font-semibold leading-tight">
+            Shawty <span className="gradient-text">Beauty Studio</span>
+          </span>
+        </Link>
 
-        <nav className="hidden md:flex items-center gap-0.5">
-          {links.map((l) => (
-            <Link key={l.to} to={l.to}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                pathname === l.to ? 'text-white bg-white/[0.08]' : 'text-muted hover:text-white'
-              }`}>
-              {l.label}
-            </Link>
-          ))}
-          <span className="w-px h-4 bg-white/[0.08] mx-1" />
-          {extraLinks.map((l) => (
-            <Link key={l.to} to={l.to}
-              className={`px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
-                pathname.startsWith(l.to) ? 'text-[#a855f7] bg-[#a855f7]/10' : 'text-muted hover:text-[#a855f7]'
-              }`}>
-              {l.label}
-            </Link>
-          ))}
+        <nav className="hidden md:flex items-center gap-1">
+          {links.map((l) =>
+            l.hash ? (
+              <a
+                key={l.to}
+                href={l.to}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
+                  'text-ink/70 hover:text-rose-dark hover:bg-black/5'
+                }`}
+              >
+                {l.label}
+              </a>
+            ) : (
+              <Link
+                key={l.to}
+                to={l.to}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
+                  isActive(l.to)
+                    ? 'text-rose-dark bg-blush'
+                    : 'text-ink/70 hover:text-rose-dark hover:bg-black/5'
+                }`}
+              >
+                {l.label}
+              </Link>
+            ),
+          )}
+          <a
+            href={siteConfig.whatsapp}
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-primary ml-2 !py-2.5 !px-5"
+          >
+            <MessageCircle size={16} /> Book a Session
+          </a>
         </nav>
 
-        <button onClick={() => setOpen(!open)} className="md:hidden p-2 text-muted hover:text-white transition-colors">
-          {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        <button
+          className="md:hidden p-2 -mr-1 text-ink"
+          onClick={() => setOpen((o) => !o)}
+          aria-label="Toggle menu"
+        >
+          {open ? <X size={26} /> : <Menu size={26} />}
         </button>
       </div>
 
       {open && (
-        <div className="md:hidden border-t border-white/[0.06] bg-ink">
-          <div className="px-6 py-3 space-y-0.5">
-            {links.map((l) => (
-              <Link key={l.to} to={l.to}
-                className={`block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === l.to ? 'text-white bg-white/[0.08]' : 'text-muted'
-                }`}>
+        <nav className="md:hidden px-5 pb-6 pt-2 space-y-1 border-t border-black/5 bg-cream/95 backdrop-blur-md">
+          {links.map((l) =>
+            l.hash ? (
+              <a
+                key={l.to}
+                href={l.to}
+                onClick={() => setOpen(false)}
+                className={`block px-4 py-3 rounded-lg text-[15px] font-medium text-ink/75`}
+              >
+                {l.label}
+              </a>
+            ) : (
+              <Link
+                key={l.to}
+                to={l.to}
+                onClick={() => setOpen(false)}
+                className={`block px-4 py-3 rounded-lg text-[15px] font-medium ${
+                  isActive(l.to) ? 'text-rose-dark bg-blush' : 'text-ink/75'
+                }`}
+              >
                 {l.label}
               </Link>
-            ))}
-            <hr className="my-1 border-white/[0.06]" />
-            {extraLinks.map((l) => (
-              <Link key={l.to} to={l.to}
-                className={`block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  pathname.startsWith(l.to) ? 'text-[#a855f7] bg-[#a855f7]/10' : 'text-muted'
-                }`}>
-                {l.label}
-              </Link>
-            ))}
-          </div>
-        </div>
+            ),
+          )}
+          <a
+            href={siteConfig.whatsapp}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => setOpen(false)}
+            className="btn btn-primary w-full mt-3"
+          >
+            <MessageCircle size={18} /> Book a Session on WhatsApp
+          </a>
+        </nav>
       )}
     </header>
-  );
+  )
 }
