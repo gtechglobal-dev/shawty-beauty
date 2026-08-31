@@ -5,9 +5,9 @@ import { siteConfig } from '../../lib/constants'
 
 const links = [
   { to: '/', label: 'Home' },
-  { to: '/#services', label: 'Services', hash: true },
-  { to: '/program', label: 'The Program' },
-  { to: '/sponsor', label: 'Sponsor' },
+  { to: '/#services', label: 'Our Services', hash: true },
+  { to: '/program', label: 'Our Events' },
+  { to: '/sponsor', label: 'Our Sponsors' },
   { to: '/contact', label: 'Contact' },
 ]
 

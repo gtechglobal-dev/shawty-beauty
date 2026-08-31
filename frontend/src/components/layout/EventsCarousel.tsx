@@ -92,8 +92,8 @@ export default function EventsCarousel() {
             {slides.map((s, i) => (
               <div key={i} className="w-full shrink-0">
                 <div className={`relative h-52 sm:h-72 md:h-80 w-full ${s.faint ? 'bg-gradient-to-br from-rose-dark via-rose to-gold' : ''}`}>
-                  <img src={s.image} alt={s.title} className={`absolute inset-0 w-full h-full object-cover ${s.faint ? 'opacity-40' : ''}`} loading="lazy" decoding="async" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                  <img src={s.image} alt={s.title} className={`absolute inset-0 w-full h-full object-cover ${s.faint ? 'opacity-100' : ''}`} loading="lazy" decoding="async" />
+                  <div className={`absolute inset-0 bg-gradient-to-t ${s.faint ? 'from-black/85 via-black/50 to-black/20' : 'from-black/70 via-black/20 to-transparent'}`} />
                   <div className="absolute left-0 right-0 bottom-0 p-5 md:p-8 text-white">
                     <span className="inline-flex items-center gap-2 text-xs font-semibold bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full mb-2">
                       <SparkleDot /> {s.kicker}

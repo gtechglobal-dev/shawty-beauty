@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { createHmac } from 'crypto';
 import { v4 as uuid } from 'uuid';
 import {
   writeRegistration,
@@ -62,6 +63,7 @@ interface InitBody {
   quantity?: number;
   reason?: string;
   hearAbout?: string;
+  origin?: string;
 }
 
 // Initiate payment: creates a pending registration and returns a Paystack
@@ -133,7 +135,7 @@ router.post('/initialize', async (req: Request, res: Response) => {
         amount: (amountUnit * 100).toString(),
         currency: 'NGN',
         reference: `SBS-${registrationId}`,
-        callback_url: `${process.env.BASE_URL || 'http://localhost:5173'}/register/payment-callback`,
+        callback_url: `${body.origin || process.env.BASE_URL || 'http://localhost:5173'}/register/payment-callback`,
         metadata: {
           registrationId,
           ticketType: ticket.id,
@@ -163,7 +165,10 @@ router.post('/initialize', async (req: Request, res: Response) => {
       success: true,
       message: 'Payment initialized',
       registrationId,
-      paystack: data.data,
+      paystack: {
+        ...data.data,
+        amount: amountUnit * 100,
+      },
     });
   } catch (err: any) {
     console.error('Paystack initialize failed:', err.message);
@@ -219,6 +224,49 @@ router.post('/verify', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('Paystack verify failed:', err.message);
     res.status(500).json({ error: 'Failed to verify payment' });
+  }
+});
+
+// Webhook: Paystack calls this when a transaction status changes.
+// Unlike the callback (browser-dependent), this fires server-side and is
+// the most reliable way to confirm payment.
+router.post('/webhook', async (req: Request, res: Response) => {
+  try {
+    // --- Verify signature ---
+    const signature = req.headers['x-paystack-signature'] as string | undefined;
+    if (!PAYSTACK_SECRET || !signature) {
+      return res.status(400).json({ error: 'Missing signature' });
+    }
+    const rawBody = (req as any).rawBody as Buffer | undefined;
+    if (!rawBody) {
+      return res.status(400).json({ error: 'Missing raw body' });
+    }
+    const hash = createHmac('sha512', PAYSTACK_SECRET).update(rawBody).digest('hex');
+    if (hash !== signature) {
+      return res.status(400).json({ error: 'Invalid signature' });
+    }
+
+    const event = req.body as { event: string; data: any };
+
+    if (event.event === 'charge.success') {
+      const ref = event.data?.reference as string | undefined;
+      if (ref) {
+        const reg = await findRegistrationByReference(ref);
+        if (reg && reg.status !== 'paid') {
+          await updateRegistration(reg.id, {
+            status: 'paid',
+            paystackReference: ref,
+          });
+          console.log(`Webhook: registration ${reg.id} marked as paid (ref ${ref})`);
+        }
+      }
+    }
+
+    // Always return 200 so Paystack doesn't retry
+    res.status(200).json({ received: true });
+  } catch (err: any) {
+    console.error('Paystack webhook error:', err.message);
+    res.status(200).json({ received: true });
   }
 });
 

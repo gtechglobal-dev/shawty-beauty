@@ -57,13 +57,13 @@ export default function PhoneInput({ value, onChange }: Props) {
   const placeholder = country.max >= 10 ? '8012345678' : '123456789'
 
   return (
-    <div className="flex items-stretch input-field !p-0 overflow-hidden">
+    <div className="flex items-stretch input-field !p-0 overflow-hidden min-w-0">
       <div className="relative shrink-0">
         <select
           value={dial}
           onChange={(e) => changeDial(e.target.value)}
           aria-label="Country code"
-          className="appearance-none bg-white pl-3 pr-8 py-3 h-full text-[0.9rem] font-medium outline-none cursor-pointer border-r border-black/10"
+          className="appearance-none bg-white pl-2 pr-7 py-3 h-full text-[0.9rem] font-medium outline-none cursor-pointer border-r border-black/10"
         >
           {countries.map((c) => (
             <option key={c.code} value={c.dial}>

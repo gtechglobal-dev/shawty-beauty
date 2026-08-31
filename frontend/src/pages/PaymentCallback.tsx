@@ -33,10 +33,13 @@ export default function PaymentCallback() {
           <CircleCheck className="mx-auto text-green-500 mb-4" size={56} />
           <h1 className="section-title text-2xl mb-3">Payment Successful!</h1>
           <p className="text-ink/70 mb-6">
-            Thank you! Your registration is confirmed. We’ll be in touch with further details about
-            the program, including the venue and exact date.
+            Thank you! Your registration is confirmed. A confirmation email has been sent to you.
+            Kindly join the WhatsApp community with the link below. Welcome Onboard!
           </p>
-          <Link to="/" className="btn btn-primary">Back to Home</Link>
+          <a href="https://chat.whatsapp.com/LsEBJJVVFAJ0rSr8bsx8Sq" target="_blank" rel="noopener noreferrer" className="btn btn-primary mb-3">
+            Join WhatsApp Community
+          </a>
+          <Link to="/" className="btn btn-outline">Back to Home</Link>
         </div>
       )}
 

@@ -107,9 +107,21 @@ export default function Register() {
         quantity: form.quantity,
         reason: form.reason,
         hearAbout: form.hearAbout,
+        origin: window.location.origin,
       })
 
       // 2. Open Paystack inline checkout
+      const isMobile = window.matchMedia('(max-width: 767px)').matches
+
+      if (isMobile) {
+        // Mobile: redirect the current tab to Paystack (the JS callback
+        // doesn't fire for handler.open(), so we rely on callback_url).
+        setSuccess(true)
+        window.location.href = paystack.authorization_url
+        return
+      }
+
+      // Desktop: open the Paystack iframe popup
       const handler = window.PaystackPop.setup({
         key: config.publicKey,
         email: form.email,
@@ -118,7 +130,6 @@ export default function Register() {
         currency: 'NGN',
         metadata: paystack.metadata,
         callback: (response: { reference: string }) => {
-          // After payment, navigate to verify via callback page
           navigate(`/register/payment-callback?reference=${response.reference}`)
         },
         onClose: () => {
@@ -126,15 +137,8 @@ export default function Register() {
           setSuccess(false)
         },
       })
-// Paystack inline iframe is unreliable on phones (card/bank redirects
-        // need a real tab), so open a new tab on mobile devices.
-        const isMobile = window.matchMedia('(max-width: 767px)').matches
-        if (isMobile) {
-          handler.open()
-        } else {
-          handler.openIframe()
-        }
-        setSuccess(true)
+      handler.openIframe()
+      setSuccess(true)
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.')
       setLoading(false)
@@ -177,8 +181,10 @@ export default function Register() {
 
   return (
     <div>
-      <section className="sticky top-16 md:top-[72px] z-30 shadow-lg relative overflow-hidden bg-gradient-to-br from-rose-dark via-rose to-gold">
-        <div className="container py-8 md:py-10 text-center">
+      <section className="shadow-lg relative overflow-hidden bg-gradient-to-br from-rose-dark via-rose to-gold">
+        <img src="/images/carousel/event.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/70 to-black/40" />
+        <div className="container py-8 md:py-10 text-center relative">
           <h1 className="font-display text-3xl md:text-5xl font-bold text-white leading-tight mb-2">
             3-Days Beginner Makeup Class
           </h1>
@@ -190,9 +196,9 @@ export default function Register() {
         </div>
       </section>
 
-      <div className="container section-pad grid lg:grid-cols-[1fr_380px] gap-8 lg:gap-10 items-start">
+      <div className="container section-pad grid lg:grid-cols-[1fr_380px] gap-8 lg:gap-10 items-start min-w-0">
         {/* FORM */}
-        <form onSubmit={handleManualRegister} className="card p-6 sm:p-8">
+        <form onSubmit={handleManualRegister} className="card p-6 sm:p-8 min-w-0">
           <h2 className="font-display text-xl md:text-2xl font-bold mb-5">
             Provide the following Info
           </h2>
@@ -328,14 +334,14 @@ export default function Register() {
                         className="sr-only"
                         required
                       />
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="flex items-center gap-2">
-                          <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${checked ? 'border-rose' : 'border-ink/30'}`}>
+                      <span className="flex items-center justify-between gap-2 min-w-0">
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${checked ? 'border-rose' : 'border-ink/30'}`}>
                             {checked && <span className="w-2 h-2 rounded-full bg-rose" />}
                           </span>
-                          <span className="font-semibold text-sm">{t.label}</span>
+                          <span className="font-semibold text-sm leading-tight">{t.label}</span>
                         </span>
-                        <span className="text-sm font-bold">{formatNgn(t.price)}</span>
+                        <span className="text-sm font-bold shrink-0">{formatNgn(t.price)}</span>
                       </span>
                       {isEarlyBird ? (
                         earlyBirdExpired ? (
@@ -388,7 +394,7 @@ export default function Register() {
         </form>
 
         {/* SUMMARY SIDEBAR */}
-        <aside className="space-y-6">
+        <aside className="space-y-6 min-w-0">
           <div className="card p-6">
             <h3 className="font-semibold mb-4">Order Summary</h3>
             <div className="flex items-center justify-between text-sm mb-2">
