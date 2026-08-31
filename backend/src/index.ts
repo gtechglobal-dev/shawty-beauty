@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { connectDB, isDbConnected } from './db.js';
 import authRouter from './routes/auth.js';
 import adminRouter from './routes/admin.js';
@@ -13,6 +13,8 @@ import sponsorsRouter from './routes/sponsors.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
+
+app.set('trust proxy', 1);
 
 app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173' }));
 app.use(express.json({ limit: '50mb' }));
@@ -45,9 +47,18 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const frontendDist = resolve(__dirname, '..', '..', 'frontend', 'dist');
 
 if (existsSync(frontendDist)) {
-  app.use(express.static(frontendDist));
-  app.get('*', (_req, res) => {
-    res.sendFile(resolve(frontendDist, 'index.html'));
+  app.use(express.static(frontendDist, { index: false, redirect: false }));
+  app.get('*', (req, res) => {
+    const indexFile = resolve(frontendDist, 'index.html');
+    if (!existsSync(indexFile)) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    // Fill in the live origin so social-media crawlers (WhatsApp, Telegram,
+    // Facebook, X) get absolute og:url / og:image links on whatever domain
+    // this is served from (localhost, Render, etc.).
+    const origin = `${req.protocol}://${req.get('host')}`;
+    const html = readFileSync(indexFile, 'utf8').split('__BASE_URL__').join(origin);
+    res.type('html').send(html);
   });
 }
 

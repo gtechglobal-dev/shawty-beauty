@@ -97,8 +97,15 @@ export default function Register() {
           setSuccess(false)
         },
       })
-      handler.openIframe()
-      setSuccess(true)
+// Paystack inline iframe is unreliable on phones (card/bank redirects
+        // need a real tab), so open a new tab on mobile devices.
+        const isMobile = window.matchMedia('(max-width: 767px)').matches
+        if (isMobile) {
+          handler.open()
+        } else {
+          handler.openIframe()
+        }
+        setSuccess(true)
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.')
       setLoading(false)

@@ -3,7 +3,7 @@ import { apiUrl } from '../lib/constants'
 declare global {
   interface Window {
     PaystackPop?: {
-      setup: (opts: any) => { openIframe: () => void }
+      setup: (opts: any) => { openIframe: () => void; open: () => void }
     }
   }
 }
