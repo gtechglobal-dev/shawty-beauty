@@ -10,6 +10,7 @@ import {
   Package,
 } from 'lucide-react'
 import { formatNgn, program, tickets } from '../lib/constants'
+import Reveal from '../components/Reveal'
 
 export default function Program() {
   return (
@@ -17,38 +18,43 @@ export default function Program() {
       {/* Header */}
       <section className="bg-gradient-to-br from-blush via-cream to-white">
         <div className="container py-12 md:py-20 text-center">
-          <span className="eyebrow mb-4">Hosted by Shawty Beauty Studio</span>
-          <h1 className="section-title text-4xl md:text-5xl mb-4">{program.title}</h1>
-          <p className="font-display italic text-xl text-ink/70 mb-10">“{program.theme}”</p>
+          <Reveal variant="up">
+            <span className="eyebrow mb-4">Hosted by Shawty Beauty Studio</span>
+            <h1 className="section-title text-4xl md:text-5xl mb-4">{program.title}</h1>
+            <p className="font-display italic text-xl text-ink/70 mb-10">“{program.theme}”</p>
+          </Reveal>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
-            <div className="flex items-center gap-3 card px-5 py-4">
-              <CalendarDays className="text-rose shrink-0" />
-              <div className="text-left">
-                <div className="text-sm font-semibold">{program.dates}</div>
-                <div className="text-xs text-muted">February 2027</div>
+          <Reveal variant="up" delay={150}>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
+              <div className="flex items-center gap-3 card px-5 py-4 card-hover">
+                <CalendarDays className="text-rose shrink-0" />
+                <div className="text-left">
+                  <div className="text-sm font-semibold">{program.dates}</div>
+                  <div className="text-xs text-muted">February 2027</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 card px-5 py-4 card-hover">
+                <Clock className="text-rose shrink-0" />
+                <div className="text-left">
+                  <div className="text-sm font-semibold">{program.time.morning} / {program.time.evening}</div>
+                  <div className="text-xs text-muted">Morning & Evening sections</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 card px-5 py-4 card-hover">
+                <MapPin className="text-rose shrink-0" />
+                <div className="text-left">
+                  <div className="text-sm font-semibold">Venue TBA</div>
+                  <div className="text-xs text-muted">Disclosed after purchase</div>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-3 card px-5 py-4">
-              <Clock className="text-rose shrink-0" />
-              <div className="text-left">
-                <div className="text-sm font-semibold">{program.time.morning} / {program.time.evening}</div>
-                <div className="text-xs text-muted">Morning & Evening sections</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 card px-5 py-4">
-              <MapPin className="text-rose shrink-0" />
-              <div className="text-left">
-                <div className="text-sm font-semibold">Venue TBA</div>
-                <div className="text-xs text-muted">Disclosed after purchase</div>
-              </div>
-            </div>
-          </div>
+          </Reveal>
         </div>
       </section>
 
       <div className="container section-pad space-y-14 md:space-y-20">
         {/* Who it's for */}
+        <Reveal variant="up">
         <section>
           <span className="eyebrow">Who it's for</span>
           <h2 className="section-title mt-3 mb-6">Made for you</h2>
@@ -58,25 +64,31 @@ export default function Program() {
             ))}
           </div>
         </section>
+        </Reveal>
 
         {/* What you'll learn */}
         <section>
-          <span className="eyebrow">Curriculum</span>
-          <h2 className="section-title mt-3 mb-2">What participants will learn</h2>
-          <p className="text-ink/70 mb-8 max-w-2xl">{program.plus}</p>
+          <Reveal variant="left">
+            <span className="eyebrow">Curriculum</span>
+            <h2 className="section-title mt-3 mb-2">What participants will learn</h2>
+            <p className="text-ink/70 mb-8 max-w-2xl">{program.plus}</p>
+          </Reveal>
           <div className="grid md:grid-cols-2 gap-4">
-            {program.learn.map((item) => (
-              <div key={item} className="card p-6 flex items-start gap-3">
-                <CircleCheck className="text-rose shrink-0 mt-0.5" size={22} />
-                <span className="text-ink/80">{item}</span>
-              </div>
+            {program.learn.map((item, i) => (
+              <Reveal key={item} variant="zoom" delay={i * 80}>
+                <div className="card p-6 flex items-start gap-3 card-hover">
+                  <CircleCheck className="text-rose shrink-0 mt-0.5" size={22} />
+                  <span className="text-ink/80">{item}</span>
+                </div>
+              </Reveal>
             ))}
           </div>
         </section>
 
         {/* Difference */}
         <section className="grid md:grid-cols-2 gap-10 items-start">
-          <div className="card p-8">
+          <Reveal variant="left">
+          <div className="card p-8 card-hover">
             <div className="w-12 h-12 rounded-xl bg-blush flex items-center justify-center mb-4">
               <Lightbulb className="text-rose-dark" size={22} />
             </div>
@@ -88,8 +100,10 @@ export default function Program() {
               <strong className="text-rose-dark">Beauty CEO</strong>.
             </p>
           </div>
+          </Reveal>
 
-          <div className="card p-8">
+          <Reveal variant="right">
+          <div className="card p-8 card-hover">
             <div className="w-12 h-12 rounded-xl bg-blush flex items-center justify-center mb-4">
               <Package className="text-rose-dark" size={22} />
             </div>
@@ -98,16 +112,20 @@ export default function Program() {
               Participants should come with their own personal makeup products and tools.
             </p>
           </div>
+          </Reveal>
         </section>
 
         {/* Ticket options */}
         <section>
-          <span className="eyebrow">Registration / Tickets</span>
-          <h2 className="section-title mt-3 mb-2">Choose your ticket</h2>
-          <p className="text-ink/70 mb-10">The exact date and details will be communicated. Venue is disclosed to registered students after ticket purchase.</p>
+          <Reveal variant="up">
+            <span className="eyebrow">Registration / Tickets</span>
+            <h2 className="section-title mt-3 mb-2">Choose your ticket</h2>
+            <p className="text-ink/70 mb-10">The exact date and details will be communicated. Venue is disclosed to registered students after ticket purchase.</p>
+          </Reveal>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {tickets.map((t) => (
-              <div key={t.id} className={`card p-6 flex flex-col ${t.highlighted ? 'ring-2 ring-rose' : ''}`}>
+            {tickets.map((t, i) => (
+              <Reveal key={t.id} variant="zoom" delay={i * 100}>
+              <div className={`card p-6 flex flex-col card-hover ${t.highlighted ? 'ring-2 ring-rose border-glow' : ''}`}>
                 <span className="text-sm font-semibold text-rose-dark">{t.label}</span>
                 <div className="mt-2 mb-4">
                   <span className="font-display text-4xl font-bold">{formatNgn(t.price)}</span>
@@ -125,11 +143,13 @@ export default function Program() {
                   Get {t.label}
                 </Link>
               </div>
+              </Reveal>
             ))}
           </div>
         </section>
 
         {/* CTA */}
+        <Reveal variant="zoom">
         <div className="text-center">
           <Sparkles className="mx-auto text-rose mb-4" size={30} />
           <h2 className="section-title mb-4">Ready to begin your beauty journey?</h2>
@@ -137,6 +157,7 @@ export default function Program() {
             Register Now <ArrowRight size={18} />
           </Link>
         </div>
+        </Reveal>
       </div>
     </div>
   )

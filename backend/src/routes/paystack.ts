@@ -3,14 +3,18 @@ import { createHmac } from 'crypto';
 import { v4 as uuid } from 'uuid';
 import {
   writeRegistration,
+  findRegistration,
   findRegistrationByReference,
   updateRegistration,
   type Registration,
   type TicketType,
 } from '../db.js';
+import { sendTelegramMessage, sendTelegramPhoto, telegramConfigured, escapeHtml } from '../lib/telegram.js';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || '';
 const PAYSTACK_BASE = 'https://api.paystack.co';
+const PROCESSING_FEE_RATE = 0.015; // 1.5% of ticket amount
+const PROCESSING_FEE_BASE = 100; // + ₦100 fixed
 
 const router = Router();
 
@@ -63,7 +67,112 @@ interface InitBody {
   quantity?: number;
   reason?: string;
   hearAbout?: string;
+  photoBase64?: string;
   origin?: string;
+}
+
+function ageFromDob(dob?: string): string | null {
+  if (!dob) return null;
+  const birth = new Date(dob);
+  if (isNaN(birth.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const m = now.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) {
+    age -= 1;
+  }
+  if (age < 0) return null;
+  return `${age} years`;
+}
+
+// Send one Telegram message per registration, only when payment is confirmed.
+// Deduplicated by telegramPaidNotified so it never fires twice (even if both
+// the verify endpoint and the webhook land for the same transaction).
+async function notifyPaidRegistration(reg: Registration): Promise<void> {
+  if (!telegramConfigured()) return;
+
+  // Re-read the current record to make the dedup guard reliable across the
+  // verify endpoint and webhook which can both mark the same reg as paid.
+  const latest = reg.telegramPaidNotified
+    ? reg
+    : (await findRegistration(reg.id)) ?? reg;
+  if (latest.telegramPaidNotified) return;
+
+  const claimed = await updateRegistration(
+    reg.id,
+    { telegramPaidNotified: true },
+  );
+  if (!claimed) return;
+
+  const msg = buildRegistrationMsg({
+    fullName: reg.fullName,
+    phone: reg.phone,
+    email: reg.email,
+    instagram: reg.instagram,
+    ticketLabel: TICKETS[reg.ticketType]?.label || reg.ticketType,
+    quantity: reg.quantity,
+    subtotal: reg.subtotal || reg.unitPrice * reg.quantity,
+    processingFee: reg.processingFee || 0,
+    totalAmount: reg.amount,
+    nationality: reg.nationality,
+    state: reg.state,
+    dob: reg.dateOfBirth,
+    experienceLevel: reg.experienceLevel,
+    reason: reg.reason,
+    hearAbout: reg.hearAbout,
+    status: '✅ PAID - Payment confirmed',
+  });
+
+  if (reg.photoBase64) {
+    sendTelegramPhoto(reg.photoBase64, msg)
+      .then((ok) => { if (!ok) sendTelegramMessage(msg).catch(() => {}); })
+      .catch(() => sendTelegramMessage(msg).catch(() => {}));
+  } else {
+    sendTelegramMessage(msg).catch(() => {});
+  }
+}
+
+function buildRegistrationMsg(opts: {
+  fullName: string;
+  phone: string;
+  email: string;
+  instagram?: string;
+  ticketLabel: string;
+  quantity: number;
+  subtotal: number;
+  processingFee: number;
+  totalAmount: number;
+  nationality?: string;
+  state?: string;
+  dob?: string;
+  experienceLevel?: string;
+  reason?: string;
+  hearAbout?: string;
+  status: string;
+}): string {
+  const age = ageFromDob(opts.dob);
+  const feeNote = opts.processingFee > 0
+    ? `${(opts.subtotal * 0.015).toFixed(2)} (1.5%) + 100`
+    : '0';
+  return [
+    `<b>🎟️ New Ticket Registration</b>`,
+    ``,
+    `<b>Name:</b> ${escapeHtml(opts.fullName)}`,
+    `<b>Phone:</b> ${escapeHtml(opts.phone)}`,
+    `<b>Email:</b> ${escapeHtml(opts.email)}`,
+    opts.instagram ? `<b>Instagram:</b> ${escapeHtml(opts.instagram)}` : '',
+    `<b>Ticket:</b> ${escapeHtml(opts.ticketLabel)} × ${opts.quantity}`,
+    `<b>Ticket amount:</b> ₦${opts.subtotal.toLocaleString()}`,
+    `<b>Processing fee:</b> ₦${feeNote}`,
+    `<b>Total:</b> ₦${opts.totalAmount.toLocaleString()}`,
+    opts.nationality ? `<b>Nationality:</b> ${escapeHtml(opts.nationality)}` : '',
+    opts.state ? `<b>State:</b> ${escapeHtml(opts.state)}` : '',
+    age ? `<b>Age:</b> ${escapeHtml(age)}` : opts.dob ? `<b>DOB:</b> ${escapeHtml(opts.dob)}` : '',
+    opts.experienceLevel ? `<b>Experience:</b> ${escapeHtml(opts.experienceLevel)}` : '',
+    opts.reason ? `<b>What you hope to learn:</b> ${escapeHtml(opts.reason)}` : '',
+    opts.hearAbout ? `<b>How you heard:</b> ${escapeHtml(opts.hearAbout)}` : '',
+    `<b>Status:</b> ${escapeHtml(opts.status)}`,
+  ].filter(Boolean).join('\n');
 }
 
 // Initiate payment: creates a pending registration and returns a Paystack
@@ -96,7 +205,9 @@ router.post('/initialize', async (req: Request, res: Response) => {
       });
     }
 
-    const amountUnit = ticket.price * quantity; // in kobo-aware naira (naira * 100 only at paystack)
+    const subtotal = ticket.price * quantity; // naira
+    const processingFee = Math.round(subtotal * PROCESSING_FEE_RATE) + PROCESSING_FEE_BASE;
+    const totalAmount = subtotal + processingFee; // naira
 
     const registrationId = uuid();
     const reg: Registration = {
@@ -114,10 +225,13 @@ router.post('/initialize', async (req: Request, res: Response) => {
       ticketType,
       quantity,
       unitPrice: ticket.price,
-      amount: ticket.price * quantity,
+      subtotal,
+      processingFee,
+      amount: totalAmount,
       status: 'pending',
       reason: (body.reason || '').trim(),
       hearAbout: (body.hearAbout || '').trim(),
+      photoBase64: (body.photoBase64 || '').trim(),
       createdAt: new Date().toISOString(),
     };
 
@@ -132,7 +246,7 @@ router.post('/initialize', async (req: Request, res: Response) => {
       },
       body: JSON.stringify({
         email,
-        amount: (amountUnit * 100).toString(),
+        amount: (totalAmount * 100).toString(),
         currency: 'NGN',
         reference: `SBS-${registrationId}`,
         callback_url: `${body.origin || process.env.BASE_URL || 'http://localhost:5173'}/register/payment-callback`,
@@ -167,7 +281,7 @@ router.post('/initialize', async (req: Request, res: Response) => {
       registrationId,
       paystack: {
         ...data.data,
-        amount: amountUnit * 100,
+        amount: totalAmount * 100,
       },
     });
   } catch (err: any) {
@@ -200,11 +314,15 @@ router.post('/verify', async (req: Request, res: Response) => {
     const reg = await findRegistrationByReference(reference);
 
     if (reg) {
-      if (data.data.status === 'success') {
-        await updateRegistration(reg.id, {
+      if (data.data.status === 'success' && reg.status !== 'paid') {
+        const paid = await updateRegistration(reg.id, {
           status: 'paid',
           paystackReference: reference,
         });
+        // Notify the studio once that this registration is now PAID
+        if (paid) {
+          notifyPaidRegistration(paid).catch(() => {});
+        }
       }
       return res.json({
         success: true,
@@ -253,11 +371,14 @@ router.post('/webhook', async (req: Request, res: Response) => {
       if (ref) {
         const reg = await findRegistrationByReference(ref);
         if (reg && reg.status !== 'paid') {
-          await updateRegistration(reg.id, {
+          const paid = await updateRegistration(reg.id, {
             status: 'paid',
             paystackReference: ref,
           });
           console.log(`Webhook: registration ${reg.id} marked as paid (ref ${ref})`);
+          if (paid) {
+            notifyPaidRegistration(paid).catch(() => {});
+          }
         }
       }
     }

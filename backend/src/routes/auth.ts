@@ -5,8 +5,10 @@ import { generateToken } from '../middleware/auth.js';
 const router = Router();
 
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+// Fallback only used if ADMIN_PASSWORD is missing from the environment.
+// Set ADMIN_PASSWORD in the deployment environment for a real password.
 const ADMIN_PASSWORD_HASH = bcrypt.hashSync(
-  process.env.ADMIN_PASSWORD || 'shawty2026',
+  process.env.ADMIN_PASSWORD || 'replace-with-a-strong-password',
   10,
 );
 

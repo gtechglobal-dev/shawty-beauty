@@ -10,6 +10,7 @@ import adminRouter from './routes/admin.js';
 import contactRouter from './routes/contact.js';
 import paystackRouter from './routes/paystack.js';
 import sponsorsRouter from './routes/sponsors.js';
+import { startTelegramAdminBot } from './lib/telegramAdminBot.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -70,10 +71,12 @@ connectDB()
     app.listen(PORT, () => {
       console.log(`Shawty Beauty Studio API running on http://localhost:${PORT}`);
     });
+    startTelegramAdminBot();
   })
   .catch((err) => {
     console.error('Failed to connect to MongoDB:', err.message);
     app.listen(PORT, () => {
       console.log(`Shawty Beauty Studio API running on http://localhost:${PORT} (NO DB)`);
     });
+    startTelegramAdminBot();
   });

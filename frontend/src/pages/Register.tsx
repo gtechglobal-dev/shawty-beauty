@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CircleCheck, LoaderCircle, CreditCard, CircleAlert, Timer } from 'lucide-react'
+import { CircleCheck, LoaderCircle, CreditCard, CircleAlert, Timer, Image as ImageIcon } from 'lucide-react'
 import { formatNgn, nationalities, nationalityNames, tickets, type Ticket } from '../lib/constants'
 import { postJson } from '../lib/api'
 import { fetchPaystackConfig, loadPaystackScript, type PaystackConfig } from '../lib/paystack'
 import PhoneInput from '../components/PhoneInput'
+import Reveal from '../components/Reveal'
 
 interface FormState {
   fullName: string
@@ -42,6 +43,8 @@ const initial: FormState = {
 
 const experienceOptions = ['None / Beginner', 'Some experience', 'Intermediate', 'Advanced']
 const hearOptions = ['Instagram', 'Facebook', 'WhatsApp', 'Friend / Word of mouth', 'Flyer / Advert', 'Other']
+const PROCESSING_FEE_RATE = 0.015 // 1.5% of ticket amount
+const PROCESSING_FEE_BASE = 100 // + ₦100 fixed
 
 export default function Register() {
   const [form, setForm] = useState<FormState>(initial)
@@ -51,6 +54,8 @@ export default function Register() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  const [profilePhoto, setProfilePhoto] = useState('')
+  const [photoInvalid, setPhotoInvalid] = useState('')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -76,15 +81,38 @@ export default function Register() {
   }, [])
 
   const selected = tickets.find((t) => t.id === form.ticketType)!
-  const total = selected.price * form.quantity
+  const subtotal = selected.price * form.quantity
+  const processingFee = Math.round(subtotal * PROCESSING_FEE_RATE) + PROCESSING_FEE_BASE
+  const total = subtotal + processingFee
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }))
   }
 
+  function handlePhoto(file?: File) {
+    if (!file) return
+    if (file.size > 1500000) {
+      setPhotoInvalid('Photo must be under 1.5MB. Please choose a smaller image.')
+      return
+    }
+    if (!file.type.startsWith('image/')) {
+      setPhotoInvalid('Please choose an image file.')
+      return
+    }
+    setPhotoInvalid('')
+    const reader = new FileReader()
+    reader.onload = () => setProfilePhoto(reader.result as string)
+    reader.readAsDataURL(file)
+  }
+
   async function handlePayWithPaystack() {
     setError('')
     setLoading(true)
+    if (!profilePhoto) {
+      setError('Please upload a profile photo to complete your registration.')
+      setLoading(false)
+      return
+    }
     try {
       await loadPaystackScript()
       if (config?.paystackEnabled !== true || !window.PaystackPop) {
@@ -107,6 +135,7 @@ export default function Register() {
         quantity: form.quantity,
         reason: form.reason,
         hearAbout: form.hearAbout,
+        photoBase64: profilePhoto || undefined,
         origin: window.location.origin,
       })
 
@@ -149,6 +178,11 @@ export default function Register() {
     e.preventDefault()
     setError('')
     setLoading(true)
+    if (!profilePhoto) {
+      setError('Please upload a profile photo to complete your registration.')
+      setLoading(false)
+      return
+    }
     try {
       // If paystack configured, go through paystack
       if (config?.paystackEnabled === true) {
@@ -170,6 +204,7 @@ export default function Register() {
         quantity: form.quantity,
         reason: form.reason,
         hearAbout: form.hearAbout,
+        photoBase64: profilePhoto || undefined,
       })
       setLoading(false)
       setSuccess(true)
@@ -185,19 +220,22 @@ export default function Register() {
         <img src="/images/carousel/event.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/70 to-black/40" />
         <div className="container py-8 md:py-10 text-center relative">
-          <h1 className="font-display text-3xl md:text-5xl font-bold text-white leading-tight mb-2">
-            3-Days Beginner Makeup Class
-          </h1>
-          <p className="text-amber-300 text-base md:text-lg font-semibold mb-3">4th – 6th February 2027</p>
-          <p className="inline-block text-white text-sm md:text-base font-semibold tracking-[0.15em] uppercase">
-            Registration / Ticket Purchase
-          </p>
-          <p className="mt-2 text-white/85 text-sm md:text-base">Hosted by Shawty</p>
+          <Reveal variant="up">
+            <h1 className="font-display text-3xl md:text-5xl font-bold text-white leading-tight mb-2">
+              3-Days Beginner Makeup Class
+            </h1>
+            <p className="text-amber-300 text-base md:text-lg font-semibold mb-3">4th – 6th February 2027</p>
+            <p className="inline-block text-white text-sm md:text-base font-semibold tracking-[0.15em] uppercase">
+              Registration / Ticket Purchase
+            </p>
+            <p className="mt-2 text-white/85 text-sm md:text-base">Hosted by Shawty</p>
+          </Reveal>
         </div>
       </section>
 
       <div className="container section-pad grid lg:grid-cols-[1fr_380px] gap-8 lg:gap-10 items-start min-w-0">
         {/* FORM */}
+        <Reveal variant="up">
         <form onSubmit={handleManualRegister} className="card p-6 sm:p-8 min-w-0">
           <h2 className="font-display text-xl md:text-2xl font-bold mb-5">
             Provide the following Info
@@ -313,6 +351,29 @@ export default function Register() {
             </div>
 
             <div className="sm:col-span-2">
+              <label className="field-label">Profile Photo * (under 1.5MB)</label>
+              <div className="flex items-center gap-4">
+                <label className="flex-1 cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => { setPhotoInvalid(''); handlePhoto(e.target.files?.[0]) }}
+                  />
+                  <div className={`flex items-center justify-center gap-2 border-2 border-dashed rounded-xl px-4 py-6 text-sm transition-colors ${profilePhoto ? 'border-rose bg-rose/5 text-rose-dark' : 'border-ink/20 text-muted hover:border-rose/40 hover:text-rose-dark'}`}>
+                    {profilePhoto ? <CircleCheck size={18} /> : <ImageIcon size={18} />}
+                    {profilePhoto ? 'Photo attached — tap to change' : 'Tap to upload a photo (required)'}
+                  </div>
+                </label>
+                {profilePhoto && (
+                  <img src={profilePhoto} alt="preview" className="w-16 h-16 rounded-xl object-cover border border-black/10 shrink-0" />
+                )}
+              </div>
+              {photoInvalid && <p className="text-xs text-red-600 mt-1">{photoInvalid}</p>}
+              {!profilePhoto && <p className="text-xs text-muted mt-1">A recent photo is required to verify your identity at the venue.</p>}
+            </div>
+
+            <div className="sm:col-span-2">
               <label className="field-label">Ticket Type *</label>
               <div className="grid sm:grid-cols-2 gap-3">
                 {tickets.map((t) => {
@@ -380,6 +441,14 @@ export default function Register() {
           </div>
 
           <div className="mt-8 pt-6 border-t border-black/8">
+            <div className="flex items-center justify-between text-sm text-muted mb-1">
+              <span>Ticket amount ({form.quantity} × {formatNgn(selected.price)})</span>
+              <span>{formatNgn(subtotal)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm text-muted mb-3">
+              <span>Processing fee (1.5% + ₦100)</span>
+              <span>{formatNgn(processingFee)}</span>
+            </div>
             <div className="flex items-center justify-between mb-4">
               <span className="text-ink/70">Total</span>
               <span className="font-display text-2xl font-bold">{formatNgn(total)}</span>
@@ -392,18 +461,28 @@ export default function Register() {
             </p>
           </div>
         </form>
+        </Reveal>
 
         {/* SUMMARY SIDEBAR */}
+        <Reveal variant="right" delay={150}>
         <aside className="space-y-6 min-w-0">
-          <div className="card p-6">
+          <div className="card p-6 card-hover">
             <h3 className="font-semibold mb-4">Order Summary</h3>
             <div className="flex items-center justify-between text-sm mb-2">
               <span>{selected.label}</span>
               <span className="text-muted">× {form.quantity}</span>
             </div>
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span>Ticket amount</span>
+              <span>{formatNgn(subtotal)}</span>
+            </div>
             <div className="flex items-center justify-between text-sm mb-4">
-              <span>Amount</span>
-              <span>{formatNgn(selected.price * form.quantity)}</span>
+              <span>Processing fee (1.5% + ₦100)</span>
+              <span>{formatNgn(processingFee)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm font-semibold border-t border-black/8 pt-3">
+              <span>Total</span>
+              <span>{formatNgn(total)}</span>
             </div>
             <ul className="space-y-2 text-sm text-ink/70 border-t border-black/8 pt-4">
               {selected.includes.map((inc) => (
@@ -415,7 +494,7 @@ export default function Register() {
             </ul>
           </div>
 
-          <div className="card p-6 bg-blush border-rose/20">
+          <div className="card p-6 bg-blush border-rose/20 card-hover">
             <h4 className="font-semibold mb-2">Good to know</h4>
             <ul className="space-y-2 text-sm text-ink/75">
               <li>• The venue is disclosed to registered students after ticket purchase.</li>
@@ -424,6 +503,7 @@ export default function Register() {
             </ul>
           </div>
         </aside>
+        </Reveal>
       </div>
     </div>
   )

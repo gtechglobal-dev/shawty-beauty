@@ -3,6 +3,7 @@ import { CircleAlert, CircleCheck, LoaderCircle, Mail, Phone } from 'lucide-reac
 import InstagramIcon from '../components/icons/InstagramIcon'
 import { postJson } from '../lib/api'
 import { siteConfig } from '../lib/constants'
+import Reveal from '../components/Reveal'
 
 export default function Contact() {
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' })
@@ -47,6 +48,7 @@ export default function Contact() {
   return (
     <div>
       <section className="bg-gradient-to-br from-blush via-cream to-white border-b border-black/5">
+        <Reveal variant="up">
         <div className="container py-12 md:py-16 text-center">
           <span className="eyebrow mb-3">Contact Us</span>
           <h1 className="section-title text-4xl mb-4">Get in Touch</h1>
@@ -54,9 +56,11 @@ export default function Contact() {
             Book a makeup or lash session, ask about the 3-day class, or chat about sponsorship.
           </p>
         </div>
+        </Reveal>
       </section>
 
       <div className="container section-pad grid lg:grid-cols-[1fr_360px] gap-8 lg:gap-10 items-start">
+        <Reveal variant="up">
         <form onSubmit={submit} className="card p-6 sm:p-8 space-y-5">
           {msg && (
             <div className={`p-4 rounded-xl text-sm flex items-start gap-2 ${
@@ -91,9 +95,11 @@ export default function Contact() {
             {loading ? <><LoaderCircle size={18} className="animate-spin" /> Sending…</> : 'Send Message'}
           </button>
         </form>
+        </Reveal>
 
+        <Reveal variant="right" delay={150}>
         <aside className="space-y-6">
-          <div className="card p-6 space-y-4">
+          <div className="card p-6 space-y-4 card-hover">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blush flex items-center justify-center"><Mail className="text-rose-dark" size={18} /></div>
               <div className="min-w-0">
@@ -117,7 +123,7 @@ export default function Contact() {
             </div>
           </div>
 
-          <div className="card p-6 bg-blush border-rose/20">
+          <div className="card p-6 bg-blush border-rose/20 card-hover">
             <h3 className="font-semibold mb-2">Stay in the loop</h3>
             <p className="text-sm text-ink/70 mb-4">Subscribe for program updates, dates, and beauty tips.</p>
             <form onSubmit={subscribe} className="space-y-3">
@@ -129,6 +135,7 @@ export default function Contact() {
             </form>
           </div>
         </aside>
+        </Reveal>
       </div>
     </div>
   )

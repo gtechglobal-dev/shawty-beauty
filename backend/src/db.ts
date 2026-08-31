@@ -67,6 +67,10 @@ export interface Registration {
   hearAbout: string;
   createdAt: string;
   unitPrice: number;
+  subtotal?: number;
+  processingFee?: number;
+  photoBase64?: string;
+  telegramPaidNotified?: boolean;
 }
 
 export async function readRegistrations(

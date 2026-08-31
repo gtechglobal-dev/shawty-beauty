@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import { writeContact, addSubscriber, type ContactMessage } from '../db.js';
+import { sendTelegramMessage, telegramConfigured, escapeHtml } from '../lib/telegram.js';
 
 const router = Router();
 
@@ -31,6 +32,19 @@ router.post('/', async (req: Request, res: Response) => {
     };
 
     await writeContact(msg);
+
+    if (telegramConfigured()) {
+      const tgMsg = [
+        `<b>📩 New Contact Message</b>`,
+        ``,
+        `<b>Name:</b> ${escapeHtml(msg.name)}`,
+        `<b>Email:</b> ${escapeHtml(msg.email)}`,
+        `<b>Subject:</b> ${escapeHtml(msg.subject)}`,
+        `<b>Message:</b> ${escapeHtml(msg.message)}`,
+      ].join('\n');
+      sendTelegramMessage(tgMsg).catch(() => {});
+    }
+
     res.status(201).json({ success: true, id: msg.id });
   } catch (err: any) {
     console.error('Failed to send contact message:', err.message);

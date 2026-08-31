@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import Navbar from './components/layout/Navbar'
 import Footer from './components/layout/Footer'
+import Loader from './components/Loader'
 import Home from './pages/Home'
 import Program from './pages/Program'
 import Register from './pages/Register'
@@ -11,11 +12,24 @@ import Contact from './pages/Contact'
 import Admin from './pages/Admin'
 
 export default function App() {
-  const { pathname } = useLocation()
+  const { pathname, hash } = useLocation()
 
   const isAdmin = pathname.startsWith('/admin')
 
-  useEffect(() => { window.scrollTo(0, 0) }, [pathname])
+  const [loading, setLoading] = useState(true)
+
+  // Scroll to top on navigation; if landing with a #hash, the browser scrolls to it
+  useEffect(() => {
+    if (!hash) window.scrollTo(0, 0)
+  }, [pathname, hash])
+
+  // Loader: show on first load and on every navigation; brief but measurable
+  // to give an anticipatory feel rather than a flash.
+  useEffect(() => {
+    setLoading(true)
+    const t = setTimeout(() => setLoading(false), 1100)
+    return () => clearTimeout(t)
+  }, [pathname])
 
   if (isAdmin) {
     return <Admin />
@@ -23,8 +37,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-cream text-ink flex flex-col">
+      <Loader show={loading} />
       <Navbar />
-      <main className="flex-1">
+      <main key={pathname} className="flex-1 page-enter">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/program" element={<Program />} />

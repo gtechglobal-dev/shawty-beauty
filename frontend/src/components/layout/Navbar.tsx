@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Menu, X, MessageCircle } from 'lucide-react'
 import { siteConfig } from '../../lib/constants'
@@ -13,19 +13,53 @@ const links = [
 
 export default function Navbar() {
   const [open, setOpen] = useState(false)
-  const { pathname } = useLocation()
+  const [scrolled, setScrolled] = useState(false)
+  const { pathname, hash } = useLocation()
 
   useEffect(() => {
     setOpen(false)
-  }, [pathname])
+  }, [pathname, hash])
 
-  const isActive = (to: string, hash?: boolean) => {
-    if (hash) return false
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  const headerRef = useRef<HTMLElement | null>(null)
+
+  // Close mobile menu when clicking/tapping anywhere outside the header
+  useEffect(() => {
+    if (!open) return
+    const onDocClick = (e: MouseEvent | TouchEvent) => {
+      if (headerRef.current && !headerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('click', onDocClick)
+    document.addEventListener('touchstart', onDocClick)
+    return () => {
+      document.removeEventListener('click', onDocClick)
+      document.removeEventListener('touchstart', onDocClick)
+    }
+  }, [open])
+
+  const isActive = (to: string, isHashLink?: boolean) => {
+    if (isHashLink) {
+      // Hash links (homepage sections) are active when their hash matches the URL
+      const targetHash = to.split('#')[1]
+      return pathname === '/' && targetHash === hash.slice(1)
+    }
+    // Home: active on homepage only when no section hash is set
+    if (to === '/') {
+      return pathname === '/' && hash === ''
+    }
     return pathname === to
   }
 
   return (
-    <header className="sticky top-0 z-50 bg-cream/90 backdrop-blur-md border-b border-black/5">
+    <header ref={headerRef} onClick={() => setOpen(false)} className={`sticky top-0 z-50 bg-cream/90 backdrop-blur-md border-b transition-all duration-300 ${scrolled ? 'border-black/10 shadow-md' : 'border-black/5'}`}>
       <div className="container flex items-center justify-between h-16 md:h-[72px] gap-3">
         <Link to="/" className="flex items-center gap-2.5 shrink-0" onClick={() => setOpen(false)}>
           <span className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-rose to-gold flex items-center justify-center text-white font-display text-lg md:text-xl font-bold">
@@ -42,9 +76,7 @@ export default function Navbar() {
               <a
                 key={l.to}
                 href={l.to}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
-                  'text-ink/70 hover:text-rose-dark hover:bg-black/5'
-                }`}
+                className={`nav-link ${isActive(l.to, true) ? 'nav-active' : ''}`}
               >
                 {l.label}
               </a>
@@ -52,11 +84,7 @@ export default function Navbar() {
               <Link
                 key={l.to}
                 to={l.to}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
-                  isActive(l.to)
-                    ? 'text-rose-dark bg-blush'
-                    : 'text-ink/70 hover:text-rose-dark hover:bg-black/5'
-                }`}
+                className={`nav-link ${isActive(l.to) ? 'nav-active' : ''}`}
               >
                 {l.label}
               </Link>
@@ -74,7 +102,7 @@ export default function Navbar() {
 
         <button
           className="md:hidden p-2 -mr-1 text-ink"
-          onClick={() => setOpen((o) => !o)}
+          onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
           aria-label="Toggle menu"
         >
           {open ? <X size={26} /> : <Menu size={26} />}
@@ -82,14 +110,16 @@ export default function Navbar() {
       </div>
 
       {open && (
-        <nav className="md:hidden px-5 pb-6 pt-2 space-y-1 border-t border-black/5 bg-cream/95 backdrop-blur-md">
+        <nav onClick={(e) => e.stopPropagation()} className="md:hidden relative z-50 px-5 pb-6 pt-2 space-y-1 border-t border-black/5 bg-cream/95 backdrop-blur-md">
           {links.map((l) =>
             l.hash ? (
               <a
                 key={l.to}
                 href={l.to}
                 onClick={() => setOpen(false)}
-                className={`block px-4 py-3 rounded-lg text-[15px] font-medium text-ink/75`}
+                className={`block px-4 py-3 rounded-lg text-[15px] font-medium ${
+                  isActive(l.to, true) ? 'text-rose-dark bg-blush' : 'text-ink/75'
+                }`}
               >
                 {l.label}
               </a>

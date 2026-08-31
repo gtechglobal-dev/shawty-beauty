@@ -12,6 +12,8 @@ import {
 } from 'lucide-react'
 import InstagramIcon from '../components/icons/InstagramIcon'
 import EventsCarousel from '../components/layout/EventsCarousel'
+import Reveal from '../components/Reveal'
+import CountUp from '../components/CountUp'
 import { lashServices, makeupServices, program, siteConfig } from '../lib/constants'
 import ServiceGallery from '../components/ServiceGallery'
 
@@ -20,16 +22,19 @@ export default function Home() {
     <>
       {/* ===== HERO ===== */}
       <section className="relative overflow-hidden bg-gradient-to-br from-blush via-cream to-white">
-        <div className="absolute top-0 right-0 w-[420px] h-[420px] rounded-full bg-rose/15 blur-3xl -z-10" />
+        <div className="absolute top-0 right-0 w-[420px] h-[420px] rounded-full bg-rose/15 blur-3xl -z-10 float-slow" />
+        <div className="absolute -bottom-10 -left-16 w-72 h-72 rounded-full bg-gold/15 blur-3xl -z-10 float" />
         <div className="container pt-10 md:pt-16 pb-10 md:pb-16">
           {/* Page title */}
-          <div className="text-center mb-8 md:mb-10">
-            <span className="eyebrow mb-4 justify-center">Welcome to</span>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.08]">
-              {siteConfig.name}
-              <span className="gradient-text block">Look stunning, feel unstoppable.</span>
-            </h1>
-          </div>
+          <Reveal variant="up">
+            <div className="text-center mb-8 md:mb-10">
+              <span className="eyebrow mb-4 justify-center">Welcome to</span>
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.08]">
+                {siteConfig.name}
+                <span className="gradient-text block">Look stunning, feel unstoppable.</span>
+              </h1>
+            </div>
+          </Reveal>
 
           {/* Ads / events scrolling carousel */}
           <EventsCarousel />
@@ -67,91 +72,106 @@ export default function Home() {
           </div>
 
           {/* Sponsorship CTA */}
-          <div className="mt-6 mx-auto max-w-4xl fade-up">
-            <div className="rounded-2xl bg-gradient-to-r from-fuchsia-500 via-rose to-orange-400 p-[1px] shadow-lg">
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 rounded-2xl bg-white px-6 py-4 text-center sm:text-left">
-                <Handshake size={22} className="text-fuchsia-600 shrink-0" />
-                <p className="text-ink/80 text-sm sm:text-base leading-snug">
-                  <span className="font-bold text-ink">Interested in sponsoring?</span>{' '}
-                  Align your brand with beauty — <span className="text-fuchsia-600 font-medium">get visibility, boost your brand and ours.</span>
-                </p>
-                <Link to="/sponsor" className="btn btn-outline !border-fuchsia-300 !text-fuchsia-700 hover:!bg-fuchsia-50 shrink-0 w-full sm:w-auto">
-                  Partner With Us <ArrowRight size={18} />
-                </Link>
+          <Reveal variant="zoom" delay={100}>
+            <div className="mt-6 mx-auto max-w-4xl border-glow rounded-2xl">
+              <div className="rounded-2xl bg-white px-6 py-4 shadow-lg">
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-center sm:text-left">
+                  <Handshake size={22} className="text-fuchsia-600 shrink-0" />
+                  <p className="text-ink/80 text-sm sm:text-base leading-snug">
+                    <span className="font-bold text-ink">Interested in sponsoring?</span>{' '}
+                    Align your brand with beauty — <span className="text-fuchsia-600 font-medium">get visibility, boost your brand and ours.</span>
+                  </p>
+                  <Link to="/sponsor" className="btn btn-outline !border-fuchsia-300 !text-fuchsia-700 hover:!bg-fuchsia-50 shrink-0 w-full sm:w-auto">
+                    Partner With Us <ArrowRight size={18} />
+                  </Link>
+                </div>
               </div>
             </div>
-          </div>
+          </Reveal>
 
           {/* Content */}
-          <div className="text-center pt-12 md:pt-16">
-            <p className="text-ink/70 text-lg mb-8 max-w-xl leading-relaxed mx-auto">
-              Premium {makeupServices.length} makeup services and lash extensions in one studio.
-              From soft glam to bridal glam, and classic lashes to volume — beauty that celebrates you.
-            </p>
-            <div className="flex flex-wrap gap-3 justify-center mb-10">
-              <a href="#services" className="btn btn-primary">
-                Explore Services <ArrowRight size={18} />
-              </a>
-              <a
-                href={siteConfig.whatsapp}
-                target="_blank"
-                rel="noreferrer"
-                className="btn btn-outline"
-              >
-                <MessageCircle size={18} /> Book Now
-              </a>
+          <Reveal variant="up" delay={200}>
+            <div className="text-center pt-12 md:pt-16">
+              <p className="text-ink/70 text-lg mb-8 max-w-xl leading-relaxed mx-auto">
+                Premium {makeupServices.length} makeup services and lash extensions in one studio.
+                From soft glam to bridal glam, and classic lashes to volume — beauty that celebrates you.
+              </p>
+              <div className="flex flex-wrap gap-3 justify-center mb-10">
+                <a href="#services" className="btn btn-primary">
+                  Explore Services <ArrowRight size={18} />
+                </a>
+                <a
+                  href={siteConfig.whatsapp}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-outline"
+                >
+                  <MessageCircle size={18} /> Book Now
+                </a>
+              </div>
+              <div className="grid grid-cols-3 gap-3 max-w-md mx-auto">
+                <div className="card card-hover px-4 py-3 text-center">
+                  <div className="font-display text-2xl font-bold text-rose-dark"><CountUp end={5} suffix="+" /></div>
+                  <div className="text-[11px] text-muted mt-0.5">Makeup Looks</div>
+                </div>
+                <div className="card card-hover px-4 py-3 text-center delay-100">
+                  <div className="font-display text-2xl font-bold text-rose-dark"><CountUp end={4} /></div>
+                  <div className="text-[11px] text-muted mt-0.5">Lash Sets</div>
+                </div>
+                <div className="card card-hover px-4 py-3 text-center delay-200">
+                  <div className="font-display text-2xl font-bold text-rose-dark">1-on-1</div>
+                  <div className="text-[11px] text-muted mt-0.5">Training</div>
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-3 gap-3 max-w-md mx-auto">
-              <div className="card px-4 py-3 text-center">
-                <div className="font-display text-2xl font-bold text-rose-dark">5+</div>
-                <div className="text-[11px] text-muted mt-0.5">Makeup Looks</div>
-              </div>
-              <div className="card px-4 py-3 text-center">
-                <div className="font-display text-2xl font-bold text-rose-dark">4</div>
-                <div className="text-[11px] text-muted mt-0.5">Lash Sets</div>
-              </div>
-              <div className="card px-4 py-3 text-center">
-                <div className="font-display text-2xl font-bold text-rose-dark">1-on-1</div>
-                <div className="text-[11px] text-muted mt-0.5">Training</div>
-              </div>
-            </div>
-          </div>
+          </Reveal>
         </div>
       </section>
 
       {/* ===== LASH SERVICES ===== */}
       <section id="services" className="section-pad bg-white scroll-mt-20">
         <div className="container">
-          <div className="text-center mb-10 md:mb-12">
-            <h2 className="section-title text-3xl md:text-4xl">Our Services</h2>
-          </div>
-          <div className="max-w-2xl mb-10 md:mb-12 text-center md:text-left mx-auto md:mx-0">
-            <span className="eyebrow mb-3"><Eye size={14} /> Lash Tech</span>
-            <h2 className="section-title mt-2">Lash extensions that flatter your eyes</h2>
-            <p className="text-ink/70 mt-3">Handcrafted, comfortable lash sets tailored to your natural eye shape and everyday style.</p>
-          </div>
-          <ServiceGallery services={lashServices} />
+          <Reveal variant="up">
+            <div className="text-center mb-10 md:mb-12">
+              <h2 className="section-title text-3xl md:text-4xl">Our Services</h2>
+            </div>
+          </Reveal>
+          <Reveal variant="left">
+            <div className="max-w-2xl mb-10 md:mb-12 text-center md:text-left mx-auto md:mx-0">
+              <span className="eyebrow mb-3"><Eye size={14} /> Lash Tech</span>
+              <h2 className="section-title mt-2">Lash extensions that flatter your eyes</h2>
+              <p className="text-ink/70 mt-3">Handcrafted, comfortable lash sets tailored to your natural eye shape and everyday style.</p>
+            </div>
+          </Reveal>
+          <Reveal variant="zoom">
+            <ServiceGallery services={lashServices} />
+          </Reveal>
         </div>
       </section>
 
       {/* ===== MAKEUP SERVICES ===== */}
       <section className="section-pad bg-blush border-y border-rose/15">
         <div className="container">
-          <div className="max-w-2xl mb-10 md:mb-12 text-center md:text-left mx-auto md:mx-0">
-            <span className="eyebrow mb-3"><Brush size={14} /> Makeup Services</span>
-            <h2 className="section-title mt-2">Makeup for every moment</h2>
-            <p className="text-ink/70 mt-3">From everyday soft glam to unforgettable bridal glam — and 1-on-1 training to build your own skills.</p>
-          </div>
-          <ServiceGallery services={makeupServices} />
+          <Reveal variant="right">
+            <div className="max-w-2xl mb-10 md:mb-12 text-center md:text-left mx-auto md:mx-0">
+              <span className="eyebrow mb-3"><Brush size={14} /> Makeup Services</span>
+              <h2 className="section-title mt-2">Makeup for every moment</h2>
+              <p className="text-ink/70 mt-3">From everyday soft glam to unforgettable bridal glam — and 1-on-1 training to build your own skills.</p>
+            </div>
+          </Reveal>
+          <Reveal variant="zoom" delay={100}>
+            <ServiceGallery services={makeupServices} />
+          </Reveal>
         </div>
       </section>
 
 {/* ===== EVENT ADVERT BANNER ===== */}
       <section className="section-pad">
         <div className="container">
+          <Reveal variant="zoom">
           <div className="rounded-3xl bg-gradient-to-br from-rose-dark via-rose to-gold p-7 sm:p-10 md:p-14 text-white relative overflow-hidden">
-            <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-white/10 blur-2xl" />
-            <div className="absolute -bottom-20 -left-10 w-72 h-72 rounded-full bg-white/10 blur-2xl" />
+            <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-white/10 blur-2xl float-slow" />
+            <div className="absolute -bottom-20 -left-10 w-72 h-72 rounded-full bg-white/10 blur-2xl float" />
 
             <div className="flex flex-col lg:flex-row lg:items-center gap-8 lg:gap-10 relative z-10">
               <div className="flex-1">
@@ -176,23 +196,24 @@ export default function Home() {
               </div>
 
               <div className="lg:w-[320px] shrink-0 grid grid-cols-2 gap-3">
-                <div className="bg-white/12 rounded-2xl p-4 backdrop-blur-sm">
+                <div className="bg-white/12 rounded-2xl p-4 backdrop-blur-sm card-hover">
                   <CalendarDays size={20} className="mb-2 opacity-90" />
                   <div className="font-semibold text-sm leading-snug">{program.dates}</div>
                   <div className="text-xs opacity-75 mt-1">{program.duration}</div>
                 </div>
-                <div className="bg-white/12 rounded-2xl p-4 backdrop-blur-sm">
+                <div className="bg-white/12 rounded-2xl p-4 backdrop-blur-sm card-hover">
                   <Clock size={20} className="mb-2 opacity-90" />
                   <div className="font-semibold text-sm leading-snug">{program.time.morning}</div>
                   <div className="text-xs opacity-75 mt-1">Morning / {program.time.evening}</div>
                 </div>
-                <div className="bg-white/12 rounded-2xl p-4 backdrop-blur-sm col-span-2 flex flex-col items-center text-center">
+                <div className="bg-white/12 rounded-2xl p-4 backdrop-blur-sm col-span-2 flex flex-col items-center text-center card-hover">
                   <MapPin size={20} className="mb-2 opacity-90" />
                   <div className="text-sm leading-snug">Venue disclosed after ticket purchase</div>
                 </div>
               </div>
             </div>
           </div>
+          </Reveal>
         </div>
       </section>
 
@@ -201,6 +222,7 @@ export default function Home() {
         <div className="absolute inset-0">
           <img src="/images/studio1.png" alt="" className="w-full h-full object-cover opacity-15" loading="lazy" />
         </div>
+        <Reveal variant="up">
         <div className="container text-center relative">
           <InstagramIcon size={32} className="mx-auto text-rose mb-4" />
           <h2 className="section-title text-white mb-3">Follow the journey</h2>
@@ -209,6 +231,7 @@ export default function Home() {
             <InstagramIcon size={18} /> {siteConfig.instagramHandle}
           </a>
         </div>
+        </Reveal>
       </section>
     </>
   )

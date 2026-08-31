@@ -5,6 +5,7 @@ import {
   type Sponsor,
   type SponsorPackageType,
 } from '../db.js';
+import { sendTelegramMessage, telegramConfigured, escapeHtml } from '../lib/telegram.js';
 
 const router = Router();
 
@@ -137,6 +138,22 @@ router.post('/', async (req: Request, res: Response) => {
     };
 
     await writeSponsor(sponsor);
+
+    if (telegramConfigured()) {
+      const msg = [
+        `<b>🤝 New Sponsorship Application</b>`,
+        ``,
+        `<b>Brand:</b> ${escapeHtml(sponsor.brandName)}`,
+        `<b>Contact:</b> ${escapeHtml(sponsor.contactName)}`,
+        `<b>Email:</b> ${escapeHtml(sponsor.email)}`,
+        `<b>Phone:</b> ${escapeHtml(sponsor.phone)}`,
+        `<b>Package:</b> ${escapeHtml(pkg.label)}`,
+        sponsor.amount > 0 ? `<b>Amount:</b> ₦${sponsor.amount.toLocaleString()}` : '',
+        sponsor.notes ? `<b>Notes:</b> ${escapeHtml(sponsor.notes)}` : '',
+        `<b>Status:</b> Pending`,
+      ].filter(Boolean).join('\n');
+      sendTelegramMessage(msg).catch(() => {});
+    }
 
     res.status(201).json({ success: true, id: sponsor.id, message: 'Sponsorship application received' });
   } catch (err: any) {

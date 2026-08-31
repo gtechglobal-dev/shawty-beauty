@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'shawty-beauty-studio-secret-change-in-production';
+// Fallback only for local dev; set a strong JWT_SECRET in the environment.
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-insecure-secret-do-not-use-in-production';
 
 export interface AuthRequest extends Request {
   admin?: { username: string };

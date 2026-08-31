@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { CircleCheck, LoaderCircle, CircleAlert, CircleX } from 'lucide-react'
 import { postJson } from '../lib/api'
+import Reveal from '../components/Reveal'
 
 export default function PaymentCallback() {
   const [params] = useSearchParams()
@@ -20,6 +21,7 @@ export default function PaymentCallback() {
 
   return (
     <div className="container py-24 max-w-lg text-center">
+      <Reveal variant="up">
       {state === 'loading' && (
         <div className="card p-12">
           <LoaderCircle className="mx-auto text-rose animate-spin mb-4" size={44} />
@@ -34,11 +36,12 @@ export default function PaymentCallback() {
           <h1 className="section-title text-2xl mb-3">Payment Successful!</h1>
           <p className="text-ink/70 mb-6">
             Thank you! Your registration is confirmed. A confirmation email has been sent to you.
-            Kindly join the WhatsApp community with the link below. Welcome Onboard!
+            Kindly Join the WhatsApp community for further updates. Welcome Onboard!
           </p>
           <a href="https://chat.whatsapp.com/LsEBJJVVFAJ0rSr8bsx8Sq" target="_blank" rel="noopener noreferrer" className="btn btn-primary mb-3">
             Join WhatsApp Community
           </a>
+          <div className="mb-6" />
           <Link to="/" className="btn btn-outline">Back to Home</Link>
         </div>
       )}
@@ -58,6 +61,7 @@ export default function PaymentCallback() {
           </div>
         </div>
       )}
+      </Reveal>
     </div>
   )
 }

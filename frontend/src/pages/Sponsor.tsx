@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { formatNgn, sponsorPackages, type SponsorPkg } from '../lib/constants'
 import { postJson } from '../lib/api'
+import Reveal from '../components/Reveal'
 
 const tiers = ['supporter', 'partner', 'featured', 'title'] as const
 
@@ -79,6 +80,7 @@ export default function Sponsor() {
   return (
     <div>
       <section className="bg-gradient-to-br from-blush via-cream to-white border-b border-black/5">
+        <Reveal variant="up">
         <div className="container py-12 md:py-16 text-center">
           <span className="eyebrow mb-4">
             <Sparkles size={14} /> Become a Sponsor
@@ -90,15 +92,17 @@ export default function Sponsor() {
             program.
           </p>
         </div>
+        </Reveal>
       </section>
 
       <div className="container section-pad">
         {/* Packages */}
         <div className="grid md:grid-cols-2 gap-6">
-          {tiers.map((id) => {
+          {tiers.map((id, i) => {
             const p = sponsorPackages.find((x) => x.id === id)!
             return (
-              <div key={id} className={`card p-7 ${id === 'title' ? 'ring-2 ring-gold' : ''}`}>
+              <Reveal key={id} variant="zoom" delay={i * 100}>
+              <div className={`card p-7 card-hover ${id === 'title' ? 'ring-2 ring-gold border-glow' : ''}`}>
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 rounded-xl bg-blush flex items-center justify-center">
                     {id === 'title'
@@ -123,16 +127,18 @@ export default function Sponsor() {
                   ))}
                 </ul>
               </div>
+              </Reveal>
             )
           })}
         </div>
 
         {/* Product & Service */}
         <div className="grid md:grid-cols-2 gap-6 mt-6">
-          {['product', 'service'].map((id) => {
+          {['product', 'service'].map((id, i) => {
             const p = sponsorPackages.find((x) => x.id === id)!
             return (
-              <div key={id} className="card p-7">
+              <Reveal key={id} variant="left" delay={i * 100}>
+              <div className="card p-7 card-hover">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-xl bg-gold/15 flex items-center justify-center">
                     {id === 'product'
@@ -144,11 +150,13 @@ export default function Sponsor() {
                 <p className="text-sm text-muted mb-4">{p.desc}</p>
                 <p className="text-sm text-ink/70">Sponsors receive benefits based on their contributions and agreements.</p>
               </div>
+              </Reveal>
             )
           })}
         </div>
 
         {/* Application form */}
+        <Reveal variant="zoom">
         <div className="max-w-2xl mx-auto mt-14 md:mt-20">
           <div className="text-center mb-8">
             <h2 className="section-title mb-2">Apply to Sponsor</h2>
@@ -192,14 +200,36 @@ export default function Sponsor() {
 
             <div>
               <label className="field-label">Sponsorship Package *</label>
-              <select className="input-field" value={form.packageType}
-                onChange={(e) => update('packageType', e.target.value as SponsorPkg['id'])}>
-                {sponsorPackages.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}{p.price > 0 ? ` — ${formatNgn(p.price)}` : ''}
-                  </option>
-                ))}
-              </select>
+              <div className="grid sm:grid-cols-2 gap-3 mt-2">
+                {sponsorPackages.map((p) => {
+                  const active = form.packageType === p.id
+                  return (
+                    <label
+                      key={p.id}
+                      className={`cursor-pointer rounded-xl border p-4 flex items-start gap-3 transition-all duration-200 ${
+                        active
+                          ? 'border-rose bg-blush shadow-sm'
+                          : 'border-black/10 hover:border-rose/50'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="packageType"
+                        value={p.id}
+                        checked={active}
+                        onChange={() => update('packageType', p.id as SponsorPkg['id'])}
+                        className="mt-1 accent-rose"
+                      />
+                      <span>
+                        <span className="block font-medium text-sm">{p.label}</span>
+                        <span className="block text-xs text-muted">
+                          {p.price > 0 ? formatNgn(p.price) : p.slot || 'Custom / In-kind'}
+                        </span>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
             </div>
 
             {(selectedPkg.id === 'product' || selectedPkg.id === 'service' || selectedPkg.id === 'title') && (
@@ -234,6 +264,7 @@ export default function Sponsor() {
             </button>
           </form>
         </div>
+        </Reveal>
       </div>
     </div>
   )
