@@ -1,9 +1,10 @@
 services:
   - type: web
-    name: my-portfolio
+    name: shawty-beauty
     runtime: node
     region: ohio
-    buildCommand: npm install && cd backend && npm install && cd .. && npm run build:all
+    plan: free
+    buildCommand: npm install && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
@@ -11,29 +12,15 @@ services:
         sync: false
       - key: CORS_ORIGIN
         sync: false
-      - key: QR_BASE_URL
+      - key: BASE_URL
         sync: false
       - key: ADMIN_USERNAME
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
-      - key: SMTP_HOST
-        sync: false
-      - key: SMTP_PORT
-        sync: false
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASS
-        sync: false
-      - key: EMAIL_FROM
-        sync: false
       - key: JWT_SECRET
         sync: false
-      - key: WA_ACCESS_TOKEN
+      - key: PAYSTACK_PUBLIC_KEY
         sync: false
-      - key: WA_PHONE_NUMBER_ID
-        sync: false
-      - key: WA_TEMPLATE_NAME
-        sync: false
-      - key: WA_BUSINESS_ACCOUNT_ID
+      - key: PAYSTACK_SECRET_KEY
         sync: false
