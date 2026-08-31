@@ -23,7 +23,10 @@ export default function ServiceGallery({ services }: { services: Service[] }) {
                 loading="lazy"
               />
             </div>
-            <h3 className="font-semibold leading-snug flex-1">{s.title}</h3>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-base sm:text-lg font-semibold leading-snug">{s.title}</h3>
+              <p className="text-xs sm:text-sm text-muted mt-1 leading-snug line-clamp-2">{s.desc}</p>
+            </div>
           </button>
         ))}
       </div>

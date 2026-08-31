@@ -1,21 +1,52 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { galleryImages, program } from '../../lib/constants'
+import { lashServices, makeupServices } from '../../lib/constants'
 
-const slides = [
+const carouselImages: Record<string, string> = {
+  'Hybrid Lashes': '/images/carousel/hybrid.jpg',
+  'Volume Lashes': '/images/carousel/volume.jpg',
+  'Wispy Set / Bottom Lashes': '/images/carousel/wispy.jpg',
+  'Soft Glam': '/images/carousel/softglam.jpg',
+  'Full Glam': '/images/carousel/fullglam.jpg',
+  'Bridal Glam': '/images/carousel/bridal.jpg',
+  'Photoshoot Makeup': '/images/carousel/photoshoot.jpg',
+}
+
+interface Slide {
+  image: string
+  kicker: string
+  title: string
+  desc: string
+  cta: string
+  ctaLabel: string
+  faint?: boolean
+}
+
+const slides: Slide[] = [
   {
-    image: '/images/makeup1.jpg',
-    kicker: 'Now Hosting an Event',
-    title: program.title,
-    desc: program.theme,
-    cta: '/program',
-    ctaLabel: 'Get Full Details',
+    image: '/images/carousel/event.jpg',
+    kicker: 'Tickets On Sale',
+    title: '3-Days Beginner Makeup Class',
+    desc: '4th – 6th February 2027',
+    cta: '/register',
+    ctaLabel: 'Book Your Slot',
+    faint: true,
   },
-  ...galleryImages.map((image) => ({
-    image,
-    kicker: 'Shawty Beauty Studio',
-    title: 'Signature looks',
-    desc: 'Handcrafted makeup & lashes, tailored to you.',
+  ...lashServices
+    .filter((s) => s.title !== 'Classic Lashes')
+    .map((s) => ({
+      image: carouselImages[s.title],
+      kicker: 'Lash Tech',
+      title: s.title,
+      desc: s.desc,
+      cta: '#services',
+      ctaLabel: 'Explore Services',
+    })),
+  ...makeupServices.slice(0, 4).map((s) => ({
+    image: carouselImages[s.title],
+    kicker: 'Makeup',
+    title: s.title,
+    desc: s.desc,
     cta: '#services',
     ctaLabel: 'Explore Services',
   })),
@@ -23,28 +54,45 @@ const slides = [
 
 export default function EventsCarousel() {
   const [index, setIndex] = useState(0)
+  const startX = useRef<number | null>(null)
 
   useEffect(() => {
     const id = setInterval(() => {
       setIndex((i) => (i + 1) % slides.length)
     }, 3500)
     return () => clearInterval(id)
-  }, [])
+  }, [index])
 
   const prev = () => setIndex((i) => (i - 1 + slides.length) % slides.length)
   const next = () => setIndex((i) => (i + 1) % slides.length)
 
+  function onTouchStart(e: React.TouchEvent) {
+    startX.current = e.touches[0].clientX
+  }
+
+  function onTouchEnd(e: React.TouchEvent) {
+    if (startX.current === null) return
+    const dx = e.changedTouches[0].clientX - startX.current
+    if (Math.abs(dx) > 50) {
+      if (dx < 0) next()
+      else prev()
+    }
+    startX.current = null
+  }
+
   return (
     <div>
-      <div className="relative max-w-4xl mx-auto rounded-2xl md:rounded-3xl overflow-hidden shadow-xl">
+      <div className="relative max-w-4xl mx-auto rounded-2xl md:rounded-3xl overflow-hidden shadow-xl group">
           <div
             className="flex transition-transform duration-700 ease-out"
-            style={{ transform: `translateX(-${index * 100}%)` }}
+            style={{ transform: `translateX(-${index * 100}%)`, touchAction: 'pan-y' }}
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
           >
             {slides.map((s, i) => (
               <div key={i} className="w-full shrink-0">
-                <div className="relative h-52 sm:h-72 md:h-80 w-full">
-                  <img src={s.image} alt={s.title} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                <div className={`relative h-52 sm:h-72 md:h-80 w-full ${s.faint ? 'bg-gradient-to-br from-rose-dark via-rose to-gold' : ''}`}>
+                  <img src={s.image} alt={s.title} className={`absolute inset-0 w-full h-full object-cover ${s.faint ? 'opacity-40' : ''}`} loading="lazy" decoding="async" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                   <div className="absolute left-0 right-0 bottom-0 p-5 md:p-8 text-white">
                     <span className="inline-flex items-center gap-2 text-xs font-semibold bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full mb-2">
@@ -66,17 +114,17 @@ export default function EventsCarousel() {
 
           <button
             onClick={prev}
-            aria-label="Previous ad"
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/85 text-ink flex items-center justify-center shadow hover:bg-white"
+            aria-label="Previous slide"
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 text-ink flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
           >
-            <ChevronLeft size={22} />
+            <ChevronLeft size={24} />
           </button>
           <button
             onClick={next}
-            aria-label="Next ad"
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/85 text-ink flex items-center justify-center shadow hover:bg-white"
+            aria-label="Next slide"
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 text-ink flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
           >
-            <ChevronRight size={22} />
+            <ChevronRight size={24} />
           </button>
 
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">

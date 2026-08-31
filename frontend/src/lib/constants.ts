@@ -23,25 +23,25 @@ export const lashServices: Service[] = [
     title: 'Classic Lashes',
     desc: 'Natural, one-to-one lashes that enhance your eyes every day.',
     long: 'Classic lashes are applied lash-by-lash — one lightweight extension on every natural lash — for a clean, refined enhancement. They are gentle, comfortable and ideal for everyday wear, adding subtle length and definition without ever looking heavy or overdone.',
-    image: '/images/lashes.jpg',
+    image: '/images/classic lashes.jpg',
   },
   {
     title: 'Hybrid Lashes',
     desc: 'A textured mix of classic and volume for a soft, fuller look.',
     long: 'Hybrid lashes blend classic single extensions with volume fans for a textured look that is fuller than classic but still soft and natural. It is the perfect middle ground — a flirty, feathery set that frames the eyes beautifully.',
-    image: '/images/lashes.jpg',
+    image: '/images/hybrid-lash-extensions-vs-classic.jpg',
   },
   {
     title: 'Volume Lashes',
     desc: 'Fluffy, dramatic volume lashes for a glam, stand-out finish.',
     long: 'Volume lashes apply several ultra-fine extensions in a fan onto each natural lash, creating a fluffy, full and dramatically glamorous set. Lightweight yet striking, they are made for anyone who wants a bold, camera-ready look.',
-    image: '/images/lashes.jpg',
+    image: '/images/volume lashes.jpeg',
   },
   {
     title: 'Wispy Set / Bottom Lashes',
     desc: 'Wispy lash sets and bottom lashes to complete your look.',
     long: 'Wispy lash sets use varying lengths to create an airy, fluttery finish that looks effortless and textured. Add bottom lashes to open up and fully frame the eyes for an unexpected, striking finish.',
-    image: '/images/lashes.jpg',
+    image: '/images/wispy set lashes.jpg',
   },
 ]
 
@@ -50,31 +50,31 @@ export const makeupServices: Service[] = [
     title: 'Soft Glam',
     desc: 'Everyday elegant glam that keeps you looking fresh and radiant.',
     long: 'Soft glam enhances your natural features with luminous skin, neutral shadows and a graceful finish. It is the everyday elegant look — fresh, wearable and radiant enough for any occasion.',
-    image: '/images/makeup1.jpg',
+    image: '/images/soft glam.png',
   },
   {
     title: 'Full Glam',
     desc: 'High-impact, camera-ready glam for events and nights out.',
     long: 'Full glam is high-impact and unapologetic — sculpted cheeks, defined, smoky eyes and a flawless, long-wearing base built for events, parties and nights out. Every detail is perfected to look stunning in person and on camera.',
-    image: '/images/makeup2.jpg',
+    image: '/images/full glam.png',
   },
   {
     title: 'Bridal Glam',
     desc: 'Long-lasting bridal makeup designed to glow through your big day.',
     long: 'Bridal glam is crafted to last from the ceremony to the last dance. We design a timeless, glowing look around your dress and personality, use long-wear products, and make sure every photograph captures your best light.',
-    image: '/images/makeup1.jpg',
+    image: '/images/bridal glam.png',
   },
   {
     title: 'Photoshoot Makeup',
     desc: 'Makeup that photographs beautifully for shoots and content.',
     long: 'Photoshoot makeup is tailored to read beautifully on camera — studio or natural light, video or stills. Skin texture is perfected, shine is controlled and features are sculpted so you look your best in every frame.',
-    image: '/images/makeup2.jpg',
+    image: '/images/photoshoot makeup.png',
   },
   {
     title: 'Makeup Training (1-on-1)',
     desc: 'Personal one-on-one lessons to build your own skills and confidence.',
     long: 'Learn makeup at your own pace with personal, one-on-one coaching. Whether you are starting from zero or brushing up your technique, you will practice on live models and leave with the confidence to do your own makeup — or even client work.',
-    image: '/images/makeup1.jpg',
+    image: '/images/studio1.png',
   },
 ]
 
