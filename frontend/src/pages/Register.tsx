@@ -177,8 +177,8 @@ export default function Register() {
 
   return (
     <div>
-      <section className="relative overflow-hidden bg-gradient-to-br from-rose-dark via-rose to-gold">
-        <div className="container py-12 md:py-16 text-center">
+      <section className="sticky top-16 md:top-[72px] z-30 shadow-lg relative overflow-hidden bg-gradient-to-br from-rose-dark via-rose to-gold">
+        <div className="container py-8 md:py-10 text-center">
           <h1 className="font-display text-3xl md:text-5xl font-bold text-white leading-tight mb-2">
             3-Days Beginner Makeup Class
           </h1>
