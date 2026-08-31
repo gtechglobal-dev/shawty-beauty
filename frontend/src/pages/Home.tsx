@@ -33,6 +33,25 @@ export default function Home() {
           {/* Ads / events scrolling carousel */}
           <EventsCarousel />
 
+          {/* Tickets alert */}
+          <div className="relative mt-8 mx-auto max-w-4xl">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-rose-dark via-rose to-gold p-[1.5px] shadow-xl">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 rounded-2xl bg-ink text-cream px-6 py-4 text-center sm:text-left">
+                <span className="relative flex w-3 h-3 shrink-0" aria-hidden>
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-rose opacity-80 animate-ping" />
+                  <span className="relative inline-flex rounded-full w-3 h-3 bg-rose" />
+                </span>
+                <p className="text-cream/95 text-sm sm:text-base leading-snug">
+                  <span className="font-bold text-white">Buy your tickets now</span> for our
+                  3-Days Beginner Makeup Class &mdash; <span className="text-gold font-medium">early-bird slots are filling fast.</span>
+                </p>
+                <Link to="/register" className="btn btn-primary shrink-0 w-full sm:w-auto !bg-gradient-to-r !from-orange-600 !to-amber-500 alert-blink">
+                  Buy Now <ArrowRight size={18} />
+                </Link>
+              </div>
+            </div>
+          </div>
+
           {/* Content */}
           <div className="text-center pt-12 md:pt-16">
             <p className="text-ink/70 text-lg mb-8 max-w-xl leading-relaxed mx-auto">

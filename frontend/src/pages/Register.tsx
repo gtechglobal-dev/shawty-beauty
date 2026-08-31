@@ -4,6 +4,7 @@ import { CircleCheck, LoaderCircle, CreditCard, CircleAlert } from 'lucide-react
 import { formatNgn, tickets, type Ticket } from '../lib/constants'
 import { postJson } from '../lib/api'
 import { fetchPaystackConfig, loadPaystackScript, type PaystackConfig } from '../lib/paystack'
+import PhoneInput from '../components/PhoneInput'
 
 interface FormState {
   fullName: string
@@ -144,20 +145,26 @@ export default function Register() {
 
   return (
     <div>
-      <section className="bg-gradient-to-br from-blush via-cream to-white border-b border-black/5">
-        <div className="container py-12 md:py-14 text-center">
-          <span className="eyebrow mb-3">Registration</span>
-          <h1 className="section-title text-4xl mb-3">Register for the Class</h1>
-          <p className="text-ink/70 max-w-xl mx-auto">
-            Fill in the form below to secure your seat in the {`${programLabel()}`}. Venue is
-            disclosed to registered students after ticket purchase.
+      <section className="relative overflow-hidden bg-gradient-to-br from-rose-dark via-rose to-gold">
+        <div className="container py-12 md:py-16 text-center">
+          <h1 className="font-display text-3xl md:text-5xl font-bold text-white leading-tight mb-2">
+            3-Days Beginner Makeup Class
+          </h1>
+          <p className="text-amber-300 text-base md:text-lg font-semibold mb-3">4th – 6th February 2027</p>
+          <p className="inline-block text-white text-sm md:text-base font-semibold tracking-[0.15em] uppercase">
+            Registration / Ticket Purchase
           </p>
+          <p className="mt-2 text-white/85 text-sm md:text-base">Hosted by Shawty</p>
         </div>
       </section>
 
       <div className="container section-pad grid lg:grid-cols-[1fr_380px] gap-8 lg:gap-10 items-start">
         {/* FORM */}
         <form onSubmit={handleManualRegister} className="card p-6 sm:p-8">
+          <h2 className="font-display text-xl md:text-2xl font-bold mb-5">
+            Please provide the below information
+          </h2>
+
           {success && !loading && (
             <div className="mb-6 p-4 rounded-xl bg-green-50 border border-green-200 text-green-800 text-sm flex items-start gap-2">
               <CircleCheck size={20} className="shrink-0" />
@@ -191,8 +198,8 @@ export default function Register() {
             </div>
             <div>
               <label className="field-label">Phone Number *</label>
-              <input className="input-field" value={form.phone}
-                onChange={(e) => update('phone', e.target.value)} required placeholder="+234 812 345 6789" />
+              <PhoneInput value={form.phone} onChange={(v) => update('phone', v)} />
+              <p className="text-xs text-muted mt-1.5">Digits adjust to the selected country's network format.</p>
             </div>
             <div>
               <label className="field-label">Email Address *</label>
@@ -217,21 +224,6 @@ export default function Register() {
               <input className="input-field" value={form.emergencyContact}
                 onChange={(e) => update('emergencyContact', e.target.value)} required placeholder="Name & phone" />
             </div>
-            <div>
-              <label className="field-label">Ticket Type *</label>
-              <select className="input-field" value={form.ticketType}
-                onChange={(e) => update('ticketType', e.target.value as Ticket['id'])} required>
-                {tickets.map((t) => (
-                  <option key={t.id} value={t.id}>{t.label} — {formatNgn(t.price)} / {t.unitName}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="field-label">Quantity *</label>
-              <input type="number" min={1} max={10} className="input-field" value={form.quantity}
-                onChange={(e) => update('quantity', Math.max(1, Number(e.target.value)))}
-                placeholder="Number of tickets" />
-            </div>
             <div className="sm:col-span-2">
               <label className="field-label">What do you hope to learn from this program? *</label>
               <textarea className="input-field" rows={3} value={form.reason}
@@ -244,6 +236,51 @@ export default function Register() {
                 <option value="">Select an option</option>
                 {hearOptions.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="field-label">Ticket Type *</label>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {tickets.map((t) => {
+                  const checked = form.ticketType === t.id
+                  return (
+                    <label
+                      key={t.id}
+                      className={`flex flex-col cursor-pointer rounded-xl border px-4 py-3 transition-colors ${checked ? 'border-rose bg-rose/5 shadow-sm' : 'border-black/10 hover:border-rose/40'}`}
+                    >
+                      <input
+                        type="radio"
+                        name="ticketType"
+                        value={t.id}
+                        checked={checked}
+                        onChange={() => update('ticketType', t.id)}
+                        className="sr-only"
+                        required
+                      />
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-2">
+                          <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${checked ? 'border-rose' : 'border-ink/30'}`}>
+                            {checked && <span className="w-2 h-2 rounded-full bg-rose" />}
+                          </span>
+                          <span className="font-semibold text-sm">{t.label}</span>
+                          {t.highlighted && (
+                            <span className="text-[10px] font-bold uppercase tracking-wide bg-rose text-white px-2 py-0.5 rounded-full">Popular</span>
+                          )}
+                        </span>
+                        <span className="text-sm font-bold">{formatNgn(t.price)}</span>
+                      </span>
+                      <span className="text-xs text-muted mt-1 ml-6">per {t.unitName}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="field-label">Quantity *</label>
+              <input type="number" min={1} max={10} className="input-field w-full sm:max-w-44" value={form.quantity}
+                onChange={(e) => update('quantity', Math.max(1, Number(e.target.value)))}
+                placeholder="Number of tickets" />
             </div>
           </div>
 
@@ -296,8 +333,4 @@ export default function Register() {
       </div>
     </div>
   )
-
-  function programLabel() {
-    return '3-Day Beginner Makeup Class'
-  }
 }
