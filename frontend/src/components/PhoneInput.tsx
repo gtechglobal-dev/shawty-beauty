@@ -63,7 +63,7 @@ export default function PhoneInput({ value, onChange }: Props) {
           value={dial}
           onChange={(e) => changeDial(e.target.value)}
           aria-label="Country code"
-          className="appearance-none bg-white pl-3 pr-8 h-full text-sm font-medium outline-none cursor-pointer border-r border-black/10"
+          className="appearance-none bg-white pl-3 pr-8 py-3 h-full text-[0.9rem] font-medium outline-none cursor-pointer border-r border-black/10"
         >
           {countries.map((c) => (
             <option key={c.code} value={c.dial}>
@@ -85,7 +85,7 @@ export default function PhoneInput({ value, onChange }: Props) {
         maxLength={country.max}
         required
         aria-label="Phone number"
-        className="flex-1 min-w-0 bg-white px-3 text-[0.9rem] font-sans outline-none"
+        className="flex-1 min-w-0 bg-white px-3 py-3 text-[0.9rem] font-sans outline-none"
       />
     </div>
   )

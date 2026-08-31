@@ -12,6 +12,10 @@ interface Registration {
   phone: string
   email: string
   instagram: string
+  dateOfBirth?: string
+  state?: string
+  nationality?: string
+  address?: string
   experienceLevel: string
   emergencyContact: string
   ticketType: string
@@ -309,6 +313,10 @@ export default function Admin() {
                       <td className="px-6 py-3">
                         <div className="text-xs">{r.email}</div>
                         <div className="text-xs text-muted">{r.phone}</div>
+                        <div className="text-xs text-muted">
+                          {[r.nationality, r.state].filter(Boolean).join(' · ') || '—'}
+                        </div>
+                        {r.address && <div className="text-xs text-muted">📍 {r.address}</div>}
                       </td>
                       <td className="px-6 py-3">
                         <div>{TICKET_LABELS[r.ticketType] || r.ticketType} × {r.quantity}</div>

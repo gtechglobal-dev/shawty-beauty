@@ -50,6 +50,10 @@ export interface Registration {
   phone: string;
   email: string;
   instagram: string;
+  dateOfBirth: string;
+  state: string;
+  nationality: string;
+  address: string;
   experienceLevel: string;
   emergencyContact: string;
   ticketType: TicketType;

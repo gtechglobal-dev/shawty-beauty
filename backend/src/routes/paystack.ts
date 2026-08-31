@@ -52,6 +52,10 @@ interface InitBody {
   phone: string;
   email: string;
   instagram?: string;
+  dateOfBirth?: string;
+  state?: string;
+  nationality?: string;
+  address?: string;
   experienceLevel?: string;
   emergencyContact?: string;
   ticketType: TicketType;
@@ -99,6 +103,10 @@ router.post('/initialize', async (req: Request, res: Response) => {
       phone,
       email,
       instagram: (body.instagram || '').trim(),
+      dateOfBirth: (body.dateOfBirth || '').trim(),
+      state: (body.state || '').trim(),
+      nationality: (body.nationality || '').trim(),
+      address: (body.address || '').trim(),
       experienceLevel: (body.experienceLevel || '').trim(),
       emergencyContact: (body.emergencyContact || '').trim(),
       ticketType,

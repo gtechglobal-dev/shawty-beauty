@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CircleCheck, LoaderCircle, CreditCard, CircleAlert } from 'lucide-react'
-import { formatNgn, tickets, type Ticket } from '../lib/constants'
+import { CircleCheck, LoaderCircle, CreditCard, CircleAlert, Timer } from 'lucide-react'
+import { formatNgn, nationalities, nationalityNames, tickets, type Ticket } from '../lib/constants'
 import { postJson } from '../lib/api'
 import { fetchPaystackConfig, loadPaystackScript, type PaystackConfig } from '../lib/paystack'
 import PhoneInput from '../components/PhoneInput'
@@ -11,6 +11,10 @@ interface FormState {
   phone: string
   email: string
   instagram: string
+  dateOfBirth: string
+  state: string
+  nationality: string
+  address: string
   experienceLevel: string
   emergencyContact: string
   ticketType: Ticket['id']
@@ -24,6 +28,10 @@ const initial: FormState = {
   phone: '',
   email: '',
   instagram: '',
+  dateOfBirth: '',
+  state: '',
+  nationality: 'Nigerian',
+  address: '',
   experienceLevel: '',
   emergencyContact: '',
   ticketType: 'student',
@@ -42,7 +50,23 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  const earlyBirdDeadline = new Date('2026-12-31T23:59:59').getTime()
+  const earlyBirdExpired = now >= earlyBirdDeadline
+  const remaining = Math.max(0, earlyBirdDeadline - now)
+
+  useEffect(() => {
+    if (earlyBirdExpired && form.ticketType === 'early-bird') {
+      setForm((f) => ({ ...f, ticketType: 'student' }))
+    }
+  }, [earlyBirdExpired, form.ticketType])
 
   useEffect(() => {
     fetchPaystackConfig().then(setConfig).catch(() => {
@@ -73,6 +97,10 @@ export default function Register() {
         phone: form.phone,
         email: form.email,
         instagram: form.instagram,
+        dateOfBirth: form.dateOfBirth,
+        state: form.state,
+        nationality: form.nationality,
+        address: form.address,
         experienceLevel: form.experienceLevel,
         emergencyContact: form.emergencyContact,
         ticketType: form.ticketType,
@@ -128,6 +156,10 @@ export default function Register() {
         phone: form.phone,
         email: form.email,
         instagram: form.instagram,
+        dateOfBirth: form.dateOfBirth,
+        state: form.state,
+        nationality: form.nationality,
+        address: form.address,
         experienceLevel: form.experienceLevel,
         emergencyContact: form.emergencyContact,
         ticketType: form.ticketType,
@@ -162,7 +194,7 @@ export default function Register() {
         {/* FORM */}
         <form onSubmit={handleManualRegister} className="card p-6 sm:p-8">
           <h2 className="font-display text-xl md:text-2xl font-bold mb-5">
-            Please provide the below information
+            Provide the following Info
           </h2>
 
           {success && !loading && (
@@ -199,7 +231,6 @@ export default function Register() {
             <div>
               <label className="field-label">Phone Number *</label>
               <PhoneInput value={form.phone} onChange={(v) => update('phone', v)} />
-              <p className="text-xs text-muted mt-1.5">Digits adjust to the selected country's network format.</p>
             </div>
             <div>
               <label className="field-label">Email Address *</label>
@@ -212,6 +243,44 @@ export default function Register() {
                 onChange={(e) => update('instagram', e.target.value)} placeholder="@yourhandle" />
             </div>
             <div>
+              <label className="field-label">Date of Birth *</label>
+              <input type="date" className="input-field" value={form.dateOfBirth}
+                onChange={(e) => update('dateOfBirth', e.target.value)} required />
+            </div>
+            <div>
+              <label className="field-label">Nationality *</label>
+              {form.nationality && !nationalityNames.includes(form.nationality) ? (
+                <input className="input-field" value={form.nationality === 'Other' ? '' : form.nationality}
+                  onChange={(e) => { update('state', ''); update('nationality', e.target.value) }}
+                  required placeholder="Type your nationality (e.g. Tanzanian)" autoFocus />
+              ) : (
+                <select className="input-field" value={form.nationality}
+                  onChange={(e) => { update('state', ''); update('nationality', e.target.value) }} required>
+                  <option value="">Select nationality</option>
+                  {nationalityNames.map((n) => <option key={n} value={n}>{n}</option>)}
+                  <option value="Other">Other</option>
+                </select>
+              )}
+            </div>
+            <div>
+              <label className="field-label">State of Residence *</label>
+              {nationalities[form.nationality] ? (
+                <select className="input-field" value={form.state}
+                  onChange={(e) => update('state', e.target.value)} required>
+                  <option value="">Select state</option>
+                  {nationalities[form.nationality].map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              ) : (
+                <input className="input-field" value={form.state}
+                  onChange={(e) => update('state', e.target.value)} required placeholder="Type your state / region" />
+              )}
+            </div>
+            <div className="sm:col-span-2">
+              <label className="field-label">Address *</label>
+              <input className="input-field" value={form.address}
+                onChange={(e) => update('address', e.target.value)} required placeholder="Street, area, city" />
+            </div>
+            <div>
               <label className="field-label">Makeup Experience Level *</label>
               <select className="input-field" value={form.experienceLevel}
                 onChange={(e) => update('experienceLevel', e.target.value)} required>
@@ -220,9 +289,8 @@ export default function Register() {
               </select>
             </div>
             <div>
-              <label className="field-label">Emergency Contact *</label>
-              <input className="input-field" value={form.emergencyContact}
-                onChange={(e) => update('emergencyContact', e.target.value)} required placeholder="Name & phone" />
+              <label className="field-label">Emergency Contact Number *</label>
+              <PhoneInput value={form.emergencyContact} onChange={(v) => update('emergencyContact', v)} />
             </div>
             <div className="sm:col-span-2">
               <label className="field-label">What do you hope to learn from this program? *</label>
@@ -242,11 +310,13 @@ export default function Register() {
               <label className="field-label">Ticket Type *</label>
               <div className="grid sm:grid-cols-2 gap-3">
                 {tickets.map((t) => {
+                  const isEarlyBird = t.id === 'early-bird'
+                  const disabled = isEarlyBird && earlyBirdExpired
                   const checked = form.ticketType === t.id
                   return (
                     <label
                       key={t.id}
-                      className={`flex flex-col cursor-pointer rounded-xl border px-4 py-3 transition-colors ${checked ? 'border-rose bg-rose/5 shadow-sm' : 'border-black/10 hover:border-rose/40'}`}
+                      className={`flex flex-col rounded-xl border px-4 py-3 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${checked ? 'border-rose bg-rose/5 shadow-sm' : 'border-black/10 hover:border-rose/40'}`}
                     >
                       <input
                         type="radio"
@@ -254,6 +324,7 @@ export default function Register() {
                         value={t.id}
                         checked={checked}
                         onChange={() => update('ticketType', t.id)}
+                        disabled={disabled}
                         className="sr-only"
                         required
                       />
@@ -263,13 +334,31 @@ export default function Register() {
                             {checked && <span className="w-2 h-2 rounded-full bg-rose" />}
                           </span>
                           <span className="font-semibold text-sm">{t.label}</span>
-                          {t.highlighted && (
-                            <span className="text-[10px] font-bold uppercase tracking-wide bg-rose text-white px-2 py-0.5 rounded-full">Popular</span>
-                          )}
                         </span>
                         <span className="text-sm font-bold">{formatNgn(t.price)}</span>
                       </span>
-                      <span className="text-xs text-muted mt-1 ml-6">per {t.unitName}</span>
+                      {isEarlyBird ? (
+                        earlyBirdExpired ? (
+                          <span className="text-xs font-semibold text-rose-dark mt-2 ml-6">Sales ended</span>
+                        ) : (
+                          <span className="text-xs font-medium mt-2 ml-6">
+                            <Timer size={13} className="inline -mt-0.5 mr-1 text-rose-dark" />
+                            Ends in{' '}
+                            <span className="font-bold text-rose-dark tabular-nums">
+                              {formatCountdown(remaining)}
+                            </span>
+                          </span>
+                        )
+                      ) : (
+                        <>
+                          <span className="text-xs text-muted mt-1 ml-6">
+                            per {t.unitName}
+                          </span>
+                          {t.highlighted && (
+                            <span className="text-[10px] font-bold uppercase tracking-wide bg-rose text-white px-2 py-0.5 rounded-full mt-2 ml-6 w-fit">Popular</span>
+                          )}
+                        </>
+                      )}
                     </label>
                   )
                 })}
@@ -326,11 +415,20 @@ export default function Register() {
               <li>• The venue is disclosed to registered students after ticket purchase.</li>
               <li>• Bring your own makeup products and tools.</li>
               <li>• Morning (9:00 AM) and Evening (3:00 PM) sections available.</li>
-              <li>• Exact date will be communicated to registered students.</li>
             </ul>
           </div>
         </aside>
       </div>
     </div>
   )
+}
+
+function formatCountdown(ms: number) {
+  const s = Math.floor(ms / 1000)
+  const days = Math.floor(s / 86400)
+  const hours = Math.floor((s % 86400) / 3600)
+  const mins = Math.floor((s % 3600) / 60)
+  const secs = s % 60
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${days}d ${pad(hours)}h ${pad(mins)}m ${pad(secs)}s`
 }
