@@ -231,6 +231,18 @@ export default function Register() {
             <p className="mt-2 text-white/85 text-sm md:text-base">Hosted by Shawty</p>
           </Reveal>
         </div>
+        <div className="relative border-t border-white/10 bg-black/45 py-3 overflow-hidden">
+          <div className="marquee">
+            <div className="marquee-track items-center text-white/90">
+              <span className="px-6 text-sm md:text-base font-medium tracking-wide">
+                Please ensure you use a valid email address as tickets will be delivered to you via your email. Thank you! ✦
+              </span>
+              <span className="px-6 text-sm md:text-base font-medium tracking-wide">
+                Please ensure you use a valid email address as tickets will be delivered to you via your email. Thank you! ✦
+              </span>
+            </div>
+          </div>
+        </div>
       </section>
 
       <div className="container section-pad grid lg:grid-cols-[1fr_380px] gap-8 lg:gap-10 items-start min-w-0">

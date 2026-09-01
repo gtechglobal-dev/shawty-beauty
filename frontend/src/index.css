@@ -390,3 +390,32 @@ h1, h2, h3, .font-display {
 .loader-progress {
   animation: loaderFill 1.1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
+
+/* ======= Scrolling ticker / marquee ======= */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
+}
+.marquee {
+  display: flex;
+  overflow: hidden;
+  white-space: nowrap;
+  width: 100%;
+}
+.marquee-track {
+  display: flex;
+  flex-shrink: 0;
+  min-width: max-content;
+  animation: marquee 24s linear infinite;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+  .marquee {
+    justify-content: center;
+  }
+}
