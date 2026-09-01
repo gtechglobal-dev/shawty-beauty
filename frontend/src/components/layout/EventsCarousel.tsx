@@ -29,7 +29,7 @@ const slides: Slide[] = [
     title: '3-Days Beginner Makeup Class',
     desc: '4th – 6th February 2027',
     cta: '/register',
-    ctaLabel: 'Book Your Slot',
+    ctaLabel: 'Get Your Tickets',
     faint: true,
   },
   ...lashServices
