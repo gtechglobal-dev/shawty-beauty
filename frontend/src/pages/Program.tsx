@@ -123,11 +123,11 @@ export default function Program() {
             <h2 className="section-title mt-3 mb-2">Choose your ticket</h2>
             <p className="text-ink/70 mb-10">The exact date and details will be communicated. Venue is disclosed to registered students after ticket purchase.</p>
           </Reveal>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid sm:grid-cols-2 gap-6 max-w-3xl">
             {tickets.map((t, i) => (
-              <Reveal key={t.id} variant="zoom" delay={i * 100}>
-                <Link to="/register" className="block">
-                  <TicketCard t={t} />
+              <Reveal key={t.id} variant="zoom" delay={i * 100} className="h-full">
+                <Link to="/register" className="block h-full">
+                  <TicketCard t={t} className="h-full" />
                 </Link>
               </Reveal>
             ))}

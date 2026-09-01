@@ -6,11 +6,13 @@ export default function TicketCard({
   now = Date.now(),
   showRadio = false,
   selected = false,
+  className = '',
 }: {
   t: Ticket
   now?: number
   showRadio?: boolean
   selected?: boolean
+  className?: string
 }) {
   const price = ticketPrice(t, now)
   const promoActive = ticketPromoActive(t, now)
@@ -23,7 +25,7 @@ export default function TicketCard({
         selected
           ? 'ring-2 ring-offset-2 ring-rose-dark shadow-lg'
           : 'border border-black/10 hover:-translate-y-0.5 hover:shadow-md'
-      } ${isStudent ? 'ticket-student' : 'ticket-gold'}`}
+      } ${isStudent ? 'ticket-student' : 'ticket-gold'} ${className}`}
     >
       {selected && (
         <span className="absolute top-2.5 right-2.5 z-10 w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-sm">

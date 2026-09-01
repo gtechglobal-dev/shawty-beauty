@@ -144,7 +144,6 @@ export const tickets: Ticket[] = [
     price: 10000,
     unitName: 'person',
     includes: ['Full 3-day class', 'Branded shirt / cap'],
-    description: 'Our premium experience — front-row access, extra attention and a branded shirt & cap to complete your look.',
   },
 ]
 

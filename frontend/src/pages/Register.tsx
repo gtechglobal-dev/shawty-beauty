@@ -386,7 +386,7 @@ export default function Register() {
               <label className="field-label">Ticket Type *</label>
               <div className="grid sm:grid-cols-2 gap-3">
                 {tickets.map((t) => (
-                  <label key={t.id} className="cursor-pointer block">
+                  <label key={t.id} className="cursor-pointer block h-full">
                     <input
                       type="radio"
                       name="ticketType"
@@ -396,7 +396,7 @@ export default function Register() {
                       className="sr-only"
                       required
                     />
-                    <TicketCard t={t} now={now} showRadio selected={form.ticketType === t.id} />
+                    <TicketCard t={t} now={now} showRadio selected={form.ticketType === t.id} className="h-full" />
                   </label>
                 ))}
               </div>
