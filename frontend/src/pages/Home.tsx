@@ -108,16 +108,16 @@ export default function Home() {
               </div>
               <div className="grid grid-cols-3 gap-3 max-w-md mx-auto">
                 <div className="card card-hover px-4 py-3 text-center">
-                  <div className="font-display text-2xl font-bold text-rose-dark"><CountUp end={5} suffix="+" /></div>
-                  <div className="text-[11px] text-muted mt-0.5">Makeup Looks</div>
+                  <div className="font-display text-2xl font-bold text-rose-dark"><CountUp end={500} suffix="+" /></div>
+                  <div className="text-[11px] text-muted mt-0.5">Happy Clients</div>
                 </div>
                 <div className="card card-hover px-4 py-3 text-center delay-100">
-                  <div className="font-display text-2xl font-bold text-rose-dark"><CountUp end={4} /></div>
-                  <div className="text-[11px] text-muted mt-0.5">Lash Sets</div>
+                  <div className="font-display text-2xl font-bold text-rose-dark"><CountUp end={5} suffix="+" /></div>
+                  <div className="text-[11px] text-muted mt-0.5">Years of Experience</div>
                 </div>
                 <div className="card card-hover px-4 py-3 text-center delay-200">
-                  <div className="font-display text-2xl font-bold text-rose-dark">1-on-1</div>
-                  <div className="text-[11px] text-muted mt-0.5">Training</div>
+                  <div className="font-display text-2xl font-bold text-rose-dark"><CountUp end={100} suffix="+" /></div>
+                  <div className="text-[11px] text-muted mt-0.5">Beauty Sessions</div>
                 </div>
               </div>
             </div>
