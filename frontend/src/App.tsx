@@ -18,6 +18,7 @@ export default function App() {
   const isAdmin = pathname.startsWith('/admin')
 
   const [loading, setLoading] = useState(true)
+  const [fading, setFading] = useState(false)
 
   // Scroll to top on navigation; if landing with a #hash, the browser scrolls to it
   useEffect(() => {
@@ -25,12 +26,19 @@ export default function App() {
   }, [pathname, hash])
 
   // Loader: show on first load and on every navigation; brief but measurable
-  // to give an anticipatory feel rather than a flash.
+  // to give an anticipatory feel rather than a flash. After the hold time
+  // elapses, fade the loader out before revealing the page.
   useEffect(() => {
     setLoading(true)
-    const t = setTimeout(() => setLoading(false), 1100)
+    setFading(false)
+    const t = setTimeout(() => {
+      setLoading(false)
+      setFading(true)
+    }, 1100)
     return () => clearTimeout(t)
   }, [pathname])
+
+  const handleFadeEnd = () => setFading(false)
 
   if (isAdmin) {
     return <Admin />
@@ -38,7 +46,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-cream text-ink flex flex-col">
-      <Loader show={loading} />
+      <Loader show={loading} fading={fading} onFadeEnd={handleFadeEnd} />
       <Navbar />
       <main key={pathname} className="flex-1 page-enter overflow-x-clip">
         <Routes>
