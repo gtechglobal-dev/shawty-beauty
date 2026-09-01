@@ -101,20 +101,51 @@ export const program = {
 }
 
 export interface Ticket {
-  id: 'early-bird' | 'student' | 'vip' | 'group'
+  id: 'student' | 'gold'
   label: string
   price: number
+  originalPrice?: number
+  promoDeadline?: number
   unitName: string
   includes: string[]
+  description?: string
   highlighted?: boolean
   slot?: string
 }
 
+// Promo window for the discounted Student ticket. Before this deadline the
+// Student ticket sells at `price` (with `originalPrice` struck through); after
+// it elapses, `originalPrice` becomes the active price automatically.
+export const promoDeadline = new Date('2026-12-31T23:59:59').getTime()
+
+export function ticketPrice(t: Ticket, now = Date.now()): number {
+  if (t.promoDeadline && t.originalPrice && now < t.promoDeadline) return t.price
+  return t.originalPrice ?? t.price
+}
+
+export function ticketPromoActive(t: Ticket, now = Date.now()): boolean {
+  return Boolean(t.promoDeadline && t.originalPrice && now < t.promoDeadline)
+}
+
 export const tickets: Ticket[] = [
-  { id: 'early-bird', label: 'Early Bird', price: 3000, unitName: 'person', includes: ['Full 3-day class'] },
-  { id: 'student', label: 'Student', price: 5000, unitName: 'person', includes: ['Full 3-day class'], highlighted: true },
-  { id: 'vip', label: 'VIP', price: 10000, unitName: 'person', includes: ['Full 3-day class', 'Branded shirt / cap'] },
-  { id: 'group', label: 'Group', price: 10000, unitName: 'group of 4', includes: ['Full 3-day class for 4 persons'] },
+  {
+    id: 'student',
+    label: 'Student',
+    price: 3000,
+    originalPrice: 5000,
+    promoDeadline,
+    unitName: 'person',
+    includes: ['Full 3-day class'],
+    highlighted: true,
+  },
+  {
+    id: 'gold',
+    label: 'Gold',
+    price: 10000,
+    unitName: 'person',
+    includes: ['Full 3-day class', 'Branded shirt / cap'],
+    description: 'Our premium experience — front-row access, extra attention and a branded shirt & cap to complete your look.',
+  },
 ]
 
 export interface SponsorPkg {

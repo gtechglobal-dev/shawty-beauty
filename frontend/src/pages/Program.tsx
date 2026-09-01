@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { formatNgn, program, tickets } from '../lib/constants'
 import Reveal from '../components/Reveal'
+import TicketCard from '../components/TicketCard'
 
 export default function Program() {
   return (
@@ -125,24 +126,9 @@ export default function Program() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {tickets.map((t, i) => (
               <Reveal key={t.id} variant="zoom" delay={i * 100}>
-              <div className={`card p-6 flex flex-col card-hover ${t.highlighted ? 'ring-2 ring-rose border-glow' : ''}`}>
-                <span className="text-sm font-semibold text-rose-dark">{t.label}</span>
-                <div className="mt-2 mb-4">
-                  <span className="font-display text-4xl font-bold">{formatNgn(t.price)}</span>
-                  <span className="text-sm text-muted ml-1">/ {t.unitName}</span>
-                </div>
-                <ul className="space-y-2 text-sm text-ink/75 mb-6">
-                  {t.includes.map((inc) => (
-                    <li key={inc} className="flex items-start gap-2">
-                      <CircleCheck className="text-rose shrink-0 mt-0.5" size={16} />
-                      {inc}
-                    </li>
-                  ))}
-                </ul>
-                <Link to="/register" className="btn btn-primary mt-auto w-full">
-                  Get {t.label}
+                <Link to="/register" className="block">
+                  <TicketCard t={t} />
                 </Link>
-              </div>
               </Reveal>
             ))}
           </div>

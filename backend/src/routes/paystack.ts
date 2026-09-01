@@ -18,39 +18,41 @@ const PROCESSING_FEE_BASE = 100; // + ₦100 fixed
 
 const router = Router();
 
-export const TICKETS: Record<
-  TicketType,
-  { id: TicketType; label: string; price: number; includes: string[]; unitName: string }
-> = {
-  'early-bird': {
-    id: 'early-bird',
-    label: 'Early Bird',
-    price: 3000,
-    unitName: 'person',
-    includes: ['Full 3-day class'],
-  },
+// Promo window for the discounted Student ticket. Before this deadline the
+// ticket charges `price`; when it elapses, `originalPrice` becomes active.
+const PROMO_DEADLINE = new Date('2026-12-31T23:59:59').getTime();
+
+interface TicketMeta {
+  id: TicketType;
+  label: string;
+  price: number;
+  originalPrice?: number;
+  unitName: string;
+  includes: string[];
+}
+
+export const TICKETS: Record<TicketType, TicketMeta> = {
   student: {
     id: 'student',
     label: 'Student',
-    price: 5000,
+    price: 3000,
+    originalPrice: 5000,
     unitName: 'person',
     includes: ['Full 3-day class'],
   },
-  vip: {
-    id: 'vip',
-    label: 'VIP',
+  gold: {
+    id: 'gold',
+    label: 'Gold',
     price: 10000,
     unitName: 'person',
     includes: ['Full 3-day class', 'Branded shirt / cap'],
   },
-  group: {
-    id: 'group',
-    label: 'Group (4 persons)',
-    price: 10000,
-    unitName: 'group (4 persons)',
-    includes: ['Full 3-day class for 4 persons'],
-  },
 };
+
+export function ticketPrice(ticket: TicketMeta): number {
+  if (ticket.originalPrice && Date.now() < PROMO_DEADLINE) return ticket.price;
+  return ticket.originalPrice ?? ticket.price;
+}
 
 interface InitBody {
   fullName: string;
@@ -205,7 +207,7 @@ router.post('/initialize', async (req: Request, res: Response) => {
       });
     }
 
-    const subtotal = ticket.price * quantity; // naira
+    const subtotal = ticketPrice(ticket) * quantity; // naira
     const processingFee = Math.round(subtotal * PROCESSING_FEE_RATE) + PROCESSING_FEE_BASE;
     const totalAmount = subtotal + processingFee; // naira
 
@@ -224,7 +226,7 @@ router.post('/initialize', async (req: Request, res: Response) => {
       emergencyContact: (body.emergencyContact || '').trim(),
       ticketType,
       quantity,
-      unitPrice: ticket.price,
+      unitPrice: ticketPrice(ticket),
       subtotal,
       processingFee,
       amount: totalAmount,
@@ -399,7 +401,7 @@ router.get('/config', (_req: Request, res: Response) => {
     paystackEnabled: Boolean(PAYSTACK_SECRET && publicKey),
     publicKey,
     baseUrl: process.env.BASE_URL || 'http://localhost:5173',
-    tickets: Object.values(TICKETS),
+    tickets: Object.values(TICKETS).map((t) => ({ ...t, price: ticketPrice(t) })),
   });
 });
 

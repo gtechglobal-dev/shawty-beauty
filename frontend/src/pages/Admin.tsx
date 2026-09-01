@@ -57,7 +57,7 @@ const SPONSOR_LABELS: Record<string, string> = {
 }
 
 const TICKET_LABELS: Record<string, string> = {
-  'early-bird': 'Early Bird', student: 'Student', vip: 'VIP', group: 'Group',
+  student: 'Student', gold: 'Gold',
 }
 
 function statusBadge(status: string) {

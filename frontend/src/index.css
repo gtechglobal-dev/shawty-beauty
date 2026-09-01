@@ -419,3 +419,15 @@ h1, h2, h3, .font-display {
     justify-content: center;
   }
 }
+
+/* ======= Ticket-style cards ======= */
+.ticket-student {
+  border-color: rgba(192, 122, 147, 0.5);
+}
+.ticket-gold {
+  border-color: rgba(201, 168, 106, 0.6);
+}
+.ticket-gold:hover {
+  box-shadow: 0 16px 34px rgba(201, 168, 106, 0.25);
+  border-color: rgba(201, 168, 106, 0.9);
+}

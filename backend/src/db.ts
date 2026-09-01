@@ -35,7 +35,7 @@ function getCollection<T extends { _id?: ObjectId }>(name: string): Collection<T
 // Student Registrations (ticket purchases)
 // ------------------------------------------------------------------
 
-export type TicketType = 'early-bird' | 'student' | 'vip' | 'group';
+export type TicketType = 'student' | 'gold';
 
 export type RegistrationStatus =
   | 'pending'

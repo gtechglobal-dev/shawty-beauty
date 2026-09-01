@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CircleCheck, LoaderCircle, CreditCard, CircleAlert, Timer, Image as ImageIcon } from 'lucide-react'
-import { formatNgn, nationalities, nationalityNames, tickets, type Ticket } from '../lib/constants'
+import { CircleCheck, LoaderCircle, CreditCard, CircleAlert, Image as ImageIcon } from 'lucide-react'
+import { formatNgn, nationalities, nationalityNames, tickets, ticketPrice, type Ticket } from '../lib/constants'
 import { postJson } from '../lib/api'
 import { fetchPaystackConfig, loadPaystackScript, type PaystackConfig } from '../lib/paystack'
 import PhoneInput from '../components/PhoneInput'
 import Reveal from '../components/Reveal'
+import TicketCard from '../components/TicketCard'
 
 interface FormState {
   fullName: string
@@ -63,15 +64,10 @@ export default function Register() {
     return () => clearInterval(id)
   }, [])
 
-  const earlyBirdDeadline = new Date('2026-12-31T23:59:59').getTime()
-  const earlyBirdExpired = now >= earlyBirdDeadline
-  const remaining = Math.max(0, earlyBirdDeadline - now)
-
   useEffect(() => {
-    if (earlyBirdExpired && form.ticketType === 'early-bird') {
-      setForm((f) => ({ ...f, ticketType: 'student' }))
-    }
-  }, [earlyBirdExpired, form.ticketType])
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   useEffect(() => {
     fetchPaystackConfig().then(setConfig).catch(() => {
@@ -81,7 +77,8 @@ export default function Register() {
   }, [])
 
   const selected = tickets.find((t) => t.id === form.ticketType)!
-  const subtotal = selected.price * form.quantity
+  const selectedPrice = ticketPrice(selected, now)
+  const subtotal = selectedPrice * form.quantity
   const processingFee = Math.round(subtotal * PROCESSING_FEE_RATE) + PROCESSING_FEE_BASE
   const total = subtotal + processingFee
 
@@ -388,59 +385,20 @@ export default function Register() {
             <div className="sm:col-span-2">
               <label className="field-label">Ticket Type *</label>
               <div className="grid sm:grid-cols-2 gap-3">
-                {tickets.map((t) => {
-                  const isEarlyBird = t.id === 'early-bird'
-                  const disabled = isEarlyBird && earlyBirdExpired
-                  const checked = form.ticketType === t.id
-                  return (
-                    <label
-                      key={t.id}
-                      className={`flex flex-col rounded-xl border px-4 py-3 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${checked ? 'border-rose bg-rose/5 shadow-sm' : 'border-black/10 hover:border-rose/40'}`}
-                    >
-                      <input
-                        type="radio"
-                        name="ticketType"
-                        value={t.id}
-                        checked={checked}
-                        onChange={() => update('ticketType', t.id)}
-                        disabled={disabled}
-                        className="sr-only"
-                        required
-                      />
-                      <span className="flex items-center justify-between gap-2 min-w-0">
-                        <span className="flex items-center gap-2 min-w-0">
-                          <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${checked ? 'border-rose' : 'border-ink/30'}`}>
-                            {checked && <span className="w-2 h-2 rounded-full bg-rose" />}
-                          </span>
-                          <span className="font-semibold text-sm leading-tight">{t.label}</span>
-                        </span>
-                        <span className="text-sm font-bold shrink-0">{formatNgn(t.price)}</span>
-                      </span>
-                      {isEarlyBird ? (
-                        earlyBirdExpired ? (
-                          <span className="text-xs font-semibold text-rose-dark mt-2 ml-6">Sales ended</span>
-                        ) : (
-                          <span className="text-xs font-medium mt-2 ml-6">
-                            <Timer size={13} className="inline -mt-0.5 mr-1 text-rose-dark" />
-                            Ends in{' '}
-                            <span className="font-bold text-rose-dark tabular-nums">
-                              {formatCountdown(remaining)}
-                            </span>
-                          </span>
-                        )
-                      ) : (
-                        <>
-                          <span className="text-xs text-muted mt-1 ml-6">
-                            per {t.unitName}
-                          </span>
-                          {t.highlighted && (
-                            <span className="text-[10px] font-bold uppercase tracking-wide bg-rose text-white px-2 py-0.5 rounded-full mt-2 ml-6 w-fit">Popular</span>
-                          )}
-                        </>
-                      )}
-                    </label>
-                  )
-                })}
+                {tickets.map((t) => (
+                  <label key={t.id} className="cursor-pointer block">
+                    <input
+                      type="radio"
+                      name="ticketType"
+                      value={t.id}
+                      checked={form.ticketType === t.id}
+                      onChange={() => update('ticketType', t.id)}
+                      className="sr-only"
+                      required
+                    />
+                    <TicketCard t={t} now={now} showRadio selected={form.ticketType === t.id} />
+                  </label>
+                ))}
               </div>
             </div>
 
@@ -454,7 +412,7 @@ export default function Register() {
 
           <div className="mt-8 pt-6 border-t border-black/8">
             <div className="flex items-center justify-between text-sm text-muted mb-1">
-              <span>Ticket amount ({form.quantity} × {formatNgn(selected.price)})</span>
+              <span>Ticket amount ({form.quantity} × {formatNgn(selectedPrice)})</span>
               <span>{formatNgn(subtotal)}</span>
             </div>
             <div className="flex items-center justify-between text-sm text-muted mb-3">
@@ -521,12 +479,4 @@ export default function Register() {
   )
 }
 
-function formatCountdown(ms: number) {
-  const s = Math.floor(ms / 1000)
-  const days = Math.floor(s / 86400)
-  const hours = Math.floor((s % 86400) / 3600)
-  const mins = Math.floor((s % 3600) / 60)
-  const secs = s % 60
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${days}d ${pad(hours)}h ${pad(mins)}m ${pad(secs)}s`
-}
+
