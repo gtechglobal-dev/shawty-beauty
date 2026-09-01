@@ -490,6 +490,23 @@ h1, h2, h3, .font-display {
 .ticket-card.ticket-student.selected::after {
   background: radial-gradient(120% 120% at 50% 130%, rgba(192, 122, 147, 0.22), transparent 60%);
 }
+
+/* Zigzag puppy-toothed ticket edges (left & right) */
+.ticket-card.notched {
+  --radius: 10px;   /* how deep the scallop bites into the edge */
+  --gap: 22px;      /* vertical size of each scallop tile */
+  border-radius: 12px;
+  -webkit-mask:
+    linear-gradient(#000 0 0) 0 0 / calc(100% - 2 * var(--radius)) 100% no-repeat,
+    radial-gradient(var(--radius) at 0 50%, #0000 99%, #000) left / var(--gap) 100% repeat-y,
+    radial-gradient(var(--radius) at 100% 50%, #0000 99%, #000) right / var(--gap) 100% repeat-y;
+  mask:
+    linear-gradient(#000 0 0) 0 0 / calc(100% - 2 * var(--radius)) 100% no-repeat,
+    radial-gradient(var(--radius) at 0 50%, #0000 99%, #000) left / var(--gap) 100% repeat-y,
+    radial-gradient(var(--radius) at 100% 50%, #0000 99%, #000) right / var(--gap) 100% repeat-y;
+  -webkit-mask-composite: source-over;
+  mask-composite: add;
+}
 @keyframes ticket-spin {
   to { --angle: 360deg; }
 }

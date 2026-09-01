@@ -21,7 +21,7 @@ export default function TicketCard({
 
   return (
     <div
-      className={`ticket-card relative overflow-hidden rounded-2xl bg-white shadow-sm transition-all duration-200 ${
+      className={`ticket-card notched relative overflow-hidden rounded-2xl bg-white shadow-sm transition-all duration-200 ${
         selected
           ? 'selected ring-2 ring-offset-2 ring-rose-dark shadow-lg'
           : 'border border-black/10 hover:-translate-y-0.5 hover:shadow-md'
