@@ -61,7 +61,7 @@ export default function Home() {
                     Live
                   </span>
                 </p>
-                <Link to="/register" className="relative z-10 btn btn-primary shrink-0 w-full sm:w-auto hover:!bg-fuchsia-700 alert-blink" style={{ background: '#d946ef', boxShadow: '0 8px 24px rgba(217, 70, 239, 0.35)' }}>
+                <Link to="/register" className="relative z-10 btn shrink-0 w-full sm:w-auto text-white font-bold alert-blink" style={{ background: 'linear-gradient(135deg, #f59e0b, #f97316)', boxShadow: '0 8px 24px rgba(249, 115, 22, 0.4)' }}>
                   Secure Your Ticket <ArrowRight size={18} />
                 </Link>
               </div>
