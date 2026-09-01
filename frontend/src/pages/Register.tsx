@@ -275,39 +275,39 @@ export default function Register() {
             </div>
           )}
 
-          <div className="grid sm:grid-cols-2 gap-5">
-            <div>
+          <div className="grid sm:grid-cols-2 gap-5 min-w-0">
+            <div className="min-w-0">
               <label className="field-label">Full Name *</label>
               <input className="input-field" value={form.fullName}
                 onChange={(e) => update('fullName', e.target.value)} required placeholder="Jane Doe" />
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="field-label">Phone Number *</label>
               <PhoneInput value={form.phone} onChange={(v) => update('phone', v)} />
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="field-label">Email Address *</label>
               <input type="email" className="input-field" value={form.email}
                 onChange={(e) => update('email', e.target.value)} required placeholder="you@email.com" />
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="field-label">Instagram Handle</label>
               <input className="input-field" value={form.instagram}
                 onChange={(e) => update('instagram', e.target.value)} placeholder="@yourhandle" />
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="field-label">Date of Birth *</label>
               <input type="date" className="input-field" value={form.dateOfBirth}
                 onChange={(e) => update('dateOfBirth', e.target.value)} required />
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="field-label">Nationality *</label>
               {form.nationality && !nationalityNames.includes(form.nationality) ? (
                 <input className="input-field" value={form.nationality === 'Other' ? '' : form.nationality}
                   onChange={(e) => { update('state', ''); update('nationality', e.target.value) }}
                   required placeholder="Type your nationality (e.g. Tanzanian)" autoFocus />
               ) : (
-                <select className="input-field" value={form.nationality}
+                <select className="input-field w-full min-w-0" value={form.nationality}
                   onChange={(e) => { update('state', ''); update('nationality', e.target.value) }} required>
                   <option value="">Select nationality</option>
                   {nationalityNames.map((n) => <option key={n} value={n}>{n}</option>)}
@@ -315,10 +315,10 @@ export default function Register() {
                 </select>
               )}
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="field-label">State of Residence *</label>
               {nationalities[form.nationality] ? (
-                <select className="input-field" value={form.state}
+                <select className="input-field w-full min-w-0" value={form.state}
                   onChange={(e) => update('state', e.target.value)} required>
                   <option value="">Select state</option>
                   {nationalities[form.nationality].map((s) => <option key={s} value={s}>{s}</option>)}
@@ -328,41 +328,41 @@ export default function Register() {
                   onChange={(e) => update('state', e.target.value)} required placeholder="Type your state / region" />
               )}
             </div>
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 min-w-0">
               <label className="field-label">Address *</label>
               <input className="input-field" value={form.address}
                 onChange={(e) => update('address', e.target.value)} required placeholder="Street, area, city" />
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="field-label">Makeup Experience Level *</label>
-              <select className="input-field" value={form.experienceLevel}
+              <select className="input-field w-full min-w-0" value={form.experienceLevel}
                 onChange={(e) => update('experienceLevel', e.target.value)} required>
                 <option value="">Select level</option>
                 {experienceOptions.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="field-label">Emergency Contact Number *</label>
               <PhoneInput value={form.emergencyContact} onChange={(v) => update('emergencyContact', v)} />
             </div>
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 min-w-0">
               <label className="field-label">What do you hope to learn from this program? *</label>
               <textarea className="input-field" rows={3} value={form.reason}
                 onChange={(e) => update('reason', e.target.value)} required placeholder="Tell us what you'd love to take away from the class" />
             </div>
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 min-w-0">
               <label className="field-label">How did you hear about the program? *</label>
-              <select className="input-field" value={form.hearAbout}
+              <select className="input-field w-full min-w-0" value={form.hearAbout}
                 onChange={(e) => update('hearAbout', e.target.value)} required>
                 <option value="">Select an option</option>
                 {hearOptions.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
 
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 min-w-0">
               <label className="field-label">Profile Photo * (under 1.5MB)</label>
               <div className="flex items-center gap-4">
-                <label className="flex-1 cursor-pointer">
+                <label className="flex-1 cursor-pointer min-w-0">
                   <input
                     type="file"
                     accept="image/*"

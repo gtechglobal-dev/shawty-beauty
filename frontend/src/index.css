@@ -190,6 +190,8 @@ h1, h2, h3, .font-display {
 
 .input-field {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   padding: 12px 16px;
   border-radius: 10px;
   border: 1.5px solid rgba(23, 16, 20, 0.14);
