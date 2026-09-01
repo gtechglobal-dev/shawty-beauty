@@ -21,10 +21,10 @@ export default function TicketCard({
 
   return (
     <div
-      className={`ticket-card notched relative overflow-hidden rounded-2xl bg-white shadow-sm transition-all duration-200 ${
+      className={`ticket-card relative overflow-hidden bg-white shadow-sm transition-all duration-200 ${
         selected
-          ? 'selected ring-2 ring-offset-2 ring-rose-dark shadow-lg'
-          : 'border border-black/10 hover:-translate-y-0.5 hover:shadow-md'
+          ? 'selected ring-2 ring-offset-2 ring-rose-dark shadow-lg border-2'
+          : 'border-2 hover:-translate-y-0.5 hover:shadow-md'
       } ${isStudent ? 'ticket-student' : 'ticket-gold'} ${className}`}
     >
       {selected && (

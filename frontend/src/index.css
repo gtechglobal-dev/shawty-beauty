@@ -424,19 +424,25 @@ h1, h2, h3, .font-display {
 
 /* ======= Ticket-style cards ======= */
 .ticket-student {
-  border-color: rgba(192, 122, 147, 0.5);
+  border-color: rgba(192, 122, 147, 0.85);
 }
 .ticket-gold {
-  border-color: rgba(201, 168, 106, 0.6);
+  border-color: rgba(201, 168, 106, 0.9);
 }
 .ticket-gold:hover {
   box-shadow: 0 16px 34px rgba(201, 168, 106, 0.25);
-  border-color: rgba(201, 168, 106, 0.9);
+  border-color: rgba(201, 168, 106, 1);
 }
 
-/* Selected ticket — animated moving light around the outline */
+/* Square card with a zigzag top edge (classic ticket) - fixed-size teeth */
 .ticket-card {
   position: relative;
+  -webkit-mask:
+    url('data:image/svg+xml,%3Csvg%20xmlns="http://www.w3.org/2000/svg"%20viewBox="0%200%2020%2018"%20preserveAspectRatio="none"%3E%3Cpath%20d="M0,18%20L0,0%20L10,18%20L20,0%20L20,18%20Z"%20fill="%23fff"/%3E%3C/svg%3E') 0 0 / 20px 18px repeat-x,
+    linear-gradient(#000 0 0) 0 18px / 100% calc(100% - 18px) no-repeat;
+  mask:
+    url('data:image/svg+xml,%3Csvg%20xmlns="http://www.w3.org/2000/svg"%20viewBox="0%200%2020%2018"%20preserveAspectRatio="none"%3E%3Cpath%20d="M0,18%20L0,0%20L10,18%20L20,0%20L20,18%20Z"%20fill="%23fff"/%3E%3C/svg%3E') 0 0 / 20px 18px repeat-x,
+    linear-gradient(#000 0 0) 0 18px / 100% calc(100% - 18px) no-repeat;
 }
 .ticket-card.selected {
   border-color: transparent !important;
@@ -491,22 +497,6 @@ h1, h2, h3, .font-display {
   background: radial-gradient(120% 120% at 50% 130%, rgba(192, 122, 147, 0.22), transparent 60%);
 }
 
-/* Zigzag puppy-toothed ticket edges (left & right) */
-.ticket-card.notched {
-  --radius: 10px;   /* how deep the scallop bites into the edge */
-  --gap: 22px;      /* vertical size of each scallop tile */
-  border-radius: 12px;
-  -webkit-mask:
-    linear-gradient(#000 0 0) 0 0 / calc(100% - 2 * var(--radius)) 100% no-repeat,
-    radial-gradient(var(--radius) at 0 50%, #0000 99%, #000) left / var(--gap) 100% repeat-y,
-    radial-gradient(var(--radius) at 100% 50%, #0000 99%, #000) right / var(--gap) 100% repeat-y;
-  mask:
-    linear-gradient(#000 0 0) 0 0 / calc(100% - 2 * var(--radius)) 100% no-repeat,
-    radial-gradient(var(--radius) at 0 50%, #0000 99%, #000) left / var(--gap) 100% repeat-y,
-    radial-gradient(var(--radius) at 100% 50%, #0000 99%, #000) right / var(--gap) 100% repeat-y;
-  -webkit-mask-composite: source-over;
-  mask-composite: add;
-}
 @keyframes ticket-spin {
   to { --angle: 360deg; }
 }
