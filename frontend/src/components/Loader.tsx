@@ -2,7 +2,7 @@ export default function Loader({ show }: { show: boolean }) {
   if (!show) return null
 
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-cream">
+    <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-cream" style={{ minHeight: '100dvh' }}>
       <div className="relative w-16 h-16">
         <div className="absolute inset-0 rounded-full bg-gradient-to-br from-fuchsia-500 via-rose to-orange-400 opacity-30 blur-sm animate-pulse" />
         <div className="absolute inset-0 rounded-full border-4 border-rose/20 border-t-rose-dark animate-spin" />

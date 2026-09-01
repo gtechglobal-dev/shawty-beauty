@@ -4,6 +4,7 @@ import Navbar from './components/layout/Navbar'
 import Footer from './components/layout/Footer'
 import Loader from './components/Loader'
 import Home from './pages/Home'
+import Services from './pages/Services'
 import Program from './pages/Program'
 import Register from './pages/Register'
 import PaymentCallback from './pages/PaymentCallback'
@@ -39,9 +40,10 @@ export default function App() {
     <div className="min-h-screen bg-cream text-ink flex flex-col">
       <Loader show={loading} />
       <Navbar />
-      <main key={pathname} className="flex-1 page-enter">
+      <main key={pathname} className="flex-1 page-enter overflow-x-clip">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/services" element={<Services />} />
           <Route path="/program" element={<Program />} />
           <Route path="/register" element={<Register />} />
           <Route path="/register/payment-callback" element={<PaymentCallback />} />

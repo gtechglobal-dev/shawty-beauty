@@ -39,7 +39,7 @@ const slides: Slide[] = [
       kicker: 'Lash Tech',
       title: s.title,
       desc: s.desc,
-      cta: '#services',
+      cta: '/services',
       ctaLabel: 'Explore Services',
     })),
   ...makeupServices.slice(0, 4).map((s) => ({
@@ -47,7 +47,7 @@ const slides: Slide[] = [
     kicker: 'Makeup',
     title: s.title,
     desc: s.desc,
-    cta: '#services',
+    cta: '/services',
     ctaLabel: 'Explore Services',
   })),
 ]

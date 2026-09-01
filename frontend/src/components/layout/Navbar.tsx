@@ -5,7 +5,7 @@ import { siteConfig } from '../../lib/constants'
 
 const links = [
   { to: '/', label: 'Home' },
-  { to: '/#services', label: 'Our Services', hash: true },
+  { to: '/services', label: 'Our Services' },
   { to: '/program', label: 'Our Events' },
   { to: '/sponsor', label: 'Our Sponsors' },
   { to: '/contact', label: 'Contact' },
@@ -45,12 +45,7 @@ export default function Navbar() {
     }
   }, [open])
 
-  const isActive = (to: string, isHashLink?: boolean) => {
-    if (isHashLink) {
-      // Hash links (homepage sections) are active when their hash matches the URL
-      const targetHash = to.split('#')[1]
-      return pathname === '/' && targetHash === hash.slice(1)
-    }
+  const isActive = (to: string) => {
     // Home: active on homepage only when no section hash is set
     if (to === '/') {
       return pathname === '/' && hash === ''
@@ -71,25 +66,15 @@ export default function Navbar() {
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">
-          {links.map((l) =>
-            l.hash ? (
-              <a
-                key={l.to}
-                href={l.to}
-                className={`nav-link ${isActive(l.to, true) ? 'nav-active' : ''}`}
-              >
-                {l.label}
-              </a>
-            ) : (
-              <Link
-                key={l.to}
-                to={l.to}
-                className={`nav-link ${isActive(l.to) ? 'nav-active' : ''}`}
-              >
-                {l.label}
-              </Link>
-            ),
-          )}
+          {links.map((l) => (
+            <Link
+              key={l.to}
+              to={l.to}
+              className={`nav-link ${isActive(l.to) ? 'nav-active' : ''}`}
+            >
+              {l.label}
+            </Link>
+          ))}
           <a
             href={siteConfig.whatsapp}
             target="_blank"
@@ -111,31 +96,18 @@ export default function Navbar() {
 
       {open && (
         <nav onClick={(e) => e.stopPropagation()} className="md:hidden relative z-50 px-5 pb-6 pt-2 space-y-1 border-t border-black/5 bg-cream/95 backdrop-blur-md">
-          {links.map((l) =>
-            l.hash ? (
-              <a
-                key={l.to}
-                href={l.to}
-                onClick={() => setOpen(false)}
-                className={`block px-4 py-3 rounded-lg text-[15px] font-medium ${
-                  isActive(l.to, true) ? 'text-rose-dark bg-blush' : 'text-ink/75'
-                }`}
-              >
-                {l.label}
-              </a>
-            ) : (
-              <Link
-                key={l.to}
-                to={l.to}
-                onClick={() => setOpen(false)}
-                className={`block px-4 py-3 rounded-lg text-[15px] font-medium ${
-                  isActive(l.to) ? 'text-rose-dark bg-blush' : 'text-ink/75'
-                }`}
-              >
-                {l.label}
-              </Link>
-            ),
-          )}
+          {links.map((l) => (
+            <Link
+              key={l.to}
+              to={l.to}
+              onClick={() => setOpen(false)}
+              className={`block px-4 py-3 rounded-lg text-[15px] font-medium ${
+                isActive(l.to) ? 'text-rose-dark bg-blush' : 'text-ink/75'
+              }`}
+            >
+              {l.label}
+            </Link>
+          ))}
           <a
             href={siteConfig.whatsapp}
             target="_blank"

@@ -6,16 +6,13 @@ import {
   MapPin,
   Sparkles,
   MessageCircle,
-  Eye,
-  Brush,
   Handshake,
 } from 'lucide-react'
 import InstagramIcon from '../components/icons/InstagramIcon'
 import EventsCarousel from '../components/layout/EventsCarousel'
 import Reveal from '../components/Reveal'
 import CountUp from '../components/CountUp'
-import { lashServices, makeupServices, program, siteConfig } from '../lib/constants'
-import ServiceGallery from '../components/ServiceGallery'
+import { makeupServices, program, siteConfig } from '../lib/constants'
 
 export default function Home() {
   return (
@@ -97,9 +94,9 @@ export default function Home() {
                 From soft glam to bridal glam, and classic lashes to volume — beauty that celebrates you.
               </p>
               <div className="flex flex-wrap gap-3 justify-center mb-10">
-                <a href="#services" className="btn btn-primary">
+                <Link to="/services" className="btn btn-primary">
                   Explore Services <ArrowRight size={18} />
-                </a>
+                </Link>
                 <a
                   href={siteConfig.whatsapp}
                   target="_blank"
@@ -128,44 +125,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ===== LASH SERVICES ===== */}
-      <section id="services" className="section-pad bg-white scroll-mt-20">
-        <div className="container">
-          <Reveal variant="up">
-            <div className="text-center mb-10 md:mb-12">
-              <h2 className="section-title text-3xl md:text-4xl">Our Services</h2>
-            </div>
-          </Reveal>
-          <Reveal variant="left">
-            <div className="max-w-2xl mb-10 md:mb-12 text-center md:text-left mx-auto md:mx-0">
-              <span className="eyebrow mb-3"><Eye size={14} /> Lash Tech</span>
-              <h2 className="section-title mt-2">Lash extensions that flatter your eyes</h2>
-              <p className="text-ink/70 mt-3">Handcrafted, comfortable lash sets tailored to your natural eye shape and everyday style.</p>
-            </div>
-          </Reveal>
-          <Reveal variant="zoom">
-            <ServiceGallery services={lashServices} />
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ===== MAKEUP SERVICES ===== */}
-      <section className="section-pad bg-blush border-y border-rose/15">
-        <div className="container">
-          <Reveal variant="right">
-            <div className="max-w-2xl mb-10 md:mb-12 text-center md:text-left mx-auto md:mx-0">
-              <span className="eyebrow mb-3"><Brush size={14} /> Makeup Services</span>
-              <h2 className="section-title mt-2">Makeup for every moment</h2>
-              <p className="text-ink/70 mt-3">From everyday soft glam to unforgettable bridal glam — and 1-on-1 training to build your own skills.</p>
-            </div>
-          </Reveal>
-          <Reveal variant="zoom" delay={100}>
-            <ServiceGallery services={makeupServices} />
-          </Reveal>
-        </div>
-      </section>
-
-{/* ===== EVENT ADVERT BANNER ===== */}
+      {/* ===== EVENT ADVERT BANNER ===== */}
       <section className="section-pad">
         <div className="container">
           <Reveal variant="zoom">
