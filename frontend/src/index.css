@@ -431,3 +431,69 @@ h1, h2, h3, .font-display {
   box-shadow: 0 16px 34px rgba(201, 168, 106, 0.25);
   border-color: rgba(201, 168, 106, 0.9);
 }
+
+/* Selected ticket — animated moving light around the outline */
+.ticket-card {
+  position: relative;
+}
+.ticket-card.selected {
+  border-color: transparent !important;
+  box-shadow: 0 0 18px rgba(201, 168, 106, 0.35), 0 18px 40px rgba(201, 168, 106, 0.18);
+}
+.ticket-card.selected::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--angle, 0deg),
+    transparent 0deg,
+    #c9a86a 60deg,
+    #fff7e0 90deg,
+    #c9a86a 120deg,
+    transparent 180deg,
+    transparent 300deg,
+    #c9a86a 340deg,
+    #fff7e0 360deg
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: ticket-spin 3s linear infinite;
+  pointer-events: none;
+  opacity: 1;
+}
+.ticket-card.ticket-student.selected::before {
+  background: conic-gradient(
+    from var(--angle, 0deg),
+    transparent 0deg,
+    #c07a93 60deg,
+    #ffe3ee 90deg,
+    #c07a93 120deg,
+    transparent 180deg,
+    transparent 300deg,
+    #c07a93 340deg,
+    #ffe3ee 360deg
+  );
+}
+.ticket-card.selected::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(120% 120% at 50% 130%, rgba(201, 168, 106, 0.22), transparent 60%);
+  pointer-events: none;
+}
+.ticket-card.ticket-student.selected::after {
+  background: radial-gradient(120% 120% at 50% 130%, rgba(192, 122, 147, 0.22), transparent 60%);
+}
+@keyframes ticket-spin {
+  to { --angle: 360deg; }
+}
+@property --angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
