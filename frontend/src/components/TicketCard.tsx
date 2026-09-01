@@ -114,7 +114,7 @@ export default function TicketCard({
         }`}
       >
         <span className="inline-flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-white/50" />
+          <span className="blink-green w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_6px_#22c55e]" />
           ON SALE
         </span>
       </div>

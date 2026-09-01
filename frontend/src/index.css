@@ -491,6 +491,15 @@ h1, h2, h3, .font-display {
 @keyframes ticket-spin {
   to { --angle: 360deg; }
 }
+
+/* Blinking green "live" light on the ON SALE band */
+.blink-green {
+  animation: blink-green 1.2s ease-in-out infinite;
+}
+@keyframes blink-green {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.15; }
+}
 @property --angle {
   syntax: '<angle>';
   initial-value: 0deg;

@@ -86,6 +86,8 @@ export default function Register() {
     setForm((f) => ({ ...f, [key]: value }))
   }
 
+  const [sameAsPhone, setSameAsPhone] = useState(false)
+
   function handlePhoto(file?: File) {
     if (!file) return
     if (file.size > 1500000) {
@@ -343,7 +345,26 @@ export default function Register() {
             </div>
             <div className="min-w-0">
               <label className="field-label">Emergency Contact Number *</label>
-              <PhoneInput value={form.emergencyContact} onChange={(v) => update('emergencyContact', v)} />
+              <PhoneInput
+                value={form.emergencyContact}
+                onChange={(v) => {
+                  setSameAsPhone(false)
+                  update('emergencyContact', v)
+                }}
+              />
+              <label className="flex items-center gap-2 mt-2 text-xs text-ink/75 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={sameAsPhone}
+                  onChange={(e) => {
+                    const on = e.target.checked
+                    setSameAsPhone(on)
+                    if (on) update('emergencyContact', form.phone)
+                  }}
+                  className="accent-rose w-4 h-4"
+                />
+                Same as Phone Number
+              </label>
             </div>
             <div className="sm:col-span-2 min-w-0">
               <label className="field-label">What do you hope to learn from this program? *</label>
