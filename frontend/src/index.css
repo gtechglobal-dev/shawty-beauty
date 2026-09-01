@@ -423,26 +423,17 @@ h1, h2, h3, .font-display {
 }
 
 /* ======= Ticket-style cards ======= */
-.ticket-student {
-  border-color: rgba(192, 122, 147, 0.85);
-}
-.ticket-gold {
-  border-color: rgba(201, 168, 106, 0.9);
-}
-.ticket-gold:hover {
-  box-shadow: 0 16px 34px rgba(201, 168, 106, 0.25);
-  border-color: rgba(201, 168, 106, 1);
-}
+/* Outline (animated light) appears only on the selected ticket */
 
-/* Square card with a zigzag top edge (classic ticket) - fixed-size teeth */
+/* Square card with a smooth wavy top edge (classic ticket) */
 .ticket-card {
   position: relative;
   -webkit-mask:
-    url('data:image/svg+xml,%3Csvg%20xmlns="http://www.w3.org/2000/svg"%20viewBox="0%200%2020%2018"%20preserveAspectRatio="none"%3E%3Cpath%20d="M0,18%20L0,0%20L10,18%20L20,0%20L20,18%20Z"%20fill="%23fff"/%3E%3C/svg%3E') 0 0 / 20px 18px repeat-x,
-    linear-gradient(#000 0 0) 0 18px / 100% calc(100% - 18px) no-repeat;
+    url('data:image/svg+xml,%3Csvg%20xmlns="http://www.w3.org/2000/svg"%20viewBox="0%200%2020%207"%20preserveAspectRatio="none"%3E%3Cpath%20d="M0,0%20C5,0%205,7%2010,7%20C15,7%2015,0%2020,0%20L20,7%20L0,7%20Z"%20fill="%23fff"/%3E%3C/svg%3E') 0 0 / 20px 7px repeat-x,
+    linear-gradient(#000 0 0) 0 7px / 100% calc(100% - 7px) no-repeat;
   mask:
-    url('data:image/svg+xml,%3Csvg%20xmlns="http://www.w3.org/2000/svg"%20viewBox="0%200%2020%2018"%20preserveAspectRatio="none"%3E%3Cpath%20d="M0,18%20L0,0%20L10,18%20L20,0%20L20,18%20Z"%20fill="%23fff"/%3E%3C/svg%3E') 0 0 / 20px 18px repeat-x,
-    linear-gradient(#000 0 0) 0 18px / 100% calc(100% - 18px) no-repeat;
+    url('data:image/svg+xml,%3Csvg%20xmlns="http://www.w3.org/2000/svg"%20viewBox="0%200%2020%207"%20preserveAspectRatio="none"%3E%3Cpath%20d="M0,0%20C5,0%205,7%2010,7%20C15,7%2015,0%2020,0%20L20,7%20L0,7%20Z"%20fill="%23fff"/%3E%3C/svg%3E') 0 0 / 20px 7px repeat-x,
+    linear-gradient(#000 0 0) 0 7px / 100% calc(100% - 7px) no-repeat;
 }
 .ticket-card.selected {
   border-color: transparent !important;

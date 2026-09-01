@@ -21,10 +21,10 @@ export default function TicketCard({
 
   return (
     <div
-      className={`ticket-card relative overflow-hidden bg-white shadow-sm transition-all duration-200 ${
+      className={`ticket-card relative overflow-hidden flex flex-col bg-white shadow-sm transition-all duration-200 ${
         selected
           ? 'selected ring-2 ring-offset-2 ring-rose-dark shadow-lg border-2'
-          : 'border-2 hover:-translate-y-0.5 hover:shadow-md'
+          : 'border-2 border-transparent hover:-translate-y-0.5 hover:shadow-md'
       } ${isStudent ? 'ticket-student' : 'ticket-gold'} ${className}`}
     >
       {selected && (
@@ -103,6 +103,20 @@ export default function TicketCard({
             Popular
           </span>
         )}
+      </div>
+
+      {/* Bottom band - matches the header fill */}
+      <div
+        className={`mt-auto flex items-center justify-end px-4 py-1.5 text-white/95 text-[10px] font-bold uppercase tracking-[0.25em] ${
+          isStudent
+            ? 'bg-gradient-to-r from-rose-dark to-rose'
+            : 'bg-gradient-to-r from-[#856238] to-gold'
+        }`}
+      >
+        <span className="inline-flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-white/50" />
+          ON SALE
+        </span>
       </div>
     </div>
   )
