@@ -425,8 +425,10 @@ h1, h2, h3, .font-display {
 /* ======= Ticket-style cards ======= */
 /* Outline (animated light) appears only on the selected ticket */
 
-/* Square card with a smooth wavy top edge (classic ticket) */
-.ticket-card {
+/* Square card with a smooth wavy top edge (classic ticket).
+   The wave mask lives on an inner `.ticket-mask` wrapper so the card element
+   itself stays unmasked and can show a real box/drop shadow. */
+.ticket-mask {
   position: relative;
   -webkit-mask:
     url('data:image/svg+xml,%3Csvg%20xmlns="http://www.w3.org/2000/svg"%20viewBox="0%200%2020%207"%20preserveAspectRatio="none"%3E%3Cpath%20d="M0,0%20C5,0%205,7%2010,7%20C15,7%2015,0%2020,0%20L20,7%20L0,7%20Z"%20fill="%23fff"/%3E%3C/svg%3E') 0 0 / 20px 7px repeat-x,
@@ -435,74 +437,55 @@ h1, h2, h3, .font-display {
     url('data:image/svg+xml,%3Csvg%20xmlns="http://www.w3.org/2000/svg"%20viewBox="0%200%2020%207"%20preserveAspectRatio="none"%3E%3Cpath%20d="M0,0%20C5,0%205,7%2010,7%20C15,7%2015,0%2020,0%20L20,7%20L0,7%20Z"%20fill="%23fff"/%3E%3C/svg%3E') 0 0 / 20px 7px repeat-x,
     linear-gradient(#000 0 0) 0 7px / 100% calc(100% - 7px) no-repeat;
 }
-.ticket-card.selected {
-  border-color: transparent !important;
-  box-shadow: 0 0 18px rgba(201, 168, 106, 0.35), 0 18px 40px rgba(201, 168, 106, 0.18);
+.ticket-card {
+  position: relative;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
-.ticket-card.selected::before {
+.ticket-card.selected {
+  box-shadow: 0 20px 26px -16px rgba(0, 0, 0, 0.3);
+}
+/* Animated glowing outline — drawn on the masked inner so it hugs the wavy edge */
+.ticket-card.selected .ticket-mask::before {
   content: '';
   position: absolute;
-  inset: -2px;
+  inset: 0;
+  z-index: 5;
+  padding: 1px;
   border-radius: inherit;
-  padding: 2px;
   background: conic-gradient(
     from var(--angle, 0deg),
-    transparent 0deg,
-    #c9a86a 60deg,
-    #fff7e0 90deg,
-    #c9a86a 120deg,
-    transparent 180deg,
-    transparent 300deg,
-    #c9a86a 340deg,
-    #fff7e0 360deg
+    rgba(250, 204, 21, 0) 0deg,
+    rgba(250, 204, 21, 0.25) 40deg,
+    rgba(250, 204, 21, 0.6) 90deg,
+    #fde047 110deg,
+    #fff3c0 130deg,
+    #fde047 150deg,
+    rgba(250, 204, 21, 0.45) 180deg,
+    rgba(250, 204, 21, 0) 250deg,
+    rgba(250, 204, 21, 0) 360deg
   );
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  animation: ticket-spin 3s linear infinite;
+  animation: ticket-spin 1.6s linear infinite;
   pointer-events: none;
-  opacity: 1;
-}
-.ticket-card.ticket-student.selected::before {
-  background: conic-gradient(
-    from var(--angle, 0deg),
-    transparent 0deg,
-    #c07a93 60deg,
-    #ffe3ee 90deg,
-    #c07a93 120deg,
-    transparent 180deg,
-    transparent 300deg,
-    #c07a93 340deg,
-    #ffe3ee 360deg
-  );
-}
-.ticket-card.selected::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(120% 120% at 50% 130%, rgba(201, 168, 106, 0.22), transparent 60%);
-  pointer-events: none;
-}
-.ticket-card.ticket-student.selected::after {
-  background: radial-gradient(120% 120% at 50% 130%, rgba(192, 122, 147, 0.22), transparent 60%);
 }
 
 @keyframes ticket-spin {
   to { --angle: 360deg; }
 }
+@property --angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
 
-/* Blinking red "live" light on the ON SALE band */
+/* Blinking yellow "live" light on the ON SALE band */
 .blink-green {
   animation: blink-green 1.2s ease-in-out infinite;
 }
 @keyframes blink-green {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.15; }
-}
-@property --angle {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
 }
 

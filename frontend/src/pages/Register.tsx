@@ -349,6 +349,29 @@ export default function Register() {
               </select>
             </div>
             <div className="min-w-0">
+              <label className="field-label">Emergency Contact Number *</label>
+              <PhoneInput
+                value={form.emergencyContact}
+                onChange={(v) => {
+                  setSameAsPhone(false)
+                  update('emergencyContact', v)
+                }}
+              />
+              <label className="flex items-center gap-2 mt-2 text-xs text-ink/75 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={sameAsPhone}
+                  onChange={(e) => {
+                    const on = e.target.checked
+                    setSameAsPhone(on)
+                    if (on) update('emergencyContact', form.phone)
+                  }}
+                  className="accent-rose w-4 h-4"
+                />
+                Same as Phone Number
+              </label>
+            </div>
+            <div className="min-w-0">
               <label className="field-label">Emergency Contact Name *</label>
               <input
                 className="input-field"
@@ -372,29 +395,6 @@ export default function Register() {
                   className="accent-rose w-4 h-4"
                 />
                 Same as Full Name
-              </label>
-            </div>
-            <div className="min-w-0">
-              <label className="field-label">Emergency Contact Number *</label>
-              <PhoneInput
-                value={form.emergencyContact}
-                onChange={(v) => {
-                  setSameAsPhone(false)
-                  update('emergencyContact', v)
-                }}
-              />
-              <label className="flex items-center gap-2 mt-2 text-xs text-ink/75 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={sameAsPhone}
-                  onChange={(e) => {
-                    const on = e.target.checked
-                    setSameAsPhone(on)
-                    if (on) update('emergencyContact', form.phone)
-                  }}
-                  className="accent-rose w-4 h-4"
-                />
-                Same as Phone Number
               </label>
             </div>
             <div className="sm:col-span-2 min-w-0">

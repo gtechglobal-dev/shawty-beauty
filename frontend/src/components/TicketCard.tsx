@@ -21,10 +21,8 @@ export default function TicketCard({
 
   return (
     <div
-      className={`ticket-card relative overflow-hidden flex flex-col bg-white shadow-sm transition-all duration-200 ${
-        selected
-          ? 'selected ring-2 ring-offset-2 ring-rose-dark shadow-lg border-2'
-          : 'border-2 border-transparent hover:-translate-y-0.5 hover:shadow-md'
+      className={`ticket-card relative overflow-hidden flex flex-col shadow-sm transition-all duration-200 ${
+        selected ? 'selected shadow-lg' : 'hover:-translate-y-0.5 hover:shadow-md'
       } ${isStudent ? 'ticket-student' : 'ticket-gold'} ${className}`}
     >
       {selected && (
@@ -33,6 +31,7 @@ export default function TicketCard({
         </span>
       )}
 
+      <div className="ticket-mask bg-white flex flex-col w-full h-full">
       {/* Ticket header */}
       <div
         className={`flex items-center justify-between px-4 py-2.5 text-white text-sm font-bold tracking-wide ${
@@ -73,7 +72,14 @@ export default function TicketCard({
               {formatNgn(t.originalPrice!)}
             </span>
           )}
-          <span className="font-display text-2xl font-bold text-rose-dark">{formatNgn(price)}</span>
+          <span className="font-display text-2xl font-bold text-rose-dark">
+            {formatNgn(price)}
+            {isStudent && promoActive && (
+              <span className="ml-1.5 align-middle inline-block text-[10px] font-bold text-muted normal-case">
+                (Early Bird)
+              </span>
+            )}
+          </span>
         </div>
         <div className="text-xs text-muted">per {t.unitName}</div>
 
@@ -114,9 +120,10 @@ export default function TicketCard({
         }`}
       >
         <span className="inline-flex items-center gap-1">
-          <span className="blink-green w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_6px_#ef4444]" />
+          <span className="blink-green w-1.5 h-1.5 rounded-full bg-yellow-400 shadow-[0_0_6px_#facc15]" />
           ON SALE
         </span>
+      </div>
       </div>
     </div>
   )
