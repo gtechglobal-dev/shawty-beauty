@@ -492,7 +492,7 @@ h1, h2, h3, .font-display {
   to { --angle: 360deg; }
 }
 
-/* Blinking green "live" light on the ON SALE band */
+/* Blinking red "live" light on the ON SALE band */
 .blink-green {
   animation: blink-green 1.2s ease-in-out infinite;
 }

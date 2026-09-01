@@ -55,6 +55,7 @@ export interface Registration {
   nationality: string;
   address: string;
   experienceLevel: string;
+  emergencyContactName: string;
   emergencyContact: string;
   ticketType: TicketType;
   quantity: number;

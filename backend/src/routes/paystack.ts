@@ -64,6 +64,7 @@ interface InitBody {
   nationality?: string;
   address?: string;
   experienceLevel?: string;
+  emergencyContactName?: string;
   emergencyContact?: string;
   ticketType: TicketType;
   quantity?: number;
@@ -223,6 +224,7 @@ router.post('/initialize', async (req: Request, res: Response) => {
       nationality: (body.nationality || '').trim(),
       address: (body.address || '').trim(),
       experienceLevel: (body.experienceLevel || '').trim(),
+      emergencyContactName: (body.emergencyContactName || '').trim(),
       emergencyContact: (body.emergencyContact || '').trim(),
       ticketType,
       quantity,

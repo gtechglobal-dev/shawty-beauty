@@ -18,6 +18,7 @@ interface FormState {
   nationality: string
   address: string
   experienceLevel: string
+  emergencyContactName: string
   emergencyContact: string
   ticketType: Ticket['id']
   quantity: number
@@ -35,6 +36,7 @@ const initial: FormState = {
   nationality: 'Nigerian',
   address: '',
   experienceLevel: '',
+  emergencyContactName: '',
   emergencyContact: '',
   ticketType: 'student',
   quantity: 1,
@@ -87,6 +89,7 @@ export default function Register() {
   }
 
   const [sameAsPhone, setSameAsPhone] = useState(false)
+  const [sameAsName, setSameAsName] = useState(false)
 
   function handlePhoto(file?: File) {
     if (!file) return
@@ -129,6 +132,7 @@ export default function Register() {
         nationality: form.nationality,
         address: form.address,
         experienceLevel: form.experienceLevel,
+        emergencyContactName: form.emergencyContactName,
         emergencyContact: form.emergencyContact,
         ticketType: form.ticketType,
         quantity: form.quantity,
@@ -198,6 +202,7 @@ export default function Register() {
         nationality: form.nationality,
         address: form.address,
         experienceLevel: form.experienceLevel,
+        emergencyContactName: form.emergencyContactName,
         emergencyContact: form.emergencyContact,
         ticketType: form.ticketType,
         quantity: form.quantity,
@@ -342,6 +347,32 @@ export default function Register() {
                 <option value="">Select level</option>
                 {experienceOptions.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
+            </div>
+            <div className="min-w-0">
+              <label className="field-label">Emergency Contact Name *</label>
+              <input
+                className="input-field"
+                value={form.emergencyContactName}
+                onChange={(e) => {
+                  setSameAsName(false)
+                  update('emergencyContactName', e.target.value)
+                }}
+                required
+                placeholder="Name of emergency contact"
+              />
+              <label className="flex items-center gap-2 mt-2 text-xs text-ink/75 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={sameAsName}
+                  onChange={(e) => {
+                    const on = e.target.checked
+                    setSameAsName(on)
+                    if (on) update('emergencyContactName', form.fullName)
+                  }}
+                  className="accent-rose w-4 h-4"
+                />
+                Same as Full Name
+              </label>
             </div>
             <div className="min-w-0">
               <label className="field-label">Emergency Contact Number *</label>
