@@ -211,19 +211,9 @@ export function EventsHome({
               const toggle = () => setExpandedId(open ? null : ev.id)
               return (
                 <div key={ev.id} className={`card overflow-hidden flex flex-col ${ev.status === 'live' ? 'border-2 border-pinkgold/60 shadow-[0_10px_30px_-12px_rgba(145,78,108,0.35)]' : ''}`}>
-                  {/* Clickable card header — title + all stats, expand for more */}
+                  {/* Card header — title + all stats */}
                   <div
-                    role="button"
-                    tabIndex={0}
-                    aria-expanded={open}
-                    onClick={toggle}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        toggle()
-                      }
-                    }}
-                    className={`p-5 cursor-pointer select-none ${ev.status === 'live' ? 'bg-gradient-to-br from-rose-deep via-rose-dark to-pinkgold text-white' : 'bg-white'}`}
+                    className={`p-5 ${ev.status === 'live' ? 'bg-gradient-to-br from-rose-deep via-rose-dark to-pinkgold text-white' : 'bg-white'}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -246,9 +236,6 @@ export function EventsHome({
                         <IconBtn title="Manage" dark={ev.status === 'live'} onClick={(e) => { e.stopPropagation(); onManage(ev.id) }}><Pencil size={14} /></IconBtn>
                         <IconBtn title="Duplicate" dark={ev.status === 'live'} onClick={(e) => { e.stopPropagation(); onDuplicate(ev.id) }}><Copy size={14} /></IconBtn>
                         <IconBtn title="Delete" danger dark={ev.status === 'live'} onClick={(e) => { e.stopPropagation(); onDelete(ev.id) }}><Trash2 size={14} /></IconBtn>
-                        <span className={`w-8 h-8 rounded-full flex items-center justify-center ${ev.status === 'live' ? 'text-white/80 hover:bg-white/20' : 'text-muted hover:bg-black/5'}`}>
-                          <ChevronDown size={16} className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-                        </span>
                       </div>
                     </div>
                     <h3 className={`font-display text-xl font-bold leading-snug mt-2 pr-8 ${ev.status === 'live' ? 'text-white' : ''}`}>{ev.title}</h3>
@@ -264,6 +251,15 @@ export function EventsHome({
                         { icon: TrendingUp, label: 'Revenue', value: formatNgn(s.revenue) },
                       ]}
                     />
+
+                    <button
+                      onClick={toggle}
+                      aria-expanded={open}
+                      className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-rose-deep hover:underline cursor-pointer"
+                    >
+                      {open ? 'View less' : 'View more'}
+                      <ChevronDown size={15} className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+                    </button>
 
                     {open && (
                       <div className="mt-5 space-y-5">
@@ -378,9 +374,15 @@ function TrackAttendanceModal({
   const counts = event.summary?.attendanceByDay || {}
   const [codes, setCodes] = useState<Record<string, { createdAt: string }>>({})
   const [genBusy, setGenBusy] = useState<string | null>(null)
-  const [generated, setGenerated] = useState<{ day: string; code: string } | null>(null)
+  const [visible, setVisible] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(`sbd:attendance-codes:${event.id}`) || '{}') || {}
+    } catch {
+      return {}
+    }
+  })
   const [err, setErr] = useState('')
-  const [copied, setCopied] = useState(false)
+  const [copiedDay, setCopiedDay] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -397,15 +399,21 @@ function TrackAttendanceModal({
     }
   }, [event.id, headers])
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(`sbd:attendance-codes:${event.id}`, JSON.stringify(visible))
+    } catch {
+      /* storage unavailable */
+    }
+  }, [visible, event.id])
+
   async function generate(day: string) {
     setGenBusy(day)
     setErr('')
-    setGenerated(null)
-    setCopied(false)
     try {
       const r = await postJson(`/api/admin/events/${event.id}/attendance-code`, { day }, headers)
       if (r.code) {
-        setGenerated({ day, code: r.code })
+        setVisible((v) => ({ ...v, [day]: r.code }))
         setCodes((c) => ({ ...c, [day]: { createdAt: new Date().toISOString() } }))
       } else {
         setErr(r.message || 'Could not generate the code.')
@@ -417,12 +425,11 @@ function TrackAttendanceModal({
     }
   }
 
-  async function copyCode() {
-    if (!generated) return
+  async function copyCode(day: string, code: string) {
     try {
-      await navigator.clipboard.writeText(generated.code)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
+      await navigator.clipboard.writeText(code)
+      setCopiedDay(day)
+      setTimeout(() => setCopiedDay((d) => (d === day ? null : d)), 1500)
     } catch {
       /* clipboard unavailable */
     }
@@ -442,6 +449,7 @@ function TrackAttendanceModal({
           const day = dayKeys(event.attendanceDays)[i]
           const existing = codes[day]
           const present = counts[day] ?? 0
+          const code = visible[day]
           return (
             <div key={day} className="border border-black/10 rounded-xl p-4 bg-white/60">
               <div className="flex items-center justify-between gap-3">
@@ -462,16 +470,16 @@ function TrackAttendanceModal({
                 </button>
               </div>
 
-              {generated?.day === day && (
+              {code && (
                 <div className="mt-3 flex items-center gap-2 bg-blush/60 rounded-lg px-3 py-2.5 border border-rose/30">
                   <span className="font-mono text-lg font-bold tracking-[0.25em] text-rose-deep flex-1 select-all">
-                    {generated.code}
+                    {code}
                   </span>
                   <button
-                    onClick={copyCode}
+                    onClick={() => copyCode(day, code)}
                     className="text-xs font-semibold text-rose-deep flex items-center gap-1 hover:underline shrink-0"
                   >
-                    {copied ? (
+                    {copiedDay === day ? (
                       <>
                         <CircleCheck size={13} /> Copied
                       </>
@@ -490,8 +498,8 @@ function TrackAttendanceModal({
 
       {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
       <p className="text-[11px] text-muted mt-4 leading-relaxed">
-        The code is only shown once when you generate it — copy it straight away. Regenerating a session's code makes
-        the previous one stop working.
+        Generated codes stay visible on this screen while you share them with the class. Regenerating a session's code
+        makes the previous one stop working.
       </p>
     </Modal>
   )

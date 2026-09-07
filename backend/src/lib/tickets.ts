@@ -187,6 +187,11 @@ export async function buildTicketPng(opts: {
   const CX = 815;             // horizontal center of the info panel
   const RIGHT = 1335;         // right-safe column inside the panel
 
+  // Shift the right-column labels (ticket no, vertical branding, ISSUED +
+  // date) left by ~1cm (59px @150dpi) on the student template so they clear
+  // its border/foil; gold template keeps the studio-approved position.
+  const L = r.ticketType === 'student' ? 59 : 0;
+
   // Vertical offset applied to everything except the QR sticker — the studio
   // wanted the text block lower while keeping the QR exactly where it is.
   const DY = 55;
@@ -265,16 +270,16 @@ export async function buildTicketPng(opts: {
   <rect x="${admitX}" y="${chipY}" width="${admitW}" height="${chipH}" rx="${chipH / 2}" fill="none" stroke="${palette.gold}" stroke-width="3"/>
   <text x="${admitX + admitW / 2}" y="${chipY + chipH / 2}" font-family="Poppins" font-size="21" font-weight="700" fill="${palette.accent}" text-anchor="middle" dominant-baseline="middle">ADMIT</text>
 
-  <text x="${RIGHT}" y="${chipY + chipH / 2 - 66}" font-family="Poppins" font-size="11" font-weight="700" letter-spacing="3" fill="${palette.faint}" text-anchor="end">TICKET NO</text>
-  <text x="${RIGHT}" y="${chipY + chipH / 2 - 38}" font-family="Poppins" font-size="16" font-weight="600" fill="${palette.ink}" text-anchor="end" letter-spacing="1">${esc(ticketNo)}</text>
+  <text x="${RIGHT - L}" y="${chipY + chipH / 2 - 66}" font-family="Poppins" font-size="11" font-weight="700" letter-spacing="3" fill="${palette.faint}" text-anchor="end">TICKET NO</text>
+  <text x="${RIGHT - L}" y="${chipY + chipH / 2 - 38}" font-family="Poppins" font-size="16" font-weight="600" fill="${palette.ink}" text-anchor="end" letter-spacing="1">${esc(ticketNo)}</text>
 
   <!-- ===== Dates strip ===== -->
   <text x="${CX}" y="${chipY + chipH + 48}" font-family="Poppins" font-size="20" font-weight="600" letter-spacing="2" fill="${palette.muted}" text-anchor="middle">${esc(dates)}</text>
 
   <!-- ===== Vertical "SHAWTY BEAUTY STUDIO" branding (rotated 90°, gold) ===== -->
-  <text transform="rotate(-90 ${1610} ${560})" x="1610" y="560" font-family="Poppins" font-size="13" font-weight="600" letter-spacing="3" fill="#FFD700" text-anchor="start">SHAWTY BEAUTY STUDIO</text>
-  <text transform="rotate(-90 ${1500} ${570})" x="1500" y="570" font-family="Poppins" font-size="14" font-weight="700" letter-spacing="4" fill="#ffffff" text-anchor="start">ISSUED</text>
-  <text transform="rotate(-90 ${1500} ${470})" x="1500" y="470" font-family="Poppins" font-size="19" font-weight="600" letter-spacing="2" fill="#ffffff" text-anchor="start">${esc(issued)}</text>
+  <text transform="rotate(-90 ${1610 - L + 48} ${578})" x="${1610 - L + 48}" y="578" font-family="Poppins" font-size="16" font-weight="600" letter-spacing="3" fill="#FFD700" text-anchor="start">SHAWTY BEAUTY STUDIO</text>
+  <text transform="rotate(-90 ${1500 - L + 30} ${570})" x="${1500 - L + 30}" y="570" font-family="Poppins" font-size="14" font-weight="700" letter-spacing="4" fill="#ffffff" text-anchor="start">ISSUED</text>
+  <text transform="rotate(-90 ${1500 - L + 30} ${470})" x="${1500 - L + 30}" y="470" font-family="Poppins" font-size="19" font-weight="600" letter-spacing="2" fill="#ffffff" text-anchor="start">${esc(issued)}</text>
 
   <!-- ===== Price-tier badge (above the QR, early-bird / full price / gold) ===== -->
   ${priceLogoDataUrl
