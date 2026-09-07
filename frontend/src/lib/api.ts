@@ -32,3 +32,15 @@ export async function patchJson<T = any>(url: string, body: any, headers?: Recor
   }
   return data as T
 }
+
+export async function delJson<T = any>(url: string, headers?: Record<string, string>): Promise<T> {
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(data.error || 'Request failed')
+  }
+  return data as T
+}

@@ -20,9 +20,11 @@ import {
   KeyRound,
   Send,
   ChevronDown,
+  Eye,
+  X,
 } from 'lucide-react'
 import { formatNgn, eventRegisterUrl, type StudioEvent, type Ticket } from '../../lib/constants'
-import { getJson, patchJson, postJson } from '../../lib/api'
+import { getJson, patchJson, postJson, delJson } from '../../lib/api'
 import Modal from '../../components/Modal'
 
 // ------------------------------------------------------------------
@@ -92,6 +94,13 @@ interface RegistrationRow {
   attendance?: Record<string, boolean>
   present?: boolean
   createdAt: string
+  dateOfBirth?: string
+  state?: string
+  nationality?: string
+  address?: string
+  experienceLevel?: string
+  emergencyContactName?: string
+  emergencyContact?: string
 }
 
 interface SponsorRow {
@@ -864,6 +873,9 @@ export function EventManage({
   const [confirmEnd, setConfirmEnd] = useState(false)
   const [genBusy, setGenBusy] = useState<string | null>(null)
   const [resendBusy, setResendBusy] = useState<string | null>(null)
+  const [profile, setProfile] = useState<RegistrationRow | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<RegistrationRow | null>(null)
+  const [delBusy, setDelBusy] = useState(false)
   const keys = dayKeys(event.attendanceDays)
   const labels: string[] = event.attendanceLabels || Array.from({ length: event.attendanceDays }, (_, i) => `Day ${i + 1}`)
   const s = event.summary
@@ -950,6 +962,23 @@ export function EventManage({
       setError(err.message || 'Failed to resend ticket')
     } finally {
       setResendBusy(null)
+    }
+  }
+
+  async function deleteReg() {
+    if (!confirmDelete) return
+    setDelBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      await delJson(`/api/admin/registrations/${confirmDelete.id}`, headers)
+      setRegs((rs) => rs.filter((r) => r.id !== confirmDelete.id))
+      setConfirmDelete(null)
+      setNotice(`${confirmDelete.fullName}'s registration deleted.`)
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete registration')
+    } finally {
+      setDelBusy(false)
     }
   }
 
@@ -1148,6 +1177,7 @@ export function EventManage({
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex flex-col gap-1.5">
+                      <button onClick={() => setProfile(r)} className="px-2.5 py-1 rounded-lg text-xs bg-ink/5 text-ink/80 hover:bg-ink/10 flex items-center justify-center gap-1"><Eye size={11} /> View profile</button>
                       {r.status === 'pending' && <button onClick={() => updateReg(r.id, { status: 'paid' })} className="px-2.5 py-1 rounded-lg text-xs bg-green-600 text-white hover:bg-green-700">Mark Paid</button>}
                       {r.status === 'paid' && <button onClick={() => updateReg(r.id, { status: 'approved' })} className="px-2.5 py-1 rounded-lg text-xs bg-rose-dark text-white hover:opacity-90">Approve</button>}
                       {r.status === 'paid' && (
@@ -1165,6 +1195,7 @@ export function EventManage({
                       >
                         {isPresent(r) ? '✓ Present' : 'Mark present'}
                       </button>
+                      <button onClick={() => setConfirmDelete(r)} className="px-2.5 py-1 rounded-lg text-xs bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center gap-1"><Trash2 size={11} /> Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -1252,6 +1283,70 @@ export function EventManage({
         }}
       />
 
+      {profile && (
+        <Modal open onClose={() => setProfile(null)}>
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="font-semibold text-lg pr-6">Student profile</h3>
+            <button onClick={() => setProfile(null)} className="w-8 h-8 rounded-full flex items-center justify-center text-muted hover:bg-black/5 shrink-0"><X size={16} /></button>
+          </div>
+          <p className="text-sm text-muted mt-1">{event.title}</p>
+
+          <div className="mt-5 flex items-center gap-4">
+            {profile.photoBase64 && <img src={profile.photoBase64} alt="" className="w-16 h-16 rounded-2xl object-cover ring-1 ring-rose/30" />}
+            <div>
+              <div className="font-display text-xl font-bold">{profile.fullName}</div>
+              {profile.instagram && <div className="text-sm text-muted">@{profile.instagram}</div>}
+              <div className="mt-1 flex items-center gap-2 flex-wrap">
+                <span className={statusBadge(profile.status)}>{profile.status}</span>
+                <span className="text-xs text-muted">Joined {new Date(profile.createdAt).toLocaleDateString()}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 grid sm:grid-cols-2 gap-3 text-sm">
+            <ProfileField label="Email" value={profile.email} />
+            <ProfileField label="Phone" value={profile.phone} />
+            <ProfileField label="Date of birth" value={profile.dateOfBirth} />
+            <ProfileField label="State" value={profile.state} />
+            <ProfileField label="Nationality" value={profile.nationality} />
+            <ProfileField label="Experience level" value={profile.experienceLevel} />
+            <ProfileField label="Address" value={profile.address} />
+            <ProfileField label="Ticket" value={`${profile.ticketLabel || profile.ticketType} × ${profile.quantity}`} />
+            <ProfileField label="Amount" value={formatNgn(profile.amount)} />
+            <ProfileField label="Present" value={isPresent(profile) ? 'Yes' : 'No'} />
+            <ProfileField label="Attendance" value={profile.attendance && Object.values(profile.attendance).some(Boolean) ? `Marked ${Object.values(profile.attendance).filter(Boolean).length}/${keys.length} day${keys.length === 1 ? '' : 's'}` : 'None yet'} />
+          </div>
+
+          <div className="mt-5 pt-4 border-t border-black/5 grid sm:grid-cols-2 gap-3 text-sm">
+            {profile.emergencyContactName && <ProfileField label="Emergency contact" value={profile.emergencyContactName} />}
+            {profile.emergencyContact && <ProfileField label="Emergency phone" value={profile.emergencyContact} />}
+            {profile.reason && <ProfileField label="Reason" value={profile.reason} />}
+          </div>
+        </Modal>
+      )}
+
+      {confirmDelete && (
+        <Modal open onClose={() => !delBusy && setConfirmDelete(null)}>
+          <div className="text-center py-2">
+            <div className="inline-flex w-14 h-14 rounded-2xl bg-red-50 border border-red-100 items-center justify-center mb-5">
+              <CircleAlert size={28} className="text-red-600" />
+            </div>
+            <h3 className="font-display text-xl md:text-2xl font-bold leading-tight">Delete this registration?</h3>
+            <p className="text-sm text-muted mt-2 max-w-sm mx-auto">
+              <strong className="text-ink">{confirmDelete.fullName}</strong>'s form, payment record and attendance
+              ({confirmDelete.ticketLabel || confirmDelete.ticketType} × {confirmDelete.quantity}) will be permanently
+              removed. Their ticket download link will stop working.
+            </p>
+            <div className="flex items-center justify-center gap-3 mt-6">
+              <button onClick={() => setConfirmDelete(null)} disabled={delBusy} className="btn btn-outline">Cancel</button>
+              <button onClick={deleteReg} disabled={delBusy} className="btn bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 flex items-center gap-2">
+                {delBusy ? <LoaderCircle size={16} className="animate-spin" /> : <Trash2 size={16} />} Delete registration
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {saving && (
         <div className="absolute inset-0 z-10 bg-white/75 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center gap-2.5">
           <LoaderCircle size={22} className="animate-spin text-rose-deep" />
@@ -1306,6 +1401,15 @@ function StatCard({ icon: Icon, label, value }: { icon: typeof Users; label: str
       <div className="w-10 h-10 rounded-xl bg-blush flex items-center justify-center mb-3"><Icon className="text-rose-deep" size={20} /></div>
       <div className="font-display text-2xl font-bold leading-tight break-words">{value}</div>
       <div className="text-sm text-muted mt-0.5">{label}</div>
+    </div>
+  )
+}
+
+function ProfileField({ label, value }: { label: string; value?: string }) {
+  return (
+    <div>
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">{label}</div>
+      <div className="font-medium break-words">{value || '—'}</div>
     </div>
   )
 }
