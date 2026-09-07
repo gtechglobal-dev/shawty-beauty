@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import {
   CircleCheck,
   LoaderCircle,
-  CircleAlert,
   Sparkles,
   Crown,
   Package,
@@ -11,6 +10,7 @@ import {
 import { formatNgn, sponsorPackages, type SponsorPkg } from '../lib/constants'
 import { postJson } from '../lib/api'
 import { fetchLiveEvent } from '../lib/events'
+import { useToast } from '../components/Toasts'
 import Reveal from '../components/Reveal'
 
 const tiers = ['supporter', 'partner', 'featured', 'title'] as const
@@ -27,10 +27,9 @@ export default function Sponsor() {
   })
   const [logo, setLogo] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [logoInvalid, setLogoInvalid] = useState('')
   const [eventId, setEventId] = useState('')
+  const toast = useToast()
 
   useEffect(() => {
     fetchLiveEvent().then((ev) => setEventId(ev.id)).catch(() => {})
@@ -54,8 +53,6 @@ export default function Sponsor() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    setError('')
-    setSuccess('')
     setLoading(true)
     try {
       await postJson('/api/sponsors', {
@@ -64,7 +61,7 @@ export default function Sponsor() {
         logoBase64: logo || undefined,
         eventId: eventId || undefined,
       })
-      setSuccess('Thank you! Your sponsorship application has been received. Our team will reach out shortly.')
+      toast.push('Thank you! Your sponsorship application has been received. Our team will reach out shortly.')
       setForm({
         brandName: '',
         contactName: '',
@@ -76,7 +73,7 @@ export default function Sponsor() {
       })
       setLogo('')
     } catch (err: any) {
-      setError(err.message || 'Something went wrong. Please try again.')
+      toast.push(err.message || 'Something went wrong. Please try again.', 'err')
     } finally {
       setLoading(false)
     }
@@ -170,17 +167,6 @@ export default function Sponsor() {
             <h2 className="section-title mb-2">Apply to Sponsor</h2>
             <p className="text-ink/70">Tell us a little about your brand and we’ll get back to you.</p>
           </div>
-
-          {success && (
-            <div className="mb-6 p-4 rounded-xl bg-green-50 border border-green-200 text-green-800 text-sm flex items-start gap-2">
-              <CircleCheck size={20} className="shrink-0" /> {success}
-            </div>
-          )}
-          {error && (
-            <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2">
-              <CircleAlert size={20} className="shrink-0" /> {error}
-            </div>
-          )}
 
           <form onSubmit={submit} className="card p-6 sm:p-8 space-y-5">
             <div className="grid sm:grid-cols-2 gap-5">

@@ -83,6 +83,8 @@ export interface Registration {
   // this registrant when they scan it), and when the ticket email was last sent.
   ticketToken?: string;
   ticketEmailedAt?: string;
+  // Photo hosted on Cloudinary (photoBase64 is kept for legacy/fallback rows).
+  photoUrl?: string;
 }
 
 export async function readRegistrations(
@@ -191,6 +193,8 @@ export interface Sponsor {
   status: SponsorStatus;
   featured: boolean;
   logoBase64?: string;
+  // Logo hosted on Cloudinary (logoBase64 kept for legacy/fallback rows).
+  logoUrl?: string;
   eventId?: string;
   createdAt: string;
 }

@@ -7,6 +7,7 @@ import {
   type SponsorPackageType,
 } from '../db.js';
 import { sendTelegramMessage, telegramConfigured, escapeHtml } from '../lib/telegram.js';
+import { uploadAndStepDown } from '../lib/cloudinary.js';
 
 const router = Router();
 
@@ -132,6 +133,20 @@ router.post('/', async (req: Request, res: Response) => {
       targetEventId = live?.id;
     }
 
+    // Brand logo: upload to Cloudinary (auto stepped down to ~100 KB); the
+    // raw base64 is only kept when Cloudinary is unavailable.
+    const rawLogo = typeof logoBase64 === 'string' && logoBase64.length > 0 ? logoBase64 : undefined;
+    let logoBase64Clean: string | undefined;
+    let logoUrl: string | undefined;
+    if (rawLogo) {
+      const up = await uploadAndStepDown(rawLogo.slice(0, 300000), {
+        folder: 'shawty-beauty-studio/sponsors',
+        maxWidth: 800,
+      });
+      if (up.ok && up.url) logoUrl = up.url;
+      else logoBase64Clean = rawLogo;
+    }
+
     const sponsor: Sponsor = {
       id: uuid(),
       brandName: cleanBrand,
@@ -143,7 +158,8 @@ router.post('/', async (req: Request, res: Response) => {
       notes: (notes || '').trim().slice(0, 2000),
       status: 'pending',
       featured: packageType === 'featured' || packageType === 'title',
-      logoBase64: typeof logoBase64 === 'string' && logoBase64.length > 0 ? logoBase64.slice(0, 300000) : undefined,
+      logoBase64: logoBase64Clean,
+      logoUrl,
       eventId: targetEventId,
       createdAt: new Date().toISOString(),
     };

@@ -15,6 +15,7 @@ import {
 } from '../db.js';
 import { sendTelegramMessage, sendTelegramPhoto, telegramConfigured, escapeHtml } from '../lib/telegram.js';
 import { generateTicketToken, deliverTicketEmail } from '../lib/tickets.js';
+import { uploadAndStepDown, fetchImageBase64 } from '../lib/cloudinary.js';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || '';
 const PAYSTACK_BASE = 'https://api.paystack.co';
@@ -149,10 +150,16 @@ async function notifyPaidRegistration(reg: Registration): Promise<void> {
     status: '✅ PAID - Payment confirmed',
   });
 
-  if (reg.photoBase64) {
-    sendTelegramPhoto(reg.photoBase64, msg)
-      .then((ok) => { if (!ok) sendTelegramMessage(msg).catch(() => {}); })
-      .catch(() => sendTelegramMessage(msg).catch(() => {}));
+if (reg.photoBase64 || reg.photoUrl) {
+    let b64: string | undefined = reg.photoBase64;
+    if (reg.photoUrl) b64 = (await fetchImageBase64(reg.photoUrl)) || undefined;
+    if (b64) {
+      sendTelegramPhoto(b64, msg)
+        .then((ok) => { if (!ok) sendTelegramMessage(msg).catch(() => {}); })
+        .catch(() => {});
+    } else {
+      sendTelegramMessage(msg).catch(() => {});
+    }
   } else {
     sendTelegramMessage(msg).catch(() => {});
   }
@@ -284,6 +291,20 @@ router.post('/initialize', async (req: Request, res: Response) => {
     const processingFee = Math.round(subtotal * PROCESSING_FEE_RATE) + PROCESSING_FEE_BASE;
     const totalAmount = subtotal + processingFee; // naira
 
+    // Profile photo: upload to Cloudinary (auto stepped down to ~100 KB); the
+    // raw base64 is only kept when Cloudinary is unavailable.
+    const rawPhoto = (body.photoBase64 || '').trim();
+    let photoBase64: string | undefined;
+    let photoUrl: string | undefined;
+    if (rawPhoto) {
+      const up = await uploadAndStepDown(rawPhoto, {
+        folder: 'shawty-beauty-studio/registrations',
+        maxWidth: 900,
+      });
+      if (up.ok && up.url) photoUrl = up.url;
+      else photoBase64 = rawPhoto;
+    }
+
     const registrationId = uuid();
     const reg: Registration = {
       id: registrationId,
@@ -309,7 +330,8 @@ router.post('/initialize', async (req: Request, res: Response) => {
       ticketLabel: ticket.label,
       reason: (body.reason || '').trim(),
       hearAbout: (body.hearAbout || '').trim(),
-      photoBase64: (body.photoBase64 || '').trim(),
+      photoBase64,
+      photoUrl,
       createdAt: new Date().toISOString(),
     };
 

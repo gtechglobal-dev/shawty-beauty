@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import {
   LoaderCircle, LogOut, LayoutDashboard, Users, Handshake,
-  MessageSquare, Ticket, Crown, TrendingUp, CircleAlert,
+  MessageSquare, Ticket, Crown, TrendingUp, ChevronDown,
 } from 'lucide-react'
 import { getJson, patchJson } from '../lib/api'
 import { formatNgn, tickets } from '../lib/constants'
+import { useToast } from '../components/Toasts'
 
 interface Registration {
   id: string
@@ -77,7 +78,6 @@ export default function Admin() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
-  const [loginError, setLoginError] = useState('')
 
   const [tab, setTab] = useState<'stats' | 'registrations' | 'sponsors' | 'contacts'>(() => {
     const t = new URLSearchParams(window.location.search).get('tab')
@@ -88,7 +88,10 @@ export default function Admin() {
   const [sponsors, setSponsors] = useState<Sponsor[]>([])
   const [contacts, setContacts] = useState<ContactMsg[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [showAllRecent, setShowAllRecent] = useState(false)
+  const [showAllRegs, setShowAllRegs] = useState(false)
+
+  const toast = useToast()
 
   useEffect(() => {
     if (token) refresh('stats')
@@ -109,7 +112,6 @@ export default function Admin() {
 
   async function refresh(which = tab) {
     setLoading(true)
-    setError('')
     const headers = { Authorization: `Bearer ${token}` }
     try {
       if (which === 'stats' || which === 'registrations' || which === 'sponsors' || which === 'contacts') {
@@ -129,7 +131,7 @@ export default function Admin() {
         setContacts(c.contacts || [])
       }
     } catch (err: any) {
-      setError(err.message)
+      toast.push(err.message || 'Failed to load', 'err')
       if (err.message.includes('Unauthorized') || err.message.includes('Invalid')) {
         setToken('')
         localStorage.removeItem('sbs_admin_token')
@@ -142,13 +144,12 @@ export default function Admin() {
   async function login(e: React.FormEvent) {
     e.preventDefault()
     setLoginLoading(true)
-    setLoginError('')
     try {
       const data = await getJsonThis('/api/auth/login', { username, password })
       setToken(data.token)
       localStorage.setItem('sbs_admin_token', data.token)
     } catch (err: any) {
-      setLoginError(err.message)
+      toast.push(err.message || 'Login failed', 'err')
     } finally {
       setLoginLoading(false)
     }
@@ -158,21 +159,24 @@ export default function Admin() {
     try {
       await patchJson(`/api/admin/registrations/${id}`, { status }, { Authorization: `Bearer ${token}` })
       refresh('registrations')
-    } catch (err: any) { setError(err.message) }
+      toast.push('Registration updated.')
+    } catch (err: any) { toast.push(err.message || 'Failed to update registration', 'err') }
   }
 
   async function setSponsorStatus(id: string, status: string) {
     try {
       await patchJson(`/api/admin/sponsors/${id}`, { status }, { Authorization: `Bearer ${token}` })
       refresh('sponsors')
-    } catch (err: any) { setError(err.message) }
+      toast.push('Sponsor updated.')
+    } catch (err: any) { toast.push(err.message || 'Failed to update sponsor', 'err') }
   }
 
   async function toggleFeatured(id: string, featured: boolean) {
     try {
       await patchJson(`/api/admin/sponsors/${id}`, { featured }, { Authorization: `Bearer ${token}` })
       refresh('sponsors')
-    } catch (err: any) { setError(err.message) }
+      toast.push(featured ? 'Sponsor featured.' : 'Sponsor unfeatured.')
+    } catch (err: any) { toast.push(err.message || 'Failed to update sponsor', 'err') }
   }
 
   if (!token) {
@@ -184,7 +188,6 @@ export default function Admin() {
             <h1 className="font-display text-xl font-bold">Admin Login</h1>
           </div>
           <p className="text-sm text-muted mb-6">Shawty Beauty Studio · Dashboard</p>
-          {loginError && <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{loginError}</div>}
           <div className="space-y-4">
             <input className="input-field" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} required />
             <input type="password" className="input-field" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
@@ -231,7 +234,6 @@ export default function Admin() {
           ))}
         </div>
 
-        {error && <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2"><CircleAlert size={20} className="shrink-0" />{error}</div>}
         {loading && <div className="flex items-center gap-2 text-muted mb-6"><LoaderCircle size={18} className="animate-spin" /> Loading…</div>}
 
         {tab === 'stats' && stats && (
@@ -248,7 +250,6 @@ export default function Admin() {
                 <div className="space-y-1 text-sm text-muted">
                   <Row label="Pending" value={stats.pendingRegistrations} />
                   <Row label="Paid" value={stats.paidRegistrations} />
-                  <Row label="Approved" value={stats.approvedRegistrations} />
                 </div>
               </div>
               <div className="card p-6">
@@ -284,7 +285,7 @@ export default function Admin() {
                       </tr>
                     </thead>
                     <tbody>
-                      {stats.recentRegistrations.map((r: Registration) => (
+                      {stats.recentRegistrations.slice(0, showAllRecent ? undefined : 3).map((r: Registration) => (
                         <tr key={r.id} className="border-b border-black/5">
                           <td className="px-6 py-3">{r.fullName}</td>
                           <td className="px-6 py-3">{TICKET_LABELS[r.ticketType] || r.ticketType}</td>
@@ -296,6 +297,14 @@ export default function Admin() {
                     </tbody>
                   </table>
                 </div>
+                {stats.recentRegistrations.length > 3 && (
+                  <div className="p-3 border-t border-black/5 text-center">
+                    <button onClick={() => setShowAllRecent(!showAllRecent)} className="text-rose-deep hover:opacity-80 text-sm font-medium cursor-pointer inline-flex items-center gap-1.5">
+                      {showAllRecent ? 'View less' : `View more (${stats.recentRegistrations.length - 3} more)`}
+                      <ChevronDown size={14} className={showAllRecent ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -320,7 +329,7 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {registrations.map((r) => (
+                  {registrations.slice(0, showAllRegs ? undefined : 3).map((r) => (
                     <tr key={r.id} className="border-b border-black/5 align-top">
                       <td className="px-6 py-3">
                         <div className="font-medium">{r.fullName}</div>
@@ -345,9 +354,6 @@ export default function Admin() {
                           {r.status === 'pending' && (
                             <button onClick={() => setRegStatus(r.id, 'paid')} className="px-2.5 py-1 rounded-lg text-xs bg-green-600 text-white hover:bg-green-700">Mark Paid</button>
                           )}
-                          {r.status === 'paid' && (
-                            <button onClick={() => setRegStatus(r.id, 'approved')} className="px-2.5 py-1 rounded-lg text-xs bg-rose-dark text-white hover:opacity-90">Approve</button>
-                          )}
                           {r.status !== 'cancelled' && (
                             <button onClick={() => setRegStatus(r.id, 'cancelled')} className="px-2.5 py-1 rounded-lg text-xs bg-black/10 hover:bg-black/20">Cancel</button>
                           )}
@@ -361,6 +367,14 @@ export default function Admin() {
                 </tbody>
               </table>
             </div>
+            {registrations.length > 3 && (
+              <div className="p-3 border-t border-black/5 text-center">
+                <button onClick={() => setShowAllRegs(!showAllRegs)} className="text-rose-deep hover:opacity-80 text-sm font-medium cursor-pointer inline-flex items-center gap-1.5">
+                  {showAllRegs ? 'View less' : `View more (${registrations.length - 3} more)`}
+                  <ChevronDown size={14} className={showAllRegs ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                </button>
+              </div>
+            )}
           </div>
         )}
 

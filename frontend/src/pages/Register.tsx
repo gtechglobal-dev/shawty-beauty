@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
-import { CircleCheck, LoaderCircle, CreditCard, CircleAlert, Image as ImageIcon, ArrowRight } from 'lucide-react'
+import { CircleCheck, LoaderCircle, CreditCard, Image as ImageIcon, ArrowRight } from 'lucide-react'
 import { formatNgn, nationalities, nationalityNames, defaultEvent, type StudioEvent } from '../lib/constants'
 import { resolveRegisterEvent, ticketPrice } from '../lib/events'
 import { postJson } from '../lib/api'
 import { fetchPaystackConfig, loadPaystackScript, type PaystackConfig } from '../lib/paystack'
+import { useToast } from '../components/Toasts'
 import PhoneInput from '../components/PhoneInput'
 import Reveal from '../components/Reveal'
 import TicketCard from '../components/TicketCard'
@@ -63,11 +64,11 @@ export default function Register() {
   const [config, setConfig] = useState<PaystackConfig | null>(null)
   const [configError, setConfigError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const [profilePhoto, setProfilePhoto] = useState('')
   const [photoInvalid, setPhotoInvalid] = useState('')
+  const toast = useToast()
   const navigate = useNavigate()
 
   // Resolve the event: honor ?event=, otherwise the live event
@@ -136,10 +137,9 @@ export default function Register() {
   }
 
   async function handlePayWithPaystack() {
-    setError('')
     setLoading(true)
     if (!profilePhoto) {
-      setError('Please upload a profile photo to complete your registration.')
+      toast.push('Please upload a profile photo to complete your registration.', 'err')
       setLoading(false)
       return
     }
@@ -200,17 +200,16 @@ export default function Register() {
       handler.openIframe()
       setSuccess(true)
     } catch (err: any) {
-      setError(err.message || 'Something went wrong. Please try again.')
+      toast.push(err.message || 'Something went wrong. Please try again.', 'err')
       setLoading(false)
     }
   }
 
   async function handleManualRegister(e: React.FormEvent) {
     e.preventDefault()
-    setError('')
     setLoading(true)
     if (!profilePhoto) {
-      setError('Please upload a profile photo to complete your registration.')
+      toast.push('Please upload a profile photo to complete your registration.', 'err')
       setLoading(false)
       return
     }
@@ -241,7 +240,7 @@ export default function Register() {
       setLoading(false)
       setSuccess(true)
     } catch (err: any) {
-      setError(err.message || 'Something went wrong. Please try again.')
+      toast.push(err.message || 'Something went wrong. Please try again.', 'err')
       setLoading(false)
     }
   }
@@ -318,13 +317,6 @@ export default function Register() {
                 payment, we’ll confirm your seat shortly. For bank transfer, use the confirmation
                 details provided after your payment.
               </div>
-            </div>
-          )}
-
-          {error && (
-            <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2">
-              <CircleAlert size={20} className="shrink-0" />
-              {error}
             </div>
           )}
 

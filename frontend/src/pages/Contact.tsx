@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { CircleAlert, CircleCheck, LoaderCircle, Mail, Phone } from 'lucide-react'
+import { LoaderCircle, Mail, Phone } from 'lucide-react'
 import InstagramIcon from '../components/icons/InstagramIcon'
 import { postJson } from '../lib/api'
+import { useToast } from '../components/Toasts'
 import { siteConfig } from '../lib/constants'
 import Reveal from '../components/Reveal'
 
@@ -9,7 +10,7 @@ export default function Contact() {
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' })
   const [newsletter, setNewsletter] = useState('')
   const [loading, setLoading] = useState(false)
-  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const toast = useToast()
 
   function update(key: string, value: string) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -18,13 +19,12 @@ export default function Contact() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    setMsg(null)
     try {
       await postJson('/api/contact', form)
-      setMsg({ type: 'ok', text: 'Your message has been sent. We’ll get back to you soon!' })
+      toast.push('Your message has been sent. We’ll get back to you soon!')
       setForm({ name: '', email: '', subject: '', message: '' })
     } catch (err: any) {
-      setMsg({ type: 'err', text: err.message })
+      toast.push(err.message || 'Could not send your message.', 'err')
     } finally {
       setLoading(false)
     }
@@ -33,13 +33,12 @@ export default function Contact() {
   async function subscribe(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    setMsg(null)
     try {
       const data = await postJson('/api/contact/subscribe', { email: newsletter })
-      setMsg({ type: 'ok', text: data.message })
+      toast.push(data.message || 'Subscribed. Thanks!')
       setNewsletter('')
     } catch (err: any) {
-      setMsg({ type: 'err', text: err.message })
+      toast.push(err.message || 'Could not subscribe.', 'err')
     } finally {
       setLoading(false)
     }
@@ -63,17 +62,6 @@ export default function Contact() {
       <div className="container section-pad grid lg:grid-cols-[1fr_360px] gap-8 lg:gap-10 items-start">
         <Reveal variant="up">
         <form onSubmit={submit} className="card p-6 sm:p-8 space-y-5">
-          {msg && (
-            <div className={`p-4 rounded-xl text-sm flex items-start gap-2 ${
-              msg.type === 'ok'
-                ? 'bg-green-50 border border-green-200 text-green-800'
-                : 'bg-red-50 border border-red-200 text-red-700'
-            }`}>
-              {msg.type === 'ok' ? <CircleCheck size={20} className="shrink-0" /> : <CircleAlert size={20} className="shrink-0" />}
-              {msg.text}
-            </div>
-          )}
-
           <div className="grid sm:grid-cols-2 gap-5">
             <div>
               <label className="field-label">Full Name *</label>

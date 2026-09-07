@@ -19,13 +19,16 @@ import {
   RefreshCw,
   KeyRound,
   Send,
-  ChevronDown,
-  Eye,
+  Mail,
+  Download,
+  Filter,
   X,
+  ChevronDown,
 } from 'lucide-react'
 import { formatNgn, eventRegisterUrl, type StudioEvent, type Ticket } from '../../lib/constants'
 import { getJson, patchJson, postJson, delJson } from '../../lib/api'
 import Modal from '../../components/Modal'
+import { useToast } from '../../components/Toasts'
 
 // ------------------------------------------------------------------
 // Shared types
@@ -85,6 +88,7 @@ interface RegistrationRow {
   email: string
   instagram: string
   photoBase64?: string
+  photoUrl?: string
   ticketType: string
   ticketLabel?: string
   quantity: number
@@ -93,6 +97,7 @@ interface RegistrationRow {
   reason?: string
   attendance?: Record<string, boolean>
   present?: boolean
+  ticketToken?: string
   createdAt: string
   dateOfBirth?: string
   state?: string
@@ -120,8 +125,6 @@ export function statusBadge(status: string) {
   const map: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-700',
     paid: 'bg-green-100 text-green-700',
-    approved: 'bg-green-100 text-green-700',
-    confirmed: 'bg-green-100 text-green-700',
     cancelled: 'bg-red-100 text-red-600',
   }
   return `inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${map[status] || 'bg-black/5 text-ink/60'}`
@@ -129,6 +132,28 @@ export function statusBadge(status: string) {
 
 export function dayKeys(count: number): string[] {
   return Array.from({ length: count }, (_, i) => `d${i + 1}`)
+}
+
+function photoSrc(r: { photoUrl?: string; photoBase64?: string }): string | undefined {
+  return r.photoUrl || r.photoBase64 || undefined
+}
+
+// Format a date of birth as "13 Aug 2026 | 26years". Falls back to the raw
+// value when it isn't a valid date.
+function formatDobWithAge(dob?: string): string {
+  if (!dob) return ''
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob.trim())
+  const birth = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(dob)
+  if (isNaN(birth.getTime())) return dob
+  const formatted = birth
+    .toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    .replace(/\s+/g, ' ')
+  const now = new Date()
+  let age = now.getFullYear() - birth.getFullYear()
+  const monthDiff = now.getMonth() - birth.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) age -= 1
+  if (age < 0) return formatted
+  return `${formatted} | ${age}years`
 }
 
 function isPresent(r: { present?: boolean; attendance?: Record<string, boolean> }): boolean {
@@ -170,9 +195,7 @@ export function EventsHome({
   onOpenMessages: () => void
   onOpenSubscribers: () => void
 }) {
-  const [trackingEvent, setTrackingEvent] = useState<DiaryEvent | null>(null)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [pendingEnd, setPendingEnd] = useState<DiaryEvent | null>(null)
+const [pendingEnd, setPendingEnd] = useState<DiaryEvent | null>(null)
 
   return (
     <div className="space-y-8">
@@ -197,10 +220,9 @@ export function EventsHome({
       <div>
         <h3 className="font-semibold text-lg mb-1">Events &amp; everything connected to them</h3>
         <p className="text-sm text-muted mb-4">
-          Each event groups its own registrations, attendance and sponsors. Click a card to drop down the session
-          attendance and actions — or press{' '}
-          <strong className="text-rose-deep"> Create New Event </strong> to start a happening. Making an event live
-          switches the homepage banner, program page and registration forms to it automatically.
+          Each event groups its own registrations, attendance and sponsors. Tap Manage event to dig into the details
+          and press <strong className="text-rose-deep"> Create New Event </strong> to start a happening. Making an
+          event live switches the homepage banner, program page and registration forms to it automatically.
         </p>
 
         {loading ? (
@@ -213,11 +235,7 @@ export function EventsHome({
           <div className="relative">
             <div className="grid lg:grid-cols-2 gap-4">
             {events.map((ev) => {
-              const labels: string[] = ev.attendanceLabels
-              const counts = ev.summary?.attendanceByDay || {}
               const s = ev.summary
-              const open = expandedId === ev.id
-              const toggle = () => setExpandedId(open ? null : ev.id)
               return (
                 <div key={ev.id} className={`card overflow-hidden flex flex-col ${ev.status === 'live' ? 'border-2 border-pinkgold/60 shadow-[0_10px_30px_-12px_rgba(145,78,108,0.35)]' : ''}`}>
                   {/* Card header — title + all stats */}
@@ -261,83 +279,36 @@ export function EventsHome({
                       ]}
                     />
 
-                    <button
-                      onClick={toggle}
-                      aria-expanded={open}
-                      className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-rose-deep hover:underline cursor-pointer"
-                    >
-                      {open ? 'View less' : 'View more'}
-                      <ChevronDown size={15} className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-                    </button>
-
-                    {open && (
-                      <div className="mt-5 space-y-5">
-                        {ev.theme && (
-                          <p className={`text-sm italic ${ev.status === 'live' ? 'text-ink/70' : 'text-ink/60'}`}>
-                            “{ev.theme}”
-                          </p>
-                        )}
-
-                        {/* Attendance mini-bars */}
-                        {labels.length > 0 && (
-                          <div>
-                            <div className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Attendance by session</div>
-                            <div className="flex flex-wrap gap-2">
-                              {ev.attendanceLabels.map((label, i) => (
-                                <div key={label} className="flex-1 min-w-[70px] bg-black/[0.03] rounded-lg px-2 py-1.5">
-                                  <div className="text-xs font-semibold truncate">{label}</div>
-                                  <div className="text-sm font-bold text-rose-deep">{counts[dayKeys(ev.attendanceDays)[i]] ?? 0}</div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {ev.status !== 'live' && (
-                            <button
-                              onClick={() => onSetLive(ev.id)}
-                              className="inline-flex items-center gap-1.5 text-sm font-semibold bg-gradient-to-r from-rose-dark to-rose text-white px-4 py-2 rounded-full hover:opacity-90 shadow-[0_8px_20px_-8px_rgba(179,99,128,0.6)]"
-                            >
-                              <Radio size={14} /> Make Live
-                            </button>
-                          )}
-                          <button onClick={() => onManage(ev.id)} className="btn btn-outline !py-2">Manage event</button>
-                          <button
-                            onClick={() => setTrackingEvent(ev)}
-                            className="btn btn-outline !py-2 flex items-center gap-1.5"
-                          >
-                            <KeyRound size={13} /> Track attendance
-                          </button>
-                          <a
-                            href={eventRegisterUrl(ev)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn btn-outline !py-2 flex items-center gap-1.5"
-                          >
-                            Register page <ExternalLink size={13} />
-                          </a>
-                          {ev.status !== 'ended' && (
-                            <button
-                              onClick={() => setPendingEnd(ev)}
-                              className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-600 border border-red-200 bg-red-50 px-4 py-2 rounded-full hover:bg-red-100"
-                            >
-                              <CircleAlert size={14} /> End Event
-                            </button>
-                          )}
-                          {ev.status === 'ended' && (
-                            <span className="inline-flex items-center gap-1.5 text-sm font-semibold bg-black/10 text-ink/60 px-4 py-2 rounded-full">
-                              <CircleAlert size={14} /> Finished — past event
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                    <div className="mt-4 flex items-center gap-2 flex-wrap">
+                      {ev.status !== 'live' && (
+                        <button
+                          onClick={() => onSetLive(ev.id)}
+                          className="inline-flex items-center gap-1.5 text-sm font-semibold bg-gradient-to-r from-rose-dark to-rose text-white px-4 py-2 rounded-full hover:opacity-90 shadow-[0_8px_20px_-8px_rgba(179,99,128,0.6)]"
+                        >
+                          <Radio size={14} /> Make Live
+                        </button>
+                      )}
+                      <button onClick={() => onManage(ev.id)} className="btn btn-outline !py-2">Manage event</button>
+                      {ev.status !== 'ended' && (
+                        <button
+                          onClick={() => setPendingEnd(ev)}
+                          className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-600 border border-red-200 bg-red-50 px-4 py-2 rounded-full hover:bg-red-100"
+                        >
+                          <CircleAlert size={14} /> End Event
+                        </button>
+                      )}
+                      {ev.status === 'ended' && (
+                        <span className="inline-flex items-center gap-1.5 text-sm font-semibold bg-black/10 text-ink/60 px-4 py-2 rounded-full">
+                          <CircleAlert size={14} /> Finished — past event
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )
             })}
             </div>
+
             {saving && (
               <div className="absolute inset-0 z-10 bg-white/75 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center gap-2.5">
                 <LoaderCircle size={22} className="animate-spin text-rose-deep" />
@@ -347,14 +318,6 @@ export function EventsHome({
           </div>
         )}
       </div>
-
-      {trackingEvent && (
-        <TrackAttendanceModal
-          event={trackingEvent}
-          headers={headers}
-          onClose={() => setTrackingEvent(null)}
-        />
-      )}
 
       {pendingEnd && (
         <EndEventModal
@@ -368,149 +331,6 @@ export function EventsHome({
         />
       )}
     </div>
-  )
-}
-
-function TrackAttendanceModal({
-  event,
-  headers,
-  onClose,
-}: {
-  event: DiaryEvent
-  headers: Record<string, string>
-  onClose: () => void
-}) {
-  const counts = event.summary?.attendanceByDay || {}
-  const [codes, setCodes] = useState<Record<string, { createdAt: string }>>({})
-  const [genBusy, setGenBusy] = useState<string | null>(null)
-  const [visible, setVisible] = useState<Record<string, string>>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(`sbd:attendance-codes:${event.id}`) || '{}') || {}
-    } catch {
-      return {}
-    }
-  })
-  const [err, setErr] = useState('')
-  const [copiedDay, setCopiedDay] = useState<string | null>(null)
-
-  useEffect(() => {
-    let alive = true
-    getJson(`/api/admin/events/${event.id}/attendance-codes`, headers)
-      .then((r) => {
-        if (!alive) return
-        const map: Record<string, { createdAt: string }> = {}
-        for (const c of r.codes || []) map[c.day] = c
-        setCodes(map)
-      })
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
-  }, [event.id, headers])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(`sbd:attendance-codes:${event.id}`, JSON.stringify(visible))
-    } catch {
-      /* storage unavailable */
-    }
-  }, [visible, event.id])
-
-  async function generate(day: string) {
-    setGenBusy(day)
-    setErr('')
-    try {
-      const r = await postJson(`/api/admin/events/${event.id}/attendance-code`, { day }, headers)
-      if (r.code) {
-        setVisible((v) => ({ ...v, [day]: r.code }))
-        setCodes((c) => ({ ...c, [day]: { createdAt: new Date().toISOString() } }))
-      } else {
-        setErr(r.message || 'Could not generate the code.')
-      }
-    } catch (e: any) {
-      setErr(e.message || 'Something went wrong.')
-    } finally {
-      setGenBusy(null)
-    }
-  }
-
-  async function copyCode(day: string, code: string) {
-    try {
-      await navigator.clipboard.writeText(code)
-      setCopiedDay(day)
-      setTimeout(() => setCopiedDay((d) => (d === day ? null : d)), 1500)
-    } catch {
-      /* clipboard unavailable */
-    }
-  }
-
-  return (
-    <Modal open onClose={onClose}>
-      <h3 className="font-semibold text-lg pr-8">Track attendance</h3>
-      <p className="text-sm text-muted mt-1">{event.title}</p>
-      <p className="text-sm text-muted mt-3">
-        Students scan their ticket QR, then type the code for the session they're attending. Each session has one shared
-        code so a whole class can check in together in seconds.
-      </p>
-
-      <div className="space-y-3 mt-5">
-        {event.attendanceLabels.map((label, i) => {
-          const day = dayKeys(event.attendanceDays)[i]
-          const existing = codes[day]
-          const present = counts[day] ?? 0
-          const code = visible[day]
-          return (
-            <div key={day} className="border border-black/10 rounded-xl p-4 bg-white/60">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="font-semibold text-sm">{label}</div>
-                  <div className="text-xs text-muted mt-0.5">
-                    {present} present
-                    {existing ? ' · code active' : ''}
-                  </div>
-                </div>
-                <button
-                  onClick={() => generate(day)}
-                  disabled={genBusy === day}
-                  className="btn btn-primary !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
-                >
-                  {genBusy === day ? <LoaderCircle size={13} className="animate-spin" /> : <KeyRound size={13} />}
-                  {existing ? 'Regenerate' : 'Generate code'}
-                </button>
-              </div>
-
-              {code && (
-                <div className="mt-3 flex items-center gap-2 bg-blush/60 rounded-lg px-3 py-2.5 border border-rose/30">
-                  <span className="font-mono text-lg font-bold tracking-[0.25em] text-rose-deep flex-1 select-all">
-                    {code}
-                  </span>
-                  <button
-                    onClick={() => copyCode(day, code)}
-                    className="text-xs font-semibold text-rose-deep flex items-center gap-1 hover:underline shrink-0"
-                  >
-                    {copiedDay === day ? (
-                      <>
-                        <CircleCheck size={13} /> Copied
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={13} /> Copy
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
-      <p className="text-[11px] text-muted mt-4 leading-relaxed">
-        Generated codes stay visible on this screen while you share them with the class. Regenerating a session's code
-        makes the previous one stop working.
-      </p>
-    </Modal>
   )
 }
 
@@ -560,8 +380,359 @@ function EndEventModal({
   )
 }
 
-// ------------------------------------------------------------------
-// Event editor (create / edit — replaces details of the previous event)
+function ViewTicketModal({
+  reg,
+  event,
+  headers,
+  onClose,
+}: {
+  reg: RegistrationRow
+  event: DiaryEvent
+  headers: Record<string, string>
+  onClose: () => void
+}) {
+  const [resending, setResending] = useState(false)
+  const toast = useToast()
+  const pngUrl = `/api/tickets/${reg.ticketToken}.png`
+
+  return (
+    <Modal open wide onClose={onClose}>
+      <h3 className="font-semibold text-lg pr-8">Ticket — {reg.fullName}</h3>
+      <p className="text-sm text-muted mt-1">
+        {reg.ticketLabel || reg.ticketType} × {reg.quantity} · {formatNgn(reg.amount)} · {event.title}
+      </p>
+
+      <div className="mt-4 rounded-2xl overflow-hidden border border-black/10 bg-white">
+        <img src={pngUrl} alt={`${reg.fullName} ticket`} className="w-full" />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 mt-5">
+        <a href={pngUrl} download className="btn btn-primary !py-2 flex items-center gap-1.5">
+          <Download size={14} /> Download ticket
+        </a>
+        <button
+          onClick={async () => {
+            if (!reg.ticketToken) return
+            setResending(true)
+            try {
+              const data = await postJson(`/api/admin/registrations/${reg.id}/resend-ticket`, {}, headers)
+              const text = data.message || (data.emailed ? 'Ticket emailed.' : 'Ticket could not be emailed.')
+              toast.push(text, data.emailed ? 'ok' : 'err')
+            } catch (err: any) {
+              toast.push(err.message || 'Failed to resend ticket.', 'err')
+            } finally {
+              setResending(false)
+            }
+          }}
+          disabled={resending}
+          className="btn btn-outline !py-2 flex items-center gap-1.5 disabled:opacity-60"
+        >
+          {resending ? <LoaderCircle size={14} className="animate-spin" /> : <Send size={14} />} Resend by email
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
+function EmailApplicantsModal({
+  regs,
+  event,
+  headers,
+  onClose,
+}: {
+  regs: RegistrationRow[]
+  event: DiaryEvent
+  headers: Record<string, string>
+  onClose: () => void
+}) {
+  const paid = regs.filter((r) => r.status !== 'cancelled')
+  const [selected, setSelected] = useState<string[]>(() => paid.map((r) => r.id))
+  const [subject, setSubject] = useState('')
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+  const toast = useToast()
+
+  useEffect(() => {
+    setSelected(paid.map((r) => r.id))
+    setSubject(`Excited to have you — ${event.title}`)
+    setMessage(
+      `Hi there,\n\n` +
+        `We're really looking forward to seeing you at ${event.title}!` +
+        `${event.datesLabel ? ` It runs ${event.datesLabel}.` : ''}` +
+        `${event.venueNote ? `\n\n${event.venueNote}` : ''}` +
+        `\n\nSee you soon!\n— Shawty Beauty Studio`,
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event.id])
+
+  async function send() {
+    const recipients = paid.filter((r) => selected.includes(r.id))
+    if (recipients.length === 0) {
+      toast.push('Select at least one applicant to email.', 'err')
+      return
+    }
+    setBusy(true)
+    try {
+      const data = await postJson(
+        `/api/admin/broadcast`,
+        {
+          eventId: event.id,
+          subject: subject.trim() || `Update — ${event.title}`,
+          blocks: [{ type: 'text', text: message.trim() }],
+          emails: recipients.map((r) => r.email),
+        },
+        headers,
+      )
+      toast.push(
+        data.total
+          ? `Email sent to ${data.sent} of ${data.total} recipients (${data.failed} failed).`
+          : 'No recipients could be emailed.',
+        data.sent && data.sent > 0 ? 'ok' : 'err',
+      )
+    } catch (err: any) {
+      toast.push(err.message || 'Failed to send email.', 'err')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const toggle = (id: string) =>
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
+
+  return (
+    <Modal open onClose={onClose}>
+      <h3 className="font-semibold text-lg pr-8">Email to applicants</h3>
+      <p className="text-sm text-muted mt-1">{event.title}</p>
+
+      <div className="mt-5 space-y-4">
+        <div>
+          <label className="field-label">Subject</label>
+          <input className="input-field" value={subject} onChange={(e) => setSubject(e.target.value)} />
+        </div>
+        <div>
+          <label className="field-label">Message</label>
+          <textarea className="input-field" rows={7} value={message} onChange={(e) => setMessage(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-sm font-semibold">Recipients ({selected.length} of {paid.length})</div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setSelected(paid.map((r) => r.id))} className="text-xs font-semibold text-rose-deep hover:underline">All</button>
+            <button onClick={() => setSelected([])} className="text-xs font-semibold text-rose-deep hover:underline">None</button>
+          </div>
+        </div>
+        <div className="max-h-52 overflow-y-auto border border-black/10 rounded-xl divide-y divide-black/5">
+          {paid.length === 0 && <div className="p-4 text-sm text-muted">No applicants for this event yet.</div>}
+          {paid.map((r) => (
+            <label key={r.id} className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-black/[0.02]">
+              <input
+                type="checkbox"
+                className="accent-rose w-4 h-4 shrink-0"
+                checked={selected.includes(r.id)}
+                onChange={() => toggle(r.id)}
+              />
+              <span className="text-sm font-medium flex-1 truncate">{r.fullName}</span>
+              <span className="text-xs text-muted shrink-0">{r.ticketLabel || r.ticketType} × {r.quantity}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        <button onClick={onClose} className="btn btn-outline !py-2.5">Cancel</button>
+        <button
+          onClick={send}
+          disabled={busy || paid.length === 0}
+          className="btn btn-primary !py-2.5 flex items-center justify-center gap-1.5 disabled:opacity-60"
+        >
+          {busy ? <LoaderCircle size={15} className="animate-spin" /> : <Send size={15} />} Send email
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
+function SaveContactsModal({
+  regs,
+  event,
+  onClose,
+}: {
+  regs: RegistrationRow[]
+  event: DiaryEvent
+  onClose: () => void
+}) {
+  const paid = regs.filter((r) => r.status !== 'cancelled')
+  const options = (event.tickets || []).map((t) => t.label || t.id)
+  const [filter, setFilter] = useState('')
+  const visible = paid.filter((r) => !filter || (r.ticketLabel || r.ticketType) === filter)
+  const [selected, setSelected] = useState<string[]>(() => visible.map((r) => r.id))
+
+  useEffect(() => {
+    setSelected(visible.map((r) => r.id))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter])
+
+  function ticketPrefix(r: RegistrationRow): string {
+    const id = (r.ticketType || '').toLowerCase()
+    const label = (r.ticketLabel || '').toLowerCase()
+    if (id === 'gold' || label.includes('gold')) return '3BMCGOLD-'
+    if (id === 'student' || label.includes('student')) return '3BMCSTU-'
+    return ''
+  }
+
+  function vcardFor(r: RegistrationRow): string {
+    const prefix = ticketPrefix(r)
+    const raw = (r.fullName || 'Applicant').trim()
+    const name = `${prefix}${raw}`
+    const parts = raw.split(/\s+/)
+    const last = parts.slice(1).join(' ')
+    const first = parts[0] || ''
+    return [
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      `N:${prefix}${last};${first};;;`,
+      `FN:${name}`,
+      r.phone ? `TEL;TYPE=CELL:${r.phone}` : '',
+      r.email ? `EMAIL:${r.email}` : '',
+      r.instagram ? `NOTE:Instagram @${r.instagram}` : '',
+      'END:VCARD',
+    ]
+      .filter(Boolean)
+      .join('\r\n')
+  }
+
+  function saveOne(r: RegistrationRow) {
+    const prefix = ticketPrefix(r)
+    const blob = new Blob([vcardFor(r)], { type: 'text/vcard' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${prefix}${(r.fullName || 'applicant').replace(/\s+/g, '_')}.vcf`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  const toggle = (id: string) =>
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
+
+  return (
+    <Modal open onClose={onClose}>
+      <h3 className="font-semibold text-lg pr-8">Save contacts to phone</h3>
+      <p className="text-sm text-muted mt-1">Filter by ticket type, tick who you want, then save each as a phone contact (.vcf). Gold tickets are prefixed 3BMCGOLD-, Student tickets 3BMCSTU-.</p>
+
+      <div className="mt-5">
+        <label className="field-label">Ticket type</label>
+        <select className="input-field" value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <option value="">All ticket types</option>
+          {options.map((o) => (
+            <option key={o} value={o}>{o}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between mb-2">
+        <div className="text-sm font-semibold">Selected ({selected.filter((id) => visible.some((v) => v.id === id)).length} of {visible.length})</div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setSelected(visible.map((r) => r.id))} className="text-xs font-semibold text-rose-deep hover:underline">All</button>
+          <button onClick={() => setSelected([])} className="text-xs font-semibold text-rose-deep hover:underline">None</button>
+        </div>
+      </div>
+      <div className="border border-black/10 rounded-xl divide-y divide-black/5 max-h-60 overflow-y-auto">
+        {visible.length === 0 && <div className="p-4 text-sm text-muted">{paid.length === 0 ? 'No applicants for this event yet.' : 'No applicants match this ticket type.'}</div>}
+        {visible.map((r) => (
+          <div key={r.id} className="flex items-center gap-3 px-3 py-2.5">
+            <input
+              type="checkbox"
+              className="accent-rose w-4 h-4 shrink-0"
+              checked={selected.includes(r.id)}
+              onChange={() => toggle(r.id)}
+            />
+            <span className="text-sm font-medium flex-1 truncate">{ticketPrefix(r)}{r.fullName}</span>
+            <button onClick={() => saveOne(r)} className="px-2.5 py-1 rounded-lg text-xs bg-blush text-rose-deep hover:opacity-80 flex items-center gap-1 shrink-0">
+              <Download size={11} /> Save
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        <button onClick={onClose} className="btn btn-outline !py-2.5">Close</button>
+        <button
+          onClick={() => visible.filter((r) => selected.includes(r.id)).forEach((r) => saveOne(r))}
+          disabled={selected.length === 0}
+          className="btn btn-primary !py-2.5 flex items-center justify-center gap-1.5 disabled:opacity-60"
+        >
+          <Download size={15} /> Save selected ({selected.filter((id) => visible.some((v) => v.id === id)).length})
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
+function FilterRegModal({
+  event,
+  onApply,
+  onClose,
+}: {
+  event: DiaryEvent
+  onApply: (f: { ticketType?: string; date?: string }) => void
+  onClose: () => void
+}) {
+  const options = (event.tickets || []).map((t) => t.label || t.id)
+  const [ticketType, setTicketType] = useState('')
+  const [date, setDate] = useState('')
+
+  return (
+    <Modal open onClose={onClose}>
+      <h3 className="font-semibold text-lg pr-8">Filter registrations</h3>
+      <p className="text-sm text-muted mt-1">Show only registrations for a certain ticket type or submitted on a certain day.</p>
+
+      <div className="mt-5 space-y-4">
+        <div>
+          <label className="field-label">Ticket type</label>
+          <select className="input-field" value={ticketType} onChange={(e) => setTicketType(e.target.value)}>
+            <option value="">All ticket types</option>
+            {options.map((o) => (
+              <option key={o} value={o}>{o}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="field-label">Registered on</label>
+          <input type="date" className="input-field" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        <button
+          onClick={() => {
+            setTicketType('')
+            setDate('')
+            onApply({})
+            onClose()
+          }}
+          className="btn btn-outline !py-2.5"
+        >
+          Clear
+        </button>
+        <button
+          onClick={() => {
+            onApply({ ticketType: ticketType || undefined, date: date || undefined })
+            onClose()
+          }}
+          className="btn btn-primary !py-2.5 flex items-center justify-center gap-1.5"
+        >
+          <Filter size={15} /> Apply
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
 // ------------------------------------------------------------------
 
 interface TicketDraft {
@@ -866,23 +1037,27 @@ export function EventManage({
   const [regs, setRegs] = useState<RegistrationRow[]>([])
   const [sponsors, setSponsors] = useState<SponsorRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
   const [codes, setCodes] = useState<Record<string, { createdAt: string }>>({})
   const [generatedCode, setGeneratedCode] = useState<{ day: string; label: string; code: string } | null>(null)
   const [confirmEnd, setConfirmEnd] = useState(false)
   const [genBusy, setGenBusy] = useState<string | null>(null)
-  const [resendBusy, setResendBusy] = useState<string | null>(null)
   const [profile, setProfile] = useState<RegistrationRow | null>(null)
+  const [photoZoom, setPhotoZoom] = useState(false)
+  const [ticketReg, setTicketReg] = useState<RegistrationRow | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<RegistrationRow | null>(null)
   const [delBusy, setDelBusy] = useState(false)
+  const [emailOpen, setEmailOpen] = useState(false)
+  const [contactsOpen, setContactsOpen] = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [filters, setFilters] = useState<{ ticketType?: string; date?: string }>({})
+  const [showAllRegs, setShowAllRegs] = useState(false)
   const keys = dayKeys(event.attendanceDays)
   const labels: string[] = event.attendanceLabels || Array.from({ length: event.attendanceDays }, (_, i) => `Day ${i + 1}`)
   const s = event.summary
+  const toast = useToast()
 
   async function load() {
     setLoading(true)
-    setError('')
     try {
       const [r, sp, c] = await Promise.all([
         getJson(`/api/admin/registrations?eventId=${encodeURIComponent(event.id)}`, headers),
@@ -895,7 +1070,7 @@ export function EventManage({
       ;(c.codes || []).forEach((cc: { day: string; createdAt: string }) => { map[cc.day] = { createdAt: cc.createdAt } })
       setCodes(map)
     } catch (err: any) {
-      setError(err.message || 'Failed to load')
+      toast.push(err.message || 'Failed to load', 'err')
     } finally {
       setLoading(false)
     }
@@ -909,32 +1084,29 @@ export function EventManage({
   const sortedRegs = [...regs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   const presentCount = sortedRegs.filter(isPresent).length
 
-  async function updateReg(id: string, body: Record<string, any>) {
-    try {
-      const data = await patchJson(`/api/admin/registrations/${id}`, body, headers)
-      if (data.registration) setRegs((rs) => rs.map((r) => (r.id === id ? data.registration : r)))
-    } catch (err: any) {
-      setError(err.message)
+  const filteredRegs = sortedRegs.filter((r) => {
+    if (filters.ticketType && (r.ticketLabel || r.ticketType) !== filters.ticketType) return false
+    if (filters.date) {
+      const day = new Date(r.createdAt).toISOString().slice(0, 10)
+      if (day !== filters.date) return false
     }
-  }
+    return true
+  })
+  const hasFilters = Boolean(filters.ticketType || filters.date)
+  useEffect(() => setShowAllRegs(false), [filters.ticketType, filters.date])
 
   async function updateSponsor(id: string, body: Record<string, any>) {
     try {
       await patchJson(`/api/admin/sponsors/${id}`, body, headers)
+      toast.push('Sponsor updated.')
       load()
     } catch (err: any) {
-      setError(err.message)
+      toast.push(err.message || 'Failed to update sponsor', 'err')
     }
-  }
-
-  function toggleDay(r: RegistrationRow, key: string) {
-    const current = r.attendance || {}
-    updateReg(r.id, { attendance: { ...current, [key]: !current[key] } })
   }
 
   async function generateDayCode(day: string, label: string) {
     setGenBusy(day)
-    setError('')
     try {
       const data = await postJson(
         `/api/admin/events/${encodeURIComponent(event.id)}/attendance-code`,
@@ -943,40 +1115,24 @@ export function EventManage({
       )
       setGeneratedCode({ day, label, code: data.code })
       setCodes((prev) => ({ ...prev, [day]: { createdAt: new Date().toISOString() } }))
-      setNotice(data.message || 'Attendance code generated.')
+      toast.push(data.message || 'Attendance code generated.')
     } catch (err: any) {
-      setError(err.message || 'Failed to generate code')
+      toast.push(err.message || 'Failed to generate code', 'err')
     } finally {
       setGenBusy(null)
-    }
-  }
-
-  async function resendTicket(id: string) {
-    setResendBusy(id)
-    setError('')
-    setNotice('')
-    try {
-      const data = await postJson(`/api/admin/registrations/${id}/resend-ticket`, {}, headers)
-      setNotice(data.message || (data.emailed ? 'Ticket emailed.' : 'Ticket could not be emailed.'))
-    } catch (err: any) {
-      setError(err.message || 'Failed to resend ticket')
-    } finally {
-      setResendBusy(null)
     }
   }
 
   async function deleteReg() {
     if (!confirmDelete) return
     setDelBusy(true)
-    setError('')
-    setNotice('')
     try {
       await delJson(`/api/admin/registrations/${confirmDelete.id}`, headers)
       setRegs((rs) => rs.filter((r) => r.id !== confirmDelete.id))
       setConfirmDelete(null)
-      setNotice(`${confirmDelete.fullName}'s registration deleted.`)
+      toast.push(`${confirmDelete.fullName}'s registration deleted.`)
     } catch (err: any) {
-      setError(err.message || 'Failed to delete registration')
+      toast.push(err.message || 'Failed to delete registration', 'err')
     } finally {
       setDelBusy(false)
     }
@@ -998,6 +1154,8 @@ export function EventManage({
         <h2 className="font-display text-2xl md:text-3xl font-bold mt-2 relative z-10">{event.title}</h2>
         <div className="flex flex-wrap items-center gap-3 mt-4 relative z-10">
           <button onClick={onEdit} className="btn btn-light !py-2 flex items-center gap-1.5"><Pencil size={14} /> Edit content</button>
+          <button onClick={() => setEmailOpen(true)} className="btn btn-light !py-2 flex items-center gap-1.5"><Mail size={14} /> Email to Applicants</button>
+          <button onClick={() => setContactsOpen(true)} className="btn btn-light !py-2 flex items-center gap-1.5"><Download size={14} /> Save contacts to phone</button>
           {event.status !== 'live' && (
             <button onClick={onSetLive} className="btn btn-primary !py-2 flex items-center gap-1.5"><Radio size={14} /> Make Live now</button>
           )}
@@ -1014,9 +1172,6 @@ export function EventManage({
           </a>
         </div>
       </div>
-
-      {error && <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2"><CircleAlert size={18} className="shrink-0" />{error}</div>}
-      {notice && <div className="p-4 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm flex items-start gap-2"><CircleCheck size={18} className="shrink-0" />{notice}</div>}
 
       {/* Overview stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -1051,7 +1206,7 @@ export function EventManage({
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-muted mt-2">Tap the day toggles in the students table below to mark attendance live.</p>
+        <p className="text-xs text-muted mt-2">Students check in by scanning their ticket QR and entering the shared code for that session.</p>
       </div>
 
       {/* Daily attendance codes */}
@@ -1094,9 +1249,9 @@ export function EventManage({
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="font-display text-4xl font-bold tracking-[0.3em] text-rose-deep">{generatedCode.code}</div>
               <button
-                onClick={() => {
-                  navigator.clipboard.writeText(generatedCode.code)
-                  setNotice(`Code ${generatedCode.code} copied to clipboard.`)
+                onClick={async () => {
+                  await navigator.clipboard.writeText(generatedCode.code)
+                  toast.push(`Code ${generatedCode.code} copied to clipboard.`)
                 }}
                 className="btn btn-outline !py-2 flex items-center gap-1.5"
               >
@@ -1114,18 +1269,26 @@ export function EventManage({
       <div className="card overflow-hidden">
         <div className="p-6 flex items-center justify-between flex-wrap gap-3 border-b border-black/5">
           <div>
-            <h4 className="font-semibold text-lg">Students &amp; registrations ({sortedRegs.length})</h4>
-            <p className="text-sm text-muted">Forms submitted for this event — mark their attendance by session.</p>
+            <h4 className="font-semibold text-lg">Students &amp; registrations ({filteredRegs.length}{hasFilters ? ` of ${sortedRegs.length}` : ''})</h4>
+            <p className="text-sm text-muted">Forms submitted for this event — view profiles, tickets and attendance.</p>
           </div>
-          <button onClick={load} className="btn btn-outline !py-2 flex items-center gap-1.5"><RefreshCw size={14} /> Refresh</button>
+          <div className="flex items-center gap-2">
+            {hasFilters && (
+              <button onClick={() => setFilters({})} className="btn btn-outline !py-2 flex items-center gap-1.5"><X size={14} /> Clear filters</button>
+            )}
+            <button onClick={() => setFilterOpen(true)} className="btn btn-outline !py-2 flex items-center gap-1.5"><Filter size={14} /> Filter</button>
+            <button onClick={load} className="btn btn-outline !py-2 flex items-center gap-1.5"><RefreshCw size={14} /> Refresh</button>
+          </div>
         </div>
         {loading ? (
           <div className="p-12 flex items-center justify-center text-muted"><LoaderCircle size={20} className="animate-spin" /> Loading…</div>
         ) : (
+        <div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-muted text-xs border-b border-black/8">
+                <th className="px-5 py-2 w-10">S/N</th>
                 <th className="px-5 py-2">Student</th>
                 <th className="px-5 py-2">Contact</th>
                 <th className="px-5 py-2">Ticket</th>
@@ -1136,14 +1299,17 @@ export function EventManage({
               </tr>
             </thead>
             <tbody>
-              {sortedRegs.map((r) => (
+              {filteredRegs.slice(0, showAllRegs ? undefined : 3).map((r, i) => (
                 <tr key={r.id} className="border-b border-black/5 align-top">
+                  <td className="px-5 py-3 text-muted text-xs">{i + 1}</td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2.5">
-                      {r.photoBase64 && <img src={r.photoBase64} alt="" className="w-9 h-9 rounded-full object-cover ring-1 ring-rose/30" />}
-                      <div>
-                        <div className="font-medium">{r.fullName}</div>
-                        {r.instagram && <div className="text-xs text-muted">@{r.instagram}</div>}
+                      {photoSrc(r) && <img src={photoSrc(r)} alt="" className="w-9 h-9 rounded-full object-cover ring-1 ring-rose/30" />}
+                      <div className="flex items-center gap-2 whitespace-nowrap">
+                        <span className="font-medium">{r.fullName}</span>
+                        <a onClick={() => setProfile(r)} className="text-blue-600 hover:underline cursor-pointer text-xs">
+                          View profile
+                        </a>
                       </div>
                     </div>
                   </td>
@@ -1152,7 +1318,14 @@ export function EventManage({
                     <div className="text-xs text-muted">{r.phone}</div>
                   </td>
                   <td className="px-5 py-3">
-                    <div>{r.ticketLabel || r.ticketType} × {r.quantity}</div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>{r.ticketLabel || r.ticketType} × {r.quantity}</div>
+                      {r.status === 'paid' && r.ticketToken && (
+                        <button onClick={() => setTicketReg(r)} className="px-2 py-1 rounded-lg text-xs bg-blush text-rose-deep hover:opacity-80 flex items-center gap-1 whitespace-nowrap">
+                          <TicketIcon size={11} /> View ticket
+                        </button>
+                      )}
+                    </div>
                     {r.reason && <div className="text-xs text-muted max-w-[160px] truncate" title={r.reason}>{r.reason}</div>}
                   </td>
                   <td className="px-5 py-3">{formatNgn(r.amount)}</td>
@@ -1163,46 +1336,42 @@ export function EventManage({
                         const key = keys[i]
                         const on = r.attendance?.[key] === true
                         return (
-                          <button
+                          <span
                             key={key}
-                            onClick={() => toggleDay(r, key)}
-                            title={`${label} — ${on ? 'marked' : 'not marked'}`}
-                            className={`w-8 h-8 rounded-full text-xs font-bold transition-colors ${on ? 'bg-green-500 text-white shadow-sm' : 'bg-black/5 text-muted hover:bg-black/10'}`}
+                            title={`${label} — ${on ? 'checked in' : 'not checked in'}`}
+                            className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center transition-colors ${on ? 'bg-green-500 text-white shadow-sm' : 'bg-black/5 text-muted'}`}
                           >
                             {i + 1}
-                          </button>
+                          </span>
                         )
                       })}
                     </div>
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex flex-col gap-1.5">
-                      <button onClick={() => setProfile(r)} className="px-2.5 py-1 rounded-lg text-xs bg-ink/5 text-ink/80 hover:bg-ink/10 flex items-center justify-center gap-1"><Eye size={11} /> View profile</button>
-                      {r.status === 'pending' && <button onClick={() => updateReg(r.id, { status: 'paid' })} className="px-2.5 py-1 rounded-lg text-xs bg-green-600 text-white hover:bg-green-700">Mark Paid</button>}
-                      {r.status === 'paid' && <button onClick={() => updateReg(r.id, { status: 'approved' })} className="px-2.5 py-1 rounded-lg text-xs bg-rose-dark text-white hover:opacity-90">Approve</button>}
-                      {r.status === 'paid' && (
-                        <button
-                          onClick={() => resendTicket(r.id)}
-                          disabled={resendBusy === r.id}
-                          className="px-2.5 py-1 rounded-lg text-xs bg-rose/20 text-rose-deep hover:bg-rose/30 disabled:opacity-60 flex items-center justify-center gap-1"
-                        >
-                          {resendBusy === r.id ? <LoaderCircle size={11} className="animate-spin" /> : <Send size={11} />} Email ticket
-                        </button>
-                      )}
-                      <button
-                        onClick={() => updateReg(r.id, { present: !isPresent(r) })}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${isPresent(r) ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-ink/5 text-muted hover:bg-ink/10'}`}
-                      >
-                        {isPresent(r) ? '✓ Present' : 'Mark present'}
-                      </button>
                       <button onClick={() => setConfirmDelete(r)} className="px-2.5 py-1 rounded-lg text-xs bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center gap-1"><Trash2 size={11} /> Delete</button>
                     </div>
                   </td>
                 </tr>
               ))}
-              {sortedRegs.length === 0 && <tr><td colSpan={7} className="px-5 py-12 text-center text-muted">No registrations for this event yet.</td></tr>}
+              {filteredRegs.length === 0 && <tr><td colSpan={8} className="px-5 py-12 text-center text-muted">{sortedRegs.length === 0 ? 'No registrations for this event yet.' : 'No registrations match these filters.'}</td></tr>}
             </tbody>
           </table>
+        </div>
+        {filteredRegs.length > 3 && (
+          <div className="p-3 border-t border-black/5 text-center">
+            <button
+              onClick={() => {
+                if (showAllRegs) setShowAllRegs(false)
+                else setShowAllRegs(true)
+              }}
+              className="text-rose-deep hover:opacity-80 text-sm font-medium inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              {showAllRegs ? 'View less' : `View more (${filteredRegs.length - 3} more)`}
+              <ChevronDown size={14} className={showAllRegs ? 'rotate-180 transition-transform' : 'transition-transform'} />
+            </button>
+          </div>
+        )}
         </div>
         )}
       </div>
@@ -1284,45 +1453,98 @@ export function EventManage({
       />
 
       {profile && (
-        <Modal open onClose={() => setProfile(null)}>
-          <div className="flex items-start justify-between gap-3">
-            <h3 className="font-semibold text-lg pr-6">Student profile</h3>
-            <button onClick={() => setProfile(null)} className="w-8 h-8 rounded-full flex items-center justify-center text-muted hover:bg-black/5 shrink-0"><X size={16} /></button>
+        <Modal open wide onClose={() => setProfile(null)}>
+          <div className="text-center">
+            <div className="relative w-20 h-20 mx-auto rounded-full overflow-hidden bg-blush ring-4 ring-blush/40">
+              {photoSrc(profile) ? (
+                <img
+                  src={photoSrc(profile)}
+                  alt={profile.fullName}
+                  onClick={() => setPhotoZoom(true)}
+                  className="w-full h-full object-cover cursor-zoom-in"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center font-display text-2xl font-bold text-rose-deep">
+                  {profile.fullName.charAt(0)}
+                </div>
+              )}
+            </div>
+            <h3 className="font-display text-2xl font-bold mt-3">{profile.fullName}</h3>
+            {profile.instagram && <p className="text-sm text-muted">@{profile.instagram}</p>}
+            <div className="mt-2 flex items-center justify-center gap-2 flex-wrap">
+              <span className={statusBadge(profile.status)}>{profile.status}</span>
+              <span className="text-xs text-muted">Joined {new Date(profile.createdAt).toLocaleDateString()}</span>
+            </div>
+            <p className="text-xs text-muted mt-1">{event.title}</p>
           </div>
-          <p className="text-sm text-muted mt-1">{event.title}</p>
 
-          <div className="mt-5 flex items-center gap-4">
-            {profile.photoBase64 && <img src={profile.photoBase64} alt="" className="w-16 h-16 rounded-2xl object-cover ring-1 ring-rose/30" />}
-            <div>
-              <div className="font-display text-xl font-bold">{profile.fullName}</div>
-              {profile.instagram && <div className="text-sm text-muted">@{profile.instagram}</div>}
-              <div className="mt-1 flex items-center gap-2 flex-wrap">
-                <span className={statusBadge(profile.status)}>{profile.status}</span>
-                <span className="text-xs text-muted">Joined {new Date(profile.createdAt).toLocaleDateString()}</span>
-              </div>
+          <div className="mt-6 pt-5 border-t border-black/5">
+            <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-3">Applicant details</h4>
+            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+              <ProfileField label="Email" value={profile.email} />
+              <ProfileField label="Phone" value={profile.phone} />
+              <ProfileField label="Date of birth" value={formatDobWithAge(profile.dateOfBirth)} />
+              <ProfileField label="State" value={profile.state} />
+              <ProfileField label="Nationality" value={profile.nationality} />
+              <ProfileField label="Experience level" value={profile.experienceLevel} />
+              <ProfileField label="Address" value={profile.address} />
+              <ProfileField label="Ticket" value={`${profile.ticketLabel || profile.ticketType} × ${profile.quantity}`} />
+              <ProfileField label="Amount" value={formatNgn(profile.amount)} />
             </div>
           </div>
 
-          <div className="mt-5 grid sm:grid-cols-2 gap-3 text-sm">
-            <ProfileField label="Email" value={profile.email} />
-            <ProfileField label="Phone" value={profile.phone} />
-            <ProfileField label="Date of birth" value={profile.dateOfBirth} />
-            <ProfileField label="State" value={profile.state} />
-            <ProfileField label="Nationality" value={profile.nationality} />
-            <ProfileField label="Experience level" value={profile.experienceLevel} />
-            <ProfileField label="Address" value={profile.address} />
-            <ProfileField label="Ticket" value={`${profile.ticketLabel || profile.ticketType} × ${profile.quantity}`} />
-            <ProfileField label="Amount" value={formatNgn(profile.amount)} />
-            <ProfileField label="Present" value={isPresent(profile) ? 'Yes' : 'No'} />
-            <ProfileField label="Attendance" value={profile.attendance && Object.values(profile.attendance).some(Boolean) ? `Marked ${Object.values(profile.attendance).filter(Boolean).length}/${keys.length} day${keys.length === 1 ? '' : 's'}` : 'None yet'} />
-          </div>
+          {(profile.emergencyContactName || profile.emergencyContact || profile.reason) && (
+            <div className="mt-5 pt-5 border-t border-black/5">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-3">More info</h4>
+              <div className="grid sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                {profile.emergencyContactName && <ProfileField label="Emergency contact" value={profile.emergencyContactName} />}
+                {profile.emergencyContact && <ProfileField label="Emergency phone" value={profile.emergencyContact} />}
+                {profile.reason && <ProfileField label="Reason" value={profile.reason} />}
+              </div>
+            </div>
+          )}
 
-          <div className="mt-5 pt-4 border-t border-black/5 grid sm:grid-cols-2 gap-3 text-sm">
-            {profile.emergencyContactName && <ProfileField label="Emergency contact" value={profile.emergencyContactName} />}
-            {profile.emergencyContact && <ProfileField label="Emergency phone" value={profile.emergencyContact} />}
-            {profile.reason && <ProfileField label="Reason" value={profile.reason} />}
+          <div className="mt-5 pt-5 border-t border-black/5">
+            <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-3">Attendance — {keys.length}-day program</h4>
+            <div className="flex flex-wrap gap-2">
+              {labels.map((label, i) => {
+                const key = keys[i]
+                const on = profile.attendance?.[key] === true
+                return (
+                  <span
+                    key={key}
+                    title={`${label} — ${on ? 'checked in' : 'not checked in'}`}
+                    className={`w-9 h-9 rounded-full text-xs font-bold flex items-center justify-center ${on ? 'bg-green-500 text-white shadow-sm' : 'bg-black/5 text-muted'}`}
+                  >
+                    {i + 1}
+                  </span>
+                )
+              })}
+            </div>
           </div>
         </Modal>
+      )}
+
+      {photoZoom && profile && photoSrc(profile) && (
+        <Modal open onClose={() => setPhotoZoom(false)}>
+          <img src={photoSrc(profile!)} alt={profile.fullName} className="w-full max-h-[70vh] object-contain rounded-xl" />
+        </Modal>
+      )}
+
+      {ticketReg && (
+        <ViewTicketModal reg={ticketReg} event={event} headers={headers} onClose={() => setTicketReg(null)} />
+      )}
+
+      {emailOpen && (
+        <EmailApplicantsModal regs={regs} event={event} headers={headers} onClose={() => setEmailOpen(false)} />
+      )}
+
+      {contactsOpen && (
+        <SaveContactsModal regs={regs} event={event} onClose={() => setContactsOpen(false)} />
+      )}
+
+      {filterOpen && (
+        <FilterRegModal event={event} onApply={setFilters} onClose={() => setFilterOpen(false)} />
       )}
 
       {confirmDelete && (

@@ -336,7 +336,7 @@ export async function deliverTicketEmail(opts: {
               &#10024; <strong>Welcome to Shawty Beauty Studio 3BMC!</strong> &#10024;
             </p>
             <p style="color: #2a1b22; font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
-              We&rsquo;re so excited to have you join us for the <strong>3-Day Beginner Makeup Class</strong>,
+              We&rsquo;re so excited to have you join us for the <strong>3-Days Beginner Makeup Class</strong>,
               where you&rsquo;ll learn, practice, and build the confidence to create beautiful makeup looks
               from the ground up.
             </p>
@@ -345,8 +345,7 @@ export async function deliverTicketEmail(opts: {
               ready.</strong>
             </p>
             <p style="color: #2a1b22; font-size: 15px; line-height: 1.7; margin: 0 0 12px;">
-              &#127915; <strong>Your Ticket:</strong><br/>
-              Your personalized ticket is available through the download link below.
+              &#127915; <strong>Click the button to download your ticket:</strong>
             </p>
             <div style="text-align: center; margin: 0 0 18px;">
               <a href="${downloadUrl}" style="display: inline-block; background: linear-gradient(135deg, #d98aa0, #914e6c); color: #ffffff; text-decoration: none; font-weight: 600; font-size: 15px; padding: 14px 34px; border-radius: 999px;">

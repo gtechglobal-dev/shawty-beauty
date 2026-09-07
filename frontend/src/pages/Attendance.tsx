@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { LoaderCircle, CircleCheck, CircleAlert, Ticket, Download, CalendarDays, QrCode } from 'lucide-react'
 import { getJson, postJson } from '../lib/api'
+import { useToast } from '../components/Toasts'
 import Reveal from '../components/Reveal'
 
 interface TicketInfo {
@@ -37,8 +38,9 @@ export default function Attendance() {
   const [error, setError] = useState('')
   const [code, setCode] = useState('')
   const [marking, setMarking] = useState(false)
-  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [attendance, setAttendance] = useState<Record<string, boolean>>({})
+
+  const toast = useToast()
 
   useEffect(() => {
     if (!token) {
@@ -58,19 +60,18 @@ export default function Attendance() {
   async function markAttendance(e: React.FormEvent) {
     e.preventDefault()
     if (!code.trim()) {
-      setMsg({ type: 'err', text: 'Enter the attendance code first.' })
+      toast.push('Enter the attendance code first.', 'err')
       return
     }
     setMarking(true)
-    setMsg(null)
     try {
       const data = await postJson(`/api/tickets/${encodeURIComponent(token)}/attendance`, { code: code.trim() })
-      setMsg({ type: 'ok', text: data.message })
+      toast.push(data.message || 'Marked present.')
       setAttendance(data.registration?.attendance || attendance)
       setInfo((prev) => (prev ? { ...prev, registration: data.registration } : prev))
       setCode('')
     } catch (err: any) {
-      setMsg({ type: 'err', text: err.message || 'Could not mark attendance' })
+      toast.push(err.message || 'Could not mark attendance', 'err')
     } finally {
       setMarking(false)
     }
@@ -153,16 +154,6 @@ export default function Attendance() {
                   maxLength={8}
                   autoComplete="off"
                 />
-                {msg && (
-                  <div
-                    className={`mt-3 p-3 rounded-xl text-sm flex items-start gap-2 ${
-                      msg.type === 'ok' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
-                    }`}
-                  >
-                    {msg.type === 'ok' ? <CircleCheck size={18} className="shrink-0" /> : <CircleAlert size={18} className="shrink-0" />}
-                    {msg.text}
-                  </div>
-                )}
                 <button type="submit" disabled={marking} className="btn btn-primary w-full mt-4 flex items-center justify-center gap-2">
                   {marking ? <LoaderCircle size={18} className="animate-spin" /> : <CircleCheck size={18} />}
                   Mark me present

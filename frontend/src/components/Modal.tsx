@@ -1,14 +1,17 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
 export default function Modal({
   open,
   onClose,
   children,
+  wide = false,
 }: {
   open: boolean
   onClose: () => void
   children: React.ReactNode
+  wide?: boolean
 }) {
   useEffect(() => {
     if (!open) return
@@ -25,10 +28,13 @@ export default function Modal({
 
   if (!open) return null
 
-  return (
+  // Render at <body> level (portal) so `position: fixed` is always anchored to
+  // the viewport — a transformed/filtered ancestor would otherwise relocate the
+  // modal off-screen relative to the current scroll position.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-ink/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative card w-full max-w-lg bg-white p-6 sm:p-8 max-h-[85vh] overflow-y-auto rounded-3xl">
+      <div className={`relative card w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} bg-white p-6 sm:p-8 max-h-[85vh] overflow-y-auto rounded-3xl`}>
         <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-rose/40 to-transparent" />
         <button
           onClick={onClose}
@@ -39,6 +45,7 @@ export default function Modal({
         </button>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

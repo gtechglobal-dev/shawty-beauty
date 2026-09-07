@@ -8,6 +8,8 @@ import {
   findRegistration,
   updateRegistration,
   deleteRegistration,
+  writeRegistration,
+  findLiveEvent,
   readSponsors,
   updateSponsor,
   deleteSponsor,
@@ -25,6 +27,8 @@ import {
   DEFAULT_EVENT,
   isValidEventStatus,
   type RegistrationStatus,
+  type Registration,
+  type TicketType,
   type SponsorStatus,
   type StudioEvent,
   type EventTicket,
@@ -32,6 +36,7 @@ import {
 import { generateTicketToken, deliverTicketEmail } from '../lib/tickets.js';
 import { sendEmail, mailConfigured, type MailAttachment } from '../lib/mailer.js';
 import { escapeHtml } from '../lib/telegram.js';
+import { uploadAndStepDown } from '../lib/cloudinary.js';
 
 const router = Router();
 
@@ -53,13 +58,25 @@ function attendanceRollup(regs: { attendance?: Record<string, boolean> }[]): Rec
   return byDay;
 }
 
-function sanitizeEvent(body: any): Partial<StudioEvent> {
+async function sanitizeBannerImage(value: string): Promise<string | undefined> {
+  const input = String(value || '').trim().slice(0, 400000);
+  if (!input) return undefined;
+  // Already a hosted URL (Cloudinary or otherwise) — keep as is.
+  if (!/^data:image\//.test(input)) return input;
+  const up = await uploadAndStepDown(input, {
+    folder: 'shawty-beauty-studio/banners',
+    maxWidth: 1600,
+  });
+  return up.ok && up.url ? up.url : input;
+}
+
+async function sanitizeEvent(body: any): Promise<Partial<StudioEvent>> {
   const clean: Partial<StudioEvent> = {};
   if (typeof body.title === 'string') clean.title = body.title.trim().slice(0, 160);
   if (typeof body.slug === 'string') clean.slug = slugify(body.slug);
   if (body.slug === '') clean.slug = slugify(clean.title || 'event');
   if (typeof body.status === 'string' && isValidEventStatus(body.status)) clean.status = body.status;
-  if (typeof body.bannerImage === 'string') clean.bannerImage = body.bannerImage.slice(0, 400000) || undefined;
+  if (typeof body.bannerImage === 'string') clean.bannerImage = await sanitizeBannerImage(body.bannerImage);
   if (typeof body.theme === 'string') clean.theme = body.theme.trim().slice(0, 300);
   if (typeof body.datesLabel === 'string') clean.datesLabel = body.datesLabel.trim().slice(0, 120);
   if (typeof body.durationLabel === 'string') clean.durationLabel = body.durationLabel.trim().slice(0, 80);
@@ -295,7 +312,7 @@ router.post('/events', authMiddleware, async (req: AuthRequest, res: Response) =
 // Fully update an event's content.
 router.put('/events/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const clean = sanitizeEvent(req.body);
+    const clean = await sanitizeEvent(req.body);
     if (Object.keys(clean).length === 0) {
       return res.status(400).json({ error: 'Nothing to update' });
     }
@@ -423,31 +440,126 @@ router.get('/registrations', authMiddleware, async (req: AuthRequest, res: Respo
   }
 });
 
+// Manually add a registrant — used for cash/bank/offline payments already
+// received, so the record is created straight away as PAID (no approval step).
+// A ticket is generated and emailed to the applicant when mail is configured.
+router.post('/registrations', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const b = req.body || {};
+    const fullName = String(b.fullName || '').trim();
+    const phone = String(b.phone || '').trim();
+    const email = String(b.email || '').trim();
+    if (!fullName || !phone || !email) {
+      return res.status(400).json({ error: 'Full name, phone and email are required.' });
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      return res.status(400).json({ error: 'A valid email address is required.' });
+    }
+
+    const ticketType = String(b.ticketType || 'student').trim() || 'student';
+    const quantity = Math.max(1, Math.min(20, Math.round(Number(b.quantity) || 1)));
+    const amount = Math.max(0, Math.round(Number(b.amount) || 0));
+    const eventId = b.eventId ? String(b.eventId) : undefined;
+    const event = eventId ? await findEvent(eventId) : await findLiveEvent();
+
+    // Profile photo: upload to Cloudinary (auto stepped down to ~100 KB); the
+    // raw base64 is only kept when Cloudinary is unavailable.
+    const rawPhoto = typeof b.photoBase64 === 'string' && b.photoBase64 ? b.photoBase64 : undefined;
+    let photoBase64: string | undefined;
+    let photoUrl: string | undefined;
+    if (rawPhoto) {
+      const up = await uploadAndStepDown(rawPhoto, {
+        folder: 'shawty-beauty-studio/registrations',
+        maxWidth: 900,
+      });
+      if (up.ok && up.url) photoUrl = up.url;
+      else photoBase64 = rawPhoto;
+    }
+
+    let ticketLabel = typeof b.ticketLabel === 'string' && b.ticketLabel.trim() ? b.ticketLabel.trim() : undefined;
+    if (!ticketLabel && event?.tickets?.length) {
+      const match =
+        event.tickets.find((t) => t.id === ticketType) ||
+        event.tickets.find((t) => (t.label || '').toLowerCase() === ticketType.toLowerCase());
+      if (match) ticketLabel = match.label || undefined;
+    }
+
+    const reg: Registration = {
+      id: uuid(),
+      fullName,
+      phone,
+      email,
+      instagram: String(b.instagram || '').trim(),
+      dateOfBirth: String(b.dateOfBirth || '').trim(),
+      state: String(b.state || '').trim(),
+      nationality: String(b.nationality || '').trim(),
+      address: String(b.address || '').trim(),
+      experienceLevel: String(b.experienceLevel || '').trim(),
+      emergencyContactName: String(b.emergencyContactName || '').trim(),
+      emergencyContact: String(b.emergencyContact || '').trim(),
+ticketType: ticketType as TicketType,
+      ticketLabel,
+      quantity,
+      amount,
+      unitPrice: quantity > 0 ? Math.round(amount / quantity) : amount,
+      subtotal: amount,
+      processingFee: 0,
+      status: 'paid',
+      reason: String(b.reason || '').trim(),
+      hearAbout: String(b.hearAbout || '').trim(),
+      createdAt: new Date().toISOString(),
+      eventId: event?.id,
+      photoBase64,
+      photoUrl,
+      attendance: {},
+      present: false,
+      ticketToken: generateTicketToken(),
+    };
+
+    await writeRegistration(reg);
+
+    // Deliver the ticket by email (best-effort — never blocks the response).
+    let emailed = false;
+    try {
+      const result = await deliverTicketEmail({
+        registration: reg,
+        event,
+        baseUrl: b.origin || process.env.BASE_URL,
+      });
+      if (result.emailed) {
+        await updateRegistration(reg.id, { ticketEmailedAt: new Date().toISOString() });
+        emailed = true;
+      }
+    } catch (err: any) {
+      console.error('Ticket email failed for manual add:', err.message);
+    }
+
+    res.status(201).json({ success: true, emailed, registration: reg });
+  } catch (err: any) {
+    console.error('Failed to add registration:', err.message);
+    res.status(500).json({ error: 'Failed to add registration' });
+  }
+});
+
 router.patch('/registrations/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { status, attendance, present } = req.body;
-    const update: {
-      status?: RegistrationStatus;
-      attendance?: Record<string, boolean>;
-      present?: boolean;
-    } = {};
-    if (status && ['pending', 'paid', 'approved', 'cancelled'].includes(status as RegistrationStatus)) {
+    // Attendance is recorded ONLY by the attendee scanning their ticket QR and
+    // entering the shared session code — the admin must not mark it manually.
+    const { status } = req.body;
+    const update: { status?: RegistrationStatus } = {};
+    if (req.body.attendance != null) {
+      return res.status(400).json({ error: 'Attendance can only be marked from the attendee’s ticket when they check in.' });
+    }
+    if (req.body.present != null) {
+      return res.status(400).json({ error: 'Attendance can only be marked from the attendee’s ticket when they check in.' });
+    }
+    // Post-payment approval is gone — a confirmed payment IS paid. Only
+    // pending/paid/cancelled can be set by the admin from here.
+    if (status && ['pending', 'paid', 'cancelled'].includes(status as RegistrationStatus)) {
       update.status = status as RegistrationStatus;
     }
-    if (attendance && typeof attendance === 'object') {
-      const clean: Record<string, boolean> = {};
-      for (const [k, v] of Object.entries(attendance)) {
-        if (/^d\d+$/.test(k)) clean[k] = Boolean(v);
-      }
-      if (Object.keys(clean).length > 0) update.attendance = clean;
-    }
-    if (typeof present === 'boolean') update.present = present;
     if (Object.keys(update).length === 0) {
       return res.status(400).json({ error: 'Nothing to update' });
-    }
-    // A student counts as present when any attendance day is marked.
-    if (update.attendance && typeof update.present !== 'boolean') {
-      update.present = Object.values(update.attendance).some(Boolean);
     }
     const updated = await updateRegistration(req.params.id, update);
     if (!updated) return res.status(404).json({ error: 'Registration not found' });
@@ -739,22 +851,45 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
       return res.status(400).json({ error: 'Nothing to send — add text or attach an image' });
     }
 
-    const [subscribers, contacts, registrations, sponsors] = await Promise.all([
-      readSubscribers(),
-      readContacts(),
-      readRegistrations(),
-      readSponsors(),
-    ]);
     const excluded = await unsubscribedEmails();
-    const recipients = aggregateEmails(
-      [
-        ...subscribers.map((s) => ({ email: s.email, createdAt: s.createdAt, source: 'newsletter' })),
-        ...contacts.map((c) => ({ email: c.email, createdAt: c.createdAt, source: 'contact' })),
-        ...registrations.map((r) => ({ email: r.email, createdAt: r.createdAt, source: 'registration' })),
-        ...sponsors.map((s) => ({ email: s.email, createdAt: s.createdAt, source: 'sponsor' })),
-      ],
-      excluded,
-    ).filter((r) => !r.unsubscribed);
+
+    // When an `eventId` is given, the email only goes to that event's
+    // applicants (non-cancelled registrations) instead of the whole platform.
+    const { eventId } = req.body || {};
+    let recipients: EmailAgg[];
+    if (eventId && typeof eventId === 'string') {
+      const ev = await findEvent(eventId);
+      if (!ev) return res.status(404).json({ error: 'Event not found' });
+      const evRegs = (await readRegistrations({ eventId })).filter((r) => r.status !== 'cancelled');
+      recipients = aggregateEmails(
+        evRegs.map((r) => ({ email: r.email, createdAt: r.createdAt, source: 'registration' })),
+        excluded,
+      ).filter((r) => !r.unsubscribed);
+      // An optional `emails` list narrows the event broadcast to just those
+      // registrations (used by the "Email to applicants" picker).
+      const emailFilter = Array.isArray(req.body?.emails)
+        ? req.body.emails.map((e: any) => String(e).trim().toLowerCase()).filter(Boolean)
+        : null;
+      if (emailFilter && emailFilter.length > 0) {
+        recipients = recipients.filter((r) => emailFilter.includes(r.email.toLowerCase()));
+      }
+    } else {
+      const [subscribers, contacts, registrations, sponsors] = await Promise.all([
+        readSubscribers(),
+        readContacts(),
+        readRegistrations(),
+        readSponsors(),
+      ]);
+      recipients = aggregateEmails(
+        [
+          ...subscribers.map((s) => ({ email: s.email, createdAt: s.createdAt, source: 'newsletter' })),
+          ...contacts.map((c) => ({ email: c.email, createdAt: c.createdAt, source: 'contact' })),
+          ...registrations.map((r) => ({ email: r.email, createdAt: r.createdAt, source: 'registration' })),
+          ...sponsors.map((s) => ({ email: s.email, createdAt: s.createdAt, source: 'sponsor' })),
+        ],
+        excluded,
+      ).filter((r) => !r.unsubscribed);
+    }
 
     if (recipients.length === 0) {
       return res.json({ success: true, sent: 0, failed: 0, total: 0, unsubscribedExcluded: excluded.size });

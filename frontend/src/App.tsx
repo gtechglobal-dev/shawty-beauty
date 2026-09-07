@@ -13,6 +13,7 @@ import Contact from './pages/Contact'
 import Admin from './pages/Admin'
 import Diary from './pages/Diary'
 import Attendance from './pages/Attendance'
+import { ToastProvider } from './components/Toasts'
 
 export default function App() {
   const { pathname, hash } = useLocation()
@@ -43,27 +44,33 @@ export default function App() {
   const handleFadeEnd = () => setFading(false)
 
   if (isAdmin) {
-    return <Admin />
+    return (
+      <ToastProvider>
+        <Admin />
+      </ToastProvider>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-cream text-ink flex flex-col">
-      <Loader show={loading} fading={fading} onFadeEnd={handleFadeEnd} />
-      <Navbar />
-      <main key={pathname} className="flex-1 page-enter overflow-x-clip">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/services" element={<Services />} />
-          <Route path="/program" element={<Program />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/register/payment-callback" element={<PaymentCallback />} />
-          <Route path="/sponsor" element={<Sponsor />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/diary" element={<Diary />} />
-          <Route path="/attendance" element={<Attendance />} />
-        </Routes>
-      </main>
-      <Footer />
-    </div>
+    <ToastProvider>
+      <div className="min-h-screen bg-cream text-ink flex flex-col">
+        <Loader show={loading} fading={fading} onFadeEnd={handleFadeEnd} />
+        <Navbar />
+        <main key={pathname} className="flex-1 page-enter overflow-x-clip">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/program" element={<Program />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/register/payment-callback" element={<PaymentCallback />} />
+            <Route path="/sponsor" element={<Sponsor />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/diary" element={<Diary />} />
+            <Route path="/attendance" element={<Attendance />} />
+          </Routes>
+        </main>
+        <Footer />
+      </div>
+    </ToastProvider>
   )
 }

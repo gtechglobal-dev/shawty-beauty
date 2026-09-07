@@ -16,6 +16,7 @@ import {
   readSubscribers,
   type Registration,
 } from '../db.js';
+import { fetchImageBase64 } from './cloudinary.js';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const ADMIN_IDS = (process.env.TELEGRAM_ADMIN_IDS || '')
@@ -286,8 +287,10 @@ async function handleRegSearch(chatId: number, arg: string): Promise<void> {
       `DOB: ${orNA(r.dateOfBirth)}`,
       `What they hope to learn: ${orNA(r.reason)}`,
     ].filter(Boolean).join('\n');
-    if (r.photoBase64) {
-      await sendPhoto(chatId, r.photoBase64, msg);
+    if (r.photoBase64 || r.photoUrl) {
+      const b64 = r.photoUrl ? ((await fetchImageBase64(r.photoUrl)) || undefined) : r.photoBase64;
+      if (b64) await sendPhoto(chatId, b64, msg);
+      else await sendMessage(chatId, msg);
     } else {
       await sendMessage(chatId, msg);
     }

@@ -1,31 +1,22 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   CalendarDays,
   MessageSquare,
   Mail,
-  Send,
   LoaderCircle,
   LogOut,
-  CircleCheck,
-  CircleAlert,
   KeyRound,
   ArrowLeft,
   RefreshCw,
-  Plus,
-  ImagePlus,
-  GripVertical,
-  ChevronUp,
-  ChevronDown,
-  Trash2,
 } from 'lucide-react'
 import { getJson, patchJson, postJson } from '../lib/api'
-import { formatNgn, type StudioEvent } from '../lib/constants'
+import { type StudioEvent } from '../lib/constants'
+import { useToast } from '../components/Toasts'
 import {
   EventsHome,
   EventEditor,
   EventManage,
-  statusBadge,
   type DiaryEvent,
   type DiaryUnassigned,
   type DiaryTotals,
@@ -50,53 +41,9 @@ interface Subscriber {
   unsubscribed?: boolean
 }
 
-interface BroadcastResult {
-  sent: number
-  failed: number
-  total: number
-}
-
-type ComposerBlock =
-  | { id: string; type: 'text'; text: string }
-  | { id: string; type: 'image'; dataUrl: string; width: 'full' | 'medium' | 'small' }
-
-function blockId(): string {
-  return Math.random().toString(36).slice(2, 10)
-}
-
-// Downscale attached photos so emails stay light (max ~1600px, JPEG/PNG).
-function compressImage(file: File, maxDim = 1600, quality = 0.85): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(new Error('Could not read image'))
-    reader.onload = () => {
-      const img = new Image()
-      img.onerror = () => reject(new Error('Could not decode image'))
-      img.onload = () => {
-        const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
-        const width = Math.max(1, Math.round(img.width * scale))
-        const height = Math.max(1, Math.round(img.height * scale))
-        const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')
-        if (!ctx) {
-          resolve(reader.result as string)
-          return
-        }
-        ctx.drawImage(img, 0, 0, width, height)
-        const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg'
-        resolve(canvas.toDataURL(mime, quality))
-      }
-      img.src = reader.result as string
-    }
-    reader.readAsDataURL(file)
-  })
-}
-
 const TOKEN_KEY = 'sbs_admin_token'
 
-type Section = 'events' | 'messages' | 'subscribers' | 'email'
+type Section = 'events' | 'messages' | 'subscribers'
 type SubView = 'home' | 'manage' | 'editor'
 
 interface GroupedData {
@@ -113,9 +60,9 @@ export default function Diary() {
 
   const [token, setToken] = useState(localStorage.getItem(TOKEN_KEY) || '')
   const [screen, setScreen] = useState<'login' | 'forgot' | 'reset'>(resetToken ? 'reset' : 'login')
-  const [section, setSection] = useState<Section>(() => {
+const [section, setSection] = useState<Section>(() => {
     const s = searchParams.get('section')
-    return s === 'messages' || s === 'subscribers' || s === 'email' ? s : 'events'
+    return s === 'messages' || s === 'subscribers' ? s : 'events'
   })
   const [subView, setSubView] = useState<SubView>(() => {
     const s = searchParams.get('sub')
@@ -130,24 +77,14 @@ export default function Diary() {
   const [confirmPassword, setConfirmPassword] = useState('')
 
   const [authLoading, setAuthLoading] = useState(false)
-  const [authMsg, setAuthMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
   const [grouped, setGrouped] = useState<GroupedData>({ events: [], unassigned: null, totals: null })
   const [contacts, setContacts] = useState<ContactMsg[]>([])
   const [subscribers, setSubscribers] = useState<Subscriber[]>([])
-  const [subject, setSubject] = useState('')
-  const [blocks, setBlocks] = useState<ComposerBlock[]>([])
-  const [dragIdx, setDragIdx] = useState<number | null>(null)
-  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
-  const [fileHover, setFileHover] = useState(false)
-  const imageInputRef = useRef<HTMLInputElement>(null)
-  const [broadcastBusy, setBroadcastBusy] = useState(false)
-  const [broadcastResult, setBroadcastResult] = useState<BroadcastResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
 
+  const toast = useToast()
   const headers = { Authorization: `Bearer ${token}` }
 
   useEffect(() => {
@@ -195,14 +132,13 @@ export default function Diary() {
         totals: data.totals || null,
       })
     } catch (err: any) {
-      setError(err.message || 'Failed to load events')
+      toast.push(err.message || 'Failed to load events', 'err')
       if (/unauthorized|invalid token/i.test(err.message)) signOut()
     }
   }
 
   async function reloadAll() {
     setLoading(true)
-    setError('')
     try {
       await reloadEvents()
       if (section === 'messages') {
@@ -213,110 +149,8 @@ export default function Diary() {
         const s = await getJson('/api/admin/subscribers', headers)
         setSubscribers(s.subscribers || [])
       }
-      if (section === 'email') {
-        const s = await getJson('/api/admin/subscribers', headers)
-        setSubscribers(s.subscribers || [])
-      }
     } finally {
       setLoading(false)
-    }
-  }
-
-  function updateBlock(id: string, patch: Partial<ComposerBlock>) {
-    setBlocks((b) => b.map((x) => (x.id === id ? ({ ...x, ...patch } as ComposerBlock) : x)))
-  }
-
-  function removeBlock(id: string) {
-    setBlocks((b) => b.filter((x) => x.id !== id))
-  }
-
-  function moveBlock(id: string, dir: -1 | 1) {
-    setBlocks((b) => {
-      const i = b.findIndex((x) => x.id === id)
-      const j = i + dir
-      if (i < 0 || j < 0 || j >= b.length) return b
-      const next = [...b]
-      const [item] = next.splice(i, 1)
-      next.splice(j, 0, item)
-      return next
-    })
-  }
-
-  function reorder(from: number, to: number) {
-    if (from === to) return
-    setBlocks((b) => {
-      const next = [...b]
-      const [item] = next.splice(from, 1)
-      next.splice(to, 0, item)
-      return next
-    })
-  }
-
-  async function addImage(file?: File | null) {
-    if (!file) return
-    if (!file.type.startsWith('image/')) return
-    if (file.size > 5_000_000) {
-      setError('Each image must be under 5MB.')
-      return
-    }
-    try {
-      const dataUrl = await compressImage(file)
-      setBlocks((b) => [...b, { id: blockId(), type: 'image', dataUrl, width: 'full' }])
-    } catch (e: any) {
-      setError(e.message || 'Could not add that image')
-    }
-  }
-
-  // Insert an image right after the given block index (used when dropping a
-  // photo onto a specific block rather than into the empty composer area).
-  async function insertImageAfter(index: number, file?: File | null) {
-    if (!file) return
-    if (!file.type.startsWith('image/')) return
-    try {
-      const dataUrl = await compressImage(file)
-      const blk: ComposerBlock = { id: blockId(), type: 'image', dataUrl, width: 'full' }
-      setBlocks((b) => {
-        const next = [...b]
-        next.splice(Math.min(index + 1, next.length), 0, blk)
-        return next
-      })
-    } catch (e: any) {
-      setError(e.message || 'Could not add that image')
-    }
-  }
-
-  function addTextBlock() {
-    setBlocks((b) => [...b, { id: blockId(), type: 'text', text: '' }])
-  }
-
-  async function sendBroadcast() {
-    if (!subject.trim()) return
-    const hasContent = blocks.some((b) =>
-      b.type === 'text' ? b.text.trim().length > 0 : true,
-    )
-    if (!hasContent) return
-    setBroadcastBusy(true)
-    setBroadcastResult(null)
-    try {
-      const payload = blocks.map((b) =>
-        b.type === 'text'
-          ? { type: 'text' as const, text: b.text }
-          : { type: 'image' as const, dataUrl: b.dataUrl, width: b.width },
-      )
-      const r = await postJson(
-        '/api/admin/broadcast',
-        { subject: subject.trim(), blocks: payload, origin: window.location.origin },
-        headers,
-      )
-      setBroadcastResult({ sent: r.sent || 0, failed: r.failed || 0, total: r.total || 0 })
-      if (r.failed === 0) {
-        setSubject('')
-        setBlocks([])
-      }
-    } catch (e: any) {
-      setError(e.message || 'Could not send emails')
-    } finally {
-      setBroadcastBusy(false)
     }
   }
 
@@ -333,13 +167,12 @@ export default function Diary() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setAuthLoading(true)
-    setAuthMsg(null)
     try {
       const data = await postJson('/api/auth/login', { username, password })
       setToken(data.token)
       localStorage.setItem(TOKEN_KEY, data.token)
     } catch (err: any) {
-      setAuthMsg({ type: 'err', text: err.message || 'Login failed' })
+      toast.push(err.message || 'Login failed', 'err')
     } finally {
       setAuthLoading(false)
     }
@@ -347,12 +180,11 @@ export default function Diary() {
 
   async function handleForgot() {
     setAuthLoading(true)
-    setAuthMsg(null)
     try {
       await postJson('/api/auth/forgot-password', { origin: window.location.origin })
-      setAuthMsg({ type: 'ok', text: 'Reset link has been sent to the registered email.' })
+      toast.push('Reset link has been sent to the registered email.')
     } catch (err: any) {
-      setAuthMsg({ type: 'err', text: err.message || 'Could not send reset link.' })
+      toast.push(err.message || 'Could not send reset link.', 'err')
     } finally {
       setAuthLoading(false)
     }
@@ -361,21 +193,20 @@ export default function Diary() {
   async function handleReset(e: React.FormEvent) {
     e.preventDefault()
     setAuthLoading(true)
-    setAuthMsg(null)
     if (newPassword !== confirmPassword) {
-      setAuthMsg({ type: 'err', text: 'Passwords do not match.' })
+      toast.push('Passwords do not match.', 'err')
       setAuthLoading(false)
       return
     }
     try {
       await postJson('/api/auth/reset-password', { token: resetToken, newPassword })
-      setAuthMsg({ type: 'ok', text: 'Password updated. Sign in with your new password.' })
+      toast.push('Password updated. Sign in with your new password.')
       setNewPassword('')
       setConfirmPassword('')
       setPassword('')
       setScreen('login')
     } catch (err: any) {
-      setAuthMsg({ type: 'err', text: err.message || 'Reset failed. The link may be invalid or expired.' })
+      toast.push(err.message || 'Reset failed. The link may be invalid or expired.', 'err')
     } finally {
       setAuthLoading(false)
     }
@@ -402,14 +233,12 @@ export default function Diary() {
 
   async function handleDuplicate(id: string) {
     setSaving(true)
-    setError('')
-    setNotice('')
     try {
       await postJson('/api/admin/events', { fromEventId: id }, headers)
       await reloadEvents()
-      setNotice('Event duplicated.')
+      toast.push('Event duplicated.')
     } catch (err: any) {
-      setError(err.message)
+      toast.push(err.message || 'Failed to duplicate event', 'err')
     } finally {
       setSaving(false)
     }
@@ -417,14 +246,12 @@ export default function Diary() {
 
   async function handleSetLive(id: string) {
     setSaving(true)
-    setError('')
-    setNotice('')
     try {
       const data = await postJson(`/api/admin/events/${id}/live`, {}, headers)
       await reloadEvents()
-      setNotice(data.message || 'Event is now live on the site.')
+      toast.push(data.message || 'Event is now live on the site.')
     } catch (err: any) {
-      setError(err.message)
+      toast.push(err.message || 'Failed to make event live', 'err')
     } finally {
       setSaving(false)
     }
@@ -432,19 +259,17 @@ export default function Diary() {
 
   async function handleEnd(id: string) {
     setSaving(true)
-    setError('')
-    setNotice('')
     try {
       const data = await postJson(`/api/admin/events/${id}/end`, {}, headers)
       await reloadEvents()
-      setNotice(data.message || 'Event ended.')
+      toast.push(data.message || 'Event ended.')
     } catch (err: any) {
       if (/unauthorized|invalid token/i.test(err.message || '')) {
-        setAuthMsg({ type: 'err', text: 'Your session has expired. Please sign in again.' })
+        toast.push('Your session has expired. Please sign in again.', 'err')
         signOut()
         return
       }
-      setError(err.message)
+      toast.push(err.message || 'Failed to end event', 'err')
     } finally {
       setSaving(false)
     }
@@ -454,14 +279,12 @@ export default function Diary() {
     const ev = grouped.events.find((e) => e.id === id)
     if (!confirm(`Delete "${ev?.title || 'this event'}"? Its registrations and sponsors stay saved but won't be grouped under it.`)) return
     setSaving(true)
-    setError('')
-    setNotice('')
     try {
       await fetch(`/api/admin/events/${encodeURIComponent(id)}`, { method: 'DELETE', headers })
       await reloadEvents()
-      setNotice('Event deleted.')
+      toast.push('Event deleted.')
     } catch (err: any) {
-      setError(err.message || 'Failed to delete')
+      toast.push(err.message || 'Failed to delete', 'err')
     } finally {
       setSaving(false)
     }
@@ -469,8 +292,6 @@ export default function Diary() {
 
   async function handleSaveEvent(data: Omit<StudioEvent, 'id' | 'createdAt' | 'updatedAt'>) {
     setSaving(true)
-    setError('')
-    setNotice('')
     try {
       let id = editingEvent?.id
       if (!id) {
@@ -486,9 +307,9 @@ export default function Diary() {
       await reloadEvents()
       setSubView('home')
       setEditingEvent(null)
-      setNotice('Event saved.')
+      toast.push('Event saved.')
     } catch (err: any) {
-      setError(err.message || 'Failed to save event')
+      toast.push(err.message || 'Failed to save event', 'err')
     } finally {
       setSaving(false)
     }
@@ -499,7 +320,7 @@ export default function Diary() {
       await patchJson(`/api/admin/contacts/${id}/read`, {}, headers)
       setContacts((cs) => cs.map((c) => (c.id === id ? { ...c, read: true } : c)))
     } catch (err: any) {
-      setError(err.message)
+      toast.push(err.message || 'Failed to mark message as read', 'err')
     }
   }
 
@@ -520,15 +341,6 @@ export default function Diary() {
                 <div className="flex justify-center mt-3"><span className="ornament">✦</span></div>
               </div>
 
-              {authMsg && (
-                <div className={`mb-5 p-3 rounded-xl text-sm flex items-start gap-2 ${
-                  authMsg.type === 'ok' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
-                }`}>
-                  {authMsg.type === 'ok' ? <CircleCheck size={18} className="shrink-0" /> : <CircleAlert size={18} className="shrink-0" />}
-                  {authMsg.text}
-                </div>
-              )}
-
               <div className="space-y-4">
                 <div>
                   <label className="field-label">Username</label>
@@ -543,7 +355,7 @@ export default function Diary() {
                 </button>
               </div>
 
-              <button type="button" onClick={() => { setScreen('forgot'); setAuthMsg(null) }} className="mt-5 w-full text-center text-sm font-medium text-rose-deep hover:text-rose-dark flex items-center justify-center gap-1.5">
+              <button type="button" onClick={() => setScreen('forgot')} className="mt-5 w-full text-center text-sm font-medium text-rose-deep hover:text-rose-dark flex items-center justify-center gap-1.5">
                 <KeyRound size={14} /> Forgot password?
               </button>
             </form>
@@ -559,19 +371,10 @@ export default function Diary() {
                 </p>
               </div>
 
-              {authMsg && (
-                <div className={`mb-5 p-3 rounded-xl text-sm flex items-start gap-2 ${
-                  authMsg.type === 'ok' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
-                }`}>
-                  {authMsg.type === 'ok' ? <CircleCheck size={18} className="shrink-0" /> : <CircleAlert size={18} className="shrink-0" />}
-                  {authMsg.text}
-                </div>
-              )}
-
               <button onClick={handleForgot} disabled={authLoading} className="btn btn-primary w-full" type="button">
                 {authLoading ? <LoaderCircle size={18} className="animate-spin" /> : 'Send Reset Link'}
               </button>
-              <button type="button" onClick={() => { setScreen('login'); setAuthMsg(null) }} className="mt-4 w-full text-center text-sm font-medium text-ink/60 hover:text-rose-deep flex items-center justify-center gap-1.5">
+              <button type="button" onClick={() => setScreen('login')} className="mt-4 w-full text-center text-sm font-medium text-ink/60 hover:text-rose-deep flex items-center justify-center gap-1.5">
                 <ArrowLeft size={14} /> Back to login
               </button>
             </div>
@@ -584,15 +387,6 @@ export default function Diary() {
                 <h1 className="font-display text-2xl font-bold mt-4">Set a new password</h1>
                 <p className="text-sm text-muted mt-1">Use a strong password you&rsquo;ll remember.</p>
               </div>
-
-              {authMsg && (
-                <div className={`mb-5 p-3 rounded-xl text-sm flex items-start gap-2 ${
-                  authMsg.type === 'ok' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
-                }`}>
-                  {authMsg.type === 'ok' ? <CircleCheck size={18} className="shrink-0" /> : <CircleAlert size={18} className="shrink-0" />}
-                  {authMsg.text}
-                </div>
-              )}
 
               <div className="space-y-4">
                 <div>
@@ -655,26 +449,11 @@ export default function Diary() {
           <div className="flex ml-auto gap-2">
             <TabBtn active={section === 'messages'} onClick={async () => { setSection('messages'); const c = await getJson('/api/admin/contacts', headers); setContacts(c.contacts || []) }} icon={MessageSquare} label={`Messages${grouped.totals?.unreadMessages ? ` (${grouped.totals.unreadMessages})` : ''}`} />
             <TabBtn active={section === 'subscribers'} onClick={async () => { setSection('subscribers'); const s = await getJson('/api/admin/subscribers', headers); setSubscribers(s.subscribers || []) }} icon={Mail} label="Subscribers" />
-            <TabBtn active={section === 'email'} onClick={async () => { setSection('email'); setBroadcastResult(null); const s = await getJson('/api/admin/subscribers', headers); setSubscribers(s.subscribers || []) }} icon={Send} label="Send Email" />
           </div>
         </div>
       </header>
 
       <div className="container py-6 md:py-8">
-        {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2">
-            <CircleAlert size={20} className="shrink-0" /> {error}
-            <button onClick={() => setError('')} className="ml-auto text-xs font-semibold underline">Dismiss</button>
-          </div>
-        )}
-
-        {notice && (
-          <div className="mb-6 p-4 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm flex items-start gap-2">
-            <CircleCheck size={20} className="shrink-0" /> {notice}
-            <button onClick={() => setNotice('')} className="ml-auto text-xs font-semibold underline">Dismiss</button>
-          </div>
-        )}
-
         {section === 'events' && subView === 'editor' && (
           <EventEditor
             initial={editingEvent}
@@ -793,227 +572,6 @@ export default function Diary() {
           </div>
         )}
 
-        {/* ---------- SEND EMAIL ---------- */}
-        {section === 'email' && (
-          <div className="card overflow-hidden">
-            <div className="p-6 border-b border-black/5">
-              <h3 className="font-semibold text-lg">Send an email</h3>
-              <p className="text-sm text-muted mt-1">
-                One email goes to <strong>{subscribers.length}</strong> people — every unique address from
-                newsletters, registrations, sponsors and contact messages. Emails that opted out are skipped
-                automatically, and each one carries an unsubscribe link.
-              </p>
-            </div>
-
-            <div className="p-6">
-              <label className="field-label">Subject</label>
-              <input
-                className="input-field text-base"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="e.g. Our 5-day masterclass is open for enrolment"
-                maxLength={200}
-              />
-              <p className="text-xs text-muted mt-1">
-                This becomes the heading in the designed banner at the top of the email.
-              </p>
-
-              <div className="mt-6">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div>
-                    <label className="field-label mb-0">Content</label>
-                    <p className="text-xs text-muted mt-1">
-                      Drag photos from your computer and drop them anywhere in the email, then drag blocks to
-                      rearrange them.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      ref={imageInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => {
-                        const files = Array.from(e.target.files || [])
-                        files.forEach((f) => void addImage(f))
-                        e.target.value = ''
-                      }}
-                    />
-                    <button onClick={addTextBlock} className="btn btn-outline !py-2 flex items-center gap-1.5">
-                      <Plus size={14} /> Paragraph
-                    </button>
-                    <button
-                      onClick={() => imageInputRef.current?.click()}
-                      className="btn btn-primary !py-2 flex items-center gap-1.5"
-                    >
-                      <ImagePlus size={14} /> Add image
-                    </button>
-                  </div>
-                </div>
-
-                <div
-                  className={`mt-3 space-y-2 p-3 rounded-2xl border-2 border-dashed transition-colors ${
-                    fileHover ? 'border-rose bg-blush/50' : 'border-black/15 bg-white/40'
-                  }`}
-                  onDragOver={(e) => {
-                    if (Array.from(e.dataTransfer.types).includes('Files')) {
-                      e.preventDefault()
-                      setFileHover(true)
-                    }
-                  }}
-                  onDragLeave={(e) => {
-                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setFileHover(false)
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    setFileHover(false)
-                    Array.from(e.dataTransfer.files || []).forEach((f) => void addImage(f))
-                  }}
-                >
-                  {blocks.length === 0 && (
-                    <div className="py-10 text-center">
-                      <ImagePlus size={28} className="mx-auto text-muted/60 mb-2" />
-                      <p className="text-sm text-muted">
-                        Drop images here, or use the buttons above to add a paragraph or an image.
-                      </p>
-                    </div>
-                  )}
-
-                  {blocks.map((b, i) => (
-                    <div
-                      key={b.id}
-                      onDragOver={(e) => {
-                        e.preventDefault()
-                        if (dragIdx !== null) setDragOverIdx(i)
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        if (dragIdx !== null) {
-                          reorder(dragIdx, i)
-                          setDragIdx(null)
-                          setDragOverIdx(null)
-                        } else if (Array.from(e.dataTransfer.types).includes('Files')) {
-                          const files = Array.from(e.dataTransfer.files || [])
-                          files.forEach((f, fi) => void insertImageAfter(i + fi, f))
-                        }
-                      }}
-                      className={`rounded-xl border bg-white/70 p-3.5 transition-shadow ${
-                        dragOverIdx === i ? 'border-rose ring-2 ring-rose/30' : 'border-black/10'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <span
-                          draggable
-                          onDragStart={() => setDragIdx(i)}
-                          onDragEnd={() => {
-                            setDragIdx(null)
-                            setDragOverIdx(null)
-                          }}
-                          title="Drag to reorder"
-                          className="cursor-grab active:cursor-grabbing text-muted hover:text-rose-deep"
-                        >
-                          <GripVertical size={16} />
-                        </span>
-                        <span className="text-xs font-semibold text-rose-deep uppercase tracking-wide">
-                          {b.type === 'text' ? 'Paragraph' : 'Image'}
-                        </span>
-                        <span className="ml-auto flex items-center gap-0.5">
-                          <button
-                            onClick={() => moveBlock(b.id, -1)}
-                            disabled={i === 0}
-                            title="Move up"
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted hover:bg-black/5 hover:text-ink disabled:opacity-30"
-                          >
-                            <ChevronUp size={14} />
-                          </button>
-                          <button
-                            onClick={() => moveBlock(b.id, 1)}
-                            disabled={i === blocks.length - 1}
-                            title="Move down"
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted hover:bg-black/5 hover:text-ink disabled:opacity-30"
-                          >
-                            <ChevronDown size={14} />
-                          </button>
-                          <button
-                            onClick={() => removeBlock(b.id)}
-                            title="Remove"
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted hover:bg-red-50 hover:text-red-500"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </span>
-                      </div>
-
-                      {b.type === 'text' ? (
-                        <textarea
-                          className="input-field"
-                          rows={Math.max(3, Math.min(9, Math.ceil(b.text.length / 70)))}
-                          value={b.text}
-                          onChange={(e) => updateBlock(b.id, { text: e.target.value })}
-                          placeholder="Write a paragraph…"
-                          maxLength={20000}
-                        />
-                      ) : (
-                        <div className="flex items-start gap-3 flex-wrap">
-                          <img
-                            src={b.dataUrl}
-                            alt="attachment preview"
-                            className="max-h-36 rounded-lg border border-black/10 object-contain"
-                          />
-                          <div>
-                            <div className="text-xs text-muted mb-1">Image width</div>
-                            <div className="flex gap-1">
-                              {(['full', 'medium', 'small'] as const).map((w) => (
-                                <button
-                                  key={w}
-                                  onClick={() => updateBlock(b.id, { width: w })}
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold capitalize ${
-                                    b.width === w ? 'bg-rose text-white' : 'bg-black/5 text-ink/70 hover:bg-black/10'
-                                  }`}
-                                >
-                                  {w}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 mt-5 flex-wrap">
-                <button
-                  onClick={sendBroadcast}
-                  disabled={
-                    broadcastBusy ||
-                    !subject.trim() ||
-                    !blocks.some((b) => (b.type === 'text' ? b.text.trim().length > 0 : true))
-                  }
-                  className="btn btn-primary flex items-center gap-2"
-                >
-                  {broadcastBusy ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={16} />}
-                  {broadcastBusy ? 'Sending…' : 'Send to everyone'}
-                </button>
-                {broadcastResult && (
-                  <span className={`text-sm ${broadcastResult.failed > 0 ? 'text-amber-600' : 'text-green-600'}`}>
-                    Sent to {broadcastResult.sent} of {broadcastResult.total}
-                    {broadcastResult.failed > 0 ? ` · ${broadcastResult.failed} failed` : ''}.
-                  </span>
-                )}
-              </div>
-
-              {subject.trim() && blocks.some((b) => (b.type === 'text' ? b.text.trim().length > 0 : true)) && (
-                <p className="text-xs text-muted mt-4">
-                  Sends to {subscribers.length} recipients. The email opens with a banner showing your subject, then
-                  your content in order. Double-check before sending.
-                </p>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
