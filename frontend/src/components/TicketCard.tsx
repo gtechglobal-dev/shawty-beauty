@@ -37,7 +37,7 @@ export default function TicketCard({
         className={`flex items-center justify-between px-4 py-2.5 text-white text-sm font-bold tracking-wide ${
           isStudent
             ? 'bg-gradient-to-r from-rose-dark to-rose'
-            : 'bg-gradient-to-r from-[#856238] to-gold'
+            : 'bg-gradient-to-r from-pinkgold to-gold'
         }`}
       >
         <span className="flex items-center gap-1.5">
@@ -116,7 +116,7 @@ export default function TicketCard({
         className={`mt-auto flex items-center justify-end px-4 py-1.5 text-white/95 text-[10px] font-bold uppercase tracking-[0.25em] ${
           isStudent
             ? 'bg-gradient-to-r from-rose-dark to-rose'
-            : 'bg-gradient-to-r from-[#856238] to-gold'
+            : 'bg-gradient-to-r from-pinkgold to-gold'
         }`}
       >
         <span className="inline-flex items-center gap-1">

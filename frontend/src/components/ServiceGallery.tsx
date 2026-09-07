@@ -13,15 +13,17 @@ export default function ServiceGallery({ services }: { services: Service[] }) {
           <button
             key={s.title}
             onClick={() => setSelected(s)}
-            className="card p-4 text-left group flex items-center gap-4 cursor-pointer hover:-translate-y-1 hover:shadow-lg"
+            className="card card-silk p-4 text-left group flex items-center gap-4 cursor-pointer hover:-translate-y-1 hover:shadow-lg"
           >
             <div className="w-1/4 shrink-0">
-              <img
-                src={s.image}
-                alt={s.title}
-                className="w-full aspect-square object-cover rounded-lg"
-                loading="lazy"
-              />
+              <div className="relative overflow-hidden rounded-xl ring-1 ring-rose/15">
+                <img
+                  src={s.image}
+                  alt={s.title}
+                  className="w-full aspect-square object-cover transition-transform duration-500 group-hover:scale-110"
+                  loading="lazy"
+                />
+              </div>
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-base sm:text-lg font-semibold leading-snug">{s.title}</h3>
@@ -37,11 +39,13 @@ export default function ServiceGallery({ services }: { services: Service[] }) {
             <h3 className="font-display text-3xl font-bold mb-5">{selected.title}</h3>
             <div className="flex items-start gap-5 sm:gap-6">
               <div className="w-1/4 shrink-0">
-                <img
-                  src={selected.image}
-                  alt={selected.title}
-                  className="w-full aspect-square object-cover rounded-xl"
-                />
+                <div className="relative overflow-hidden rounded-xl ring-1 ring-rose/15">
+                  <img
+                    src={selected.image}
+                    alt={selected.title}
+                    className="w-full aspect-square object-cover"
+                  />
+                </div>
               </div>
               <p className="flex-1 text-ink/70 leading-relaxed">{selected.long}</p>
             </div>

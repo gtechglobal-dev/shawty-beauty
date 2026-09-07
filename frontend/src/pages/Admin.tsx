@@ -79,7 +79,10 @@ export default function Admin() {
   const [loginLoading, setLoginLoading] = useState(false)
   const [loginError, setLoginError] = useState('')
 
-  const [tab, setTab] = useState<'stats' | 'registrations' | 'sponsors' | 'contacts'>('stats')
+  const [tab, setTab] = useState<'stats' | 'registrations' | 'sponsors' | 'contacts'>(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    return t === 'registrations' || t === 'sponsors' || t === 'contacts' ? t : 'stats'
+  })
   const [stats, setStats] = useState<any>(null)
   const [registrations, setRegistrations] = useState<Registration[]>([])
   const [sponsors, setSponsors] = useState<Sponsor[]>([])
@@ -91,6 +94,18 @@ export default function Admin() {
     if (token) refresh('stats')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
+
+  // Keep the active tab in the URL (?tab=...) so refreshing the page doesn't
+  // bounce back to the Overview tab.
+  useEffect(() => {
+    if (!token) return
+    const params = new URLSearchParams(window.location.search)
+    params.set('tab', tab)
+    const next = params.toString()
+    if (window.location.search.replace(/^\?/, '') !== next) {
+      window.history.replaceState({}, '', next ? `?${next}` : window.location.pathname)
+    }
+  }, [token, tab])
 
   async function refresh(which = tab) {
     setLoading(true)

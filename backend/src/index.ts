@@ -4,12 +4,14 @@ import cors from 'cors';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, readFileSync } from 'fs';
-import { connectDB, isDbConnected } from './db.js';
+import { connectDB, isDbConnected, ensureSeedEvents } from './db.js';
 import authRouter from './routes/auth.js';
 import adminRouter from './routes/admin.js';
 import contactRouter from './routes/contact.js';
 import paystackRouter from './routes/paystack.js';
 import sponsorsRouter from './routes/sponsors.js';
+import eventsRouter from './routes/events.js';
+import ticketsRouter from './routes/tickets.js';
 import { startTelegramAdminBot } from './lib/telegramAdminBot.js';
 
 const app = express();
@@ -42,6 +44,8 @@ app.use('/api/admin', adminRouter);
 app.use('/api/contact', contactRouter);
 app.use('/api/paystack', paystackRouter);
 app.use('/api/sponsors', sponsorsRouter);
+app.use('/api/events', eventsRouter);
+app.use('/api/tickets', ticketsRouter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', db: isDbConnected(), timestamp: new Date().toISOString() });
@@ -67,7 +71,8 @@ if (existsSync(frontendDist)) {
 }
 
 connectDB()
-  .then(() => {
+  .then(async () => {
+    await ensureSeedEvents();
     app.listen(PORT, () => {
       console.log(`Shawty Beauty Studio API running on http://localhost:${PORT}`);
     });

@@ -9,6 +9,7 @@ const links = [
   { to: '/program', label: 'Our Events' },
   { to: '/sponsor', label: 'Our Sponsors' },
   { to: '/contact', label: 'Contact' },
+  { to: '/diary', label: "Shawty's Diary" },
 ]
 
 export default function Navbar() {
@@ -54,18 +55,36 @@ export default function Navbar() {
   }
 
   return (
-    <header ref={headerRef} onClick={() => setOpen(false)} className={`sticky top-0 z-50 bg-cream/90 backdrop-blur-md border-b transition-all duration-300 ${scrolled ? 'border-black/10 shadow-md' : 'border-black/5'}`}>
+    <header
+      ref={headerRef}
+      onClick={() => setOpen(false)}
+      className={`sticky top-0 z-50 transition-all duration-300 ${
+        scrolled || open
+          ? 'bg-cream/85 backdrop-blur-xl border-b border-pinkgold/20 shadow-[0_8px_30px_-14px_rgba(42,27,34,0.28)]'
+          : 'bg-transparent border-b border-transparent'
+      }`}
+    >
       <div className="container flex items-center justify-between h-16 md:h-[72px] gap-3">
-        <Link to="/" className="flex items-center gap-2.5 shrink-0" onClick={() => setOpen(false)}>
-          <span className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-rose to-gold flex items-center justify-center text-white font-display text-lg md:text-xl font-bold">
-            S
+        <Link to="/" className="flex items-center gap-3 shrink-0 group" onClick={() => setOpen(false)}>
+          {/* Signature double-ring monogram */}
+          <span className="relative w-10 h-10 md:w-11 md:h-11">
+            <span className="absolute inset-0 rounded-full bg-gradient-to-br from-rose via-pinkgold to-gold opacity-25 blur-[6px] group-hover:opacity-40 transition-opacity" />
+            <span className="relative w-full h-full rounded-full bg-gradient-to-br from-rose to-rose-deep flex items-center justify-center text-white font-display text-lg md:text-xl font-bold shadow-[0_6px_16px_-6px_rgba(145,78,108,0.55)]">
+              {siteConfig.name.charAt(0)}
+            </span>
+            <span className="absolute -inset-1 rounded-full border border-pinkgold/50" />
           </span>
-          <span className="font-display text-lg md:text-xl font-semibold leading-tight">
-            Shawty <span className="gradient-text">Beauty Studio</span>
+          <span className="leading-tight">
+            <span className="font-display text-lg md:text-xl font-semibold block">
+              Shawty <span className="gradient-text">Beauty Studio</span>
+            </span>
+            <span className="hidden md:block text-[10px] tracking-[0.28em] uppercase text-faint mt-0.5">
+              Makeup · Lashes · Beauty
+            </span>
           </span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden md:flex items-center gap-0.5">
           {links.map((l) => (
             <Link
               key={l.to}
@@ -79,9 +98,9 @@ export default function Navbar() {
             href={siteConfig.whatsapp}
             target="_blank"
             rel="noreferrer"
-            className="btn btn-primary ml-2 !py-2.5 !px-5"
+            className="btn btn-primary ml-1 !py-2 !px-4 !text-[13px] shrink-0"
           >
-            <MessageCircle size={16} /> Book a Session
+            <MessageCircle size={15} /> Book a Session
           </a>
         </nav>
 
@@ -102,7 +121,7 @@ export default function Navbar() {
               to={l.to}
               onClick={() => setOpen(false)}
               className={`block px-4 py-3 rounded-lg text-[15px] font-medium ${
-                isActive(l.to) ? 'text-rose-dark bg-blush' : 'text-ink/75'
+                isActive(l.to) ? 'text-rose-deep bg-blush' : 'text-ink/75'
               }`}
             >
               {l.label}

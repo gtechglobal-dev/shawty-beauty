@@ -1,7 +1,7 @@
-export async function postJson<T = any>(url: string, body: any): Promise<T> {
+export async function postJson<T = any>(url: string, body: any, headers?: Record<string, string>): Promise<T> {
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   })
   const data = await res.json().catch(() => ({}))

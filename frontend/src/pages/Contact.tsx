@@ -51,7 +51,8 @@ export default function Contact() {
         <Reveal variant="up">
         <div className="container py-12 md:py-16 text-center">
           <span className="eyebrow mb-3">Contact Us</span>
-          <h1 className="section-title text-4xl mb-4">Get in Touch</h1>
+          <span className="ornament mt-3 justify-center">✦</span>
+          <h1 className="section-title text-4xl my-4">Get in Touch</h1>
           <p className="text-ink/70 max-w-xl mx-auto">
             Book a makeup or lash session, ask about the 3-day class, or chat about sponsorship.
           </p>

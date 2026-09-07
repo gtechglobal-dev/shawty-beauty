@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { CircleCheck, LoaderCircle, CreditCard, CircleAlert, Image as ImageIcon } from 'lucide-react'
-import { formatNgn, nationalities, nationalityNames, tickets, ticketPrice, type Ticket } from '../lib/constants'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { CircleCheck, LoaderCircle, CreditCard, CircleAlert, Image as ImageIcon, ArrowRight } from 'lucide-react'
+import { formatNgn, nationalities, nationalityNames, defaultEvent, type StudioEvent } from '../lib/constants'
+import { resolveRegisterEvent, ticketPrice } from '../lib/events'
 import { postJson } from '../lib/api'
 import { fetchPaystackConfig, loadPaystackScript, type PaystackConfig } from '../lib/paystack'
 import PhoneInput from '../components/PhoneInput'
@@ -20,7 +21,7 @@ interface FormState {
   experienceLevel: string
   emergencyContactName: string
   emergencyContact: string
-  ticketType: Ticket['id']
+  ticketType: string
   quantity: number
   reason: string
   hearAbout: string
@@ -50,7 +51,15 @@ const PROCESSING_FEE_RATE = 0.015 // 1.5% of ticket amount
 const PROCESSING_FEE_BASE = 100 // + ₦100 fixed
 
 export default function Register() {
-  const [form, setForm] = useState<FormState>(initial)
+  const [searchParams] = useSearchParams()
+  const ticketParam = searchParams.get('ticket')
+  const eventParam = searchParams.get('event')
+
+  const [ev, setEv] = useState<StudioEvent>(defaultEvent)
+  const [form, setForm] = useState<FormState>(() => {
+    const valid = defaultEvent.tickets.some((t) => t.id === ticketParam)
+    return { ...initial, ticketType: valid ? ticketParam! : initial.ticketType }
+  })
   const [config, setConfig] = useState<PaystackConfig | null>(null)
   const [configError, setConfigError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -61,10 +70,28 @@ export default function Register() {
   const [photoInvalid, setPhotoInvalid] = useState('')
   const navigate = useNavigate()
 
+  // Resolve the event: honor ?event=, otherwise the live event
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(id)
-  }, [])
+    let active = true
+    ;(async () => {
+      const resolved = await resolveRegisterEvent(eventParam)
+      if (!active) return
+      setEv(resolved)
+      setForm((f) => {
+        const fresh = { ...f }
+        if (ticketParam && resolved.tickets.some((t) => t.id === ticketParam)) {
+          fresh.ticketType = ticketParam
+        }
+        if (!resolved.tickets.some((t) => t.id === fresh.ticketType)) {
+          fresh.ticketType = resolved.tickets[0]?.id || initial.ticketType
+        }
+        return fresh
+      })
+    })()
+    return () => {
+      active = false
+    }
+  }, [eventParam, ticketParam])
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
@@ -73,16 +100,17 @@ export default function Register() {
 
   useEffect(() => {
     fetchPaystackConfig().then(setConfig).catch(() => {
-      // Fall back to ticket data even if config endpoint fails
       setConfigError('Payment may not be configured yet.')
     })
   }, [])
 
-  const selected = tickets.find((t) => t.id === form.ticketType)!
-  const selectedPrice = ticketPrice(selected, now)
+  const tickets = ev.tickets
+  const selected = tickets.find((t) => t.id === form.ticketType) ?? tickets[0]
+  const selectedPrice = selected ? ticketPrice(selected, now) : 0
   const subtotal = selectedPrice * form.quantity
   const processingFee = Math.round(subtotal * PROCESSING_FEE_RATE) + PROCESSING_FEE_BASE
   const total = subtotal + processingFee
+  const ended = ev.status === 'ended'
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -140,6 +168,7 @@ export default function Register() {
         hearAbout: form.hearAbout,
         photoBase64: profilePhoto || undefined,
         origin: window.location.origin,
+        eventId: ev.id,
       })
 
       // 2. Open Paystack inline checkout
@@ -153,7 +182,6 @@ export default function Register() {
         return
       }
 
-      // Desktop: open the Paystack iframe popup
       const handler = window.PaystackPop.setup({
         key: config.publicKey,
         email: form.email,
@@ -187,7 +215,6 @@ export default function Register() {
       return
     }
     try {
-      // If paystack configured, go through paystack
       if (config?.paystackEnabled === true) {
         await handlePayWithPaystack()
         return
@@ -209,6 +236,7 @@ export default function Register() {
         reason: form.reason,
         hearAbout: form.hearAbout,
         photoBase64: profilePhoto || undefined,
+        eventId: ev.id,
       })
       setLoading(false)
       setSuccess(true)
@@ -220,17 +248,17 @@ export default function Register() {
 
   return (
     <div>
-      <section className="shadow-lg relative overflow-hidden bg-gradient-to-br from-rose-dark via-rose to-gold">
+      <section className="shadow-lg relative overflow-hidden bg-gradient-to-br from-rose-deep via-rose-dark to-pinkgold">
         <img src="/images/carousel/event.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/70 to-black/40" />
         <div className="container py-8 md:py-10 text-center relative">
           <Reveal variant="up">
             <h1 className="font-display text-3xl md:text-5xl font-bold text-white leading-tight mb-2">
-              3-Days Beginner Makeup Class
+              {ev.title}
             </h1>
-            <p className="text-amber-300 text-base md:text-lg font-semibold mb-3">4th – 6th February 2027</p>
+            <p className="text-pinkgold text-base md:text-lg font-semibold mb-3">{ev.datesLabel}</p>
             <p className="inline-block text-white text-sm md:text-base font-semibold tracking-[0.15em] uppercase">
-              Registration / Ticket Purchase
+              {ended ? 'Past Event · This Event Has Ended' : 'Registration / Ticket Purchase'}
             </p>
             <p className="mt-2 text-white/85 text-sm md:text-base">Hosted by Shawty</p>
           </Reveal>
@@ -249,7 +277,32 @@ export default function Register() {
         </div>
       </section>
 
-      <div className="container section-pad grid lg:grid-cols-[1fr_380px] gap-8 lg:gap-10 items-start min-w-0">
+      <div className={`container section-pad ${ended ? 'max-w-3xl' : ''} grid ${ended ? '' : 'lg:grid-cols-[1fr_380px] gap-8 lg:gap-10'} items-start min-w-0`}>
+        {ended ? (
+          <>
+            <Reveal variant="up">
+              <div className="card p-8 sm:p-12 text-center overflow-hidden relative">
+                <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] bg-black/10 text-ink/60 px-4 py-1.5 rounded-full mb-6">
+                  Past Event · Registration Closed
+                </span>
+                <h2 className="font-display text-3xl md:text-4xl font-bold leading-tight">This event has ended</h2>
+                <p className="text-ink/70 text-base md:text-lg mt-4 max-w-xl mx-auto leading-relaxed">
+                  Thanks for stopping by — the {ev.title} is finished. Keep an eye out for our next
+                  happening; we can’t wait to have you in the studio.
+                </p>
+                <p className="text-muted text-sm mt-3">
+                  <span className="font-semibold text-rose-deep">Coming soon:</span> watch this space for
+                  future events, dates and ticketing.
+                </p>
+                <div className="mt-8 flex items-center justify-center gap-3 flex-wrap">
+                  <Link to="/program" className="btn btn-outline">See our events <ArrowRight size={16} /></Link>
+                  <Link to="/services" className="btn btn-primary">Explore services <ArrowRight size={16} /></Link>
+                </div>
+              </div>
+            </Reveal>
+          </>
+        ) : (
+        <>
         {/* FORM */}
         <Reveal variant="up">
         <form onSubmit={handleManualRegister} className="card p-6 sm:p-8 min-w-0">
@@ -490,45 +543,49 @@ export default function Register() {
         <aside className="space-y-6 min-w-0">
           <div className="card p-6 card-hover">
             <h3 className="font-semibold mb-4">Order Summary</h3>
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span>{selected.label}</span>
-              <span className="text-muted">× {form.quantity}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span>Ticket amount</span>
-              <span>{formatNgn(subtotal)}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm mb-4">
-              <span>Processing fee (1.5% + ₦100)</span>
-              <span>{formatNgn(processingFee)}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm font-semibold border-t border-black/8 pt-3">
-              <span>Total</span>
-              <span>{formatNgn(total)}</span>
-            </div>
-            <ul className="space-y-2 text-sm text-ink/70 border-t border-black/8 pt-4">
-              {selected.includes.map((inc) => (
-                <li key={inc} className="flex items-start gap-2">
-                  <CircleCheck className="text-rose shrink-0 mt-0.5" size={15} />
-                  {inc}
-                </li>
-              ))}
-            </ul>
+            {selected && (
+              <>
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span>{selected.label}</span>
+                  <span className="text-muted">× {form.quantity}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span>Ticket amount</span>
+                  <span>{formatNgn(subtotal)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm mb-4">
+                  <span>Processing fee (1.5% + ₦100)</span>
+                  <span>{formatNgn(processingFee)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm font-semibold border-t border-black/8 pt-3">
+                  <span>Total</span>
+                  <span>{formatNgn(total)}</span>
+                </div>
+                <ul className="space-y-2 text-sm text-ink/70 border-t border-black/8 pt-4">
+                  {selected.includes.map((inc) => (
+                    <li key={inc} className="flex items-start gap-2">
+                      <CircleCheck className="text-rose shrink-0 mt-0.5" size={15} />
+                      {inc}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </div>
 
           <div className="card p-6 bg-blush border-rose/20 card-hover">
             <h4 className="font-semibold mb-2">Good to know</h4>
             <ul className="space-y-2 text-sm text-ink/75">
-              <li>• The venue is disclosed to registered students after ticket purchase.</li>
-              <li>• Bring your own makeup products and tools.</li>
-              <li>• Morning (9:00 AM) and Evening (3:00 PM) sections available.</li>
+              {ev.venueNote && <li>• {ev.venueNote}</li>}
+              {ev.bring && <li>• {ev.bring}</li>}
+              {ev.timeLabel && <li>• Sessions at: {ev.timeLabel}</li>}
             </ul>
           </div>
         </aside>
         </Reveal>
+        </>
+        )}
       </div>
     </div>
   )
 }
-
-

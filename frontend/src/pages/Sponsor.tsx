@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   CircleCheck,
   LoaderCircle,
@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { formatNgn, sponsorPackages, type SponsorPkg } from '../lib/constants'
 import { postJson } from '../lib/api'
+import { fetchLiveEvent } from '../lib/events'
 import Reveal from '../components/Reveal'
 
 const tiers = ['supporter', 'partner', 'featured', 'title'] as const
@@ -29,6 +30,11 @@ export default function Sponsor() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [logoInvalid, setLogoInvalid] = useState('')
+  const [eventId, setEventId] = useState('')
+
+  useEffect(() => {
+    fetchLiveEvent().then((ev) => setEventId(ev.id)).catch(() => {})
+  }, [])
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -56,6 +62,7 @@ export default function Sponsor() {
         ...form,
         amount: form.amount ? Number(form.amount) : undefined,
         logoBase64: logo || undefined,
+        eventId: eventId || undefined,
       })
       setSuccess('Thank you! Your sponsorship application has been received. Our team will reach out shortly.')
       setForm({
@@ -85,7 +92,8 @@ export default function Sponsor() {
           <span className="eyebrow mb-4">
             <Sparkles size={14} /> Become a Sponsor
           </span>
-          <h1 className="section-title text-4xl md:text-5xl mb-4">Support the Movement</h1>
+          <span className="ornament mt-3 justify-center">✦</span>
+          <h1 className="section-title text-4xl md:text-5xl my-4">Support the Movement</h1>
           <p className="text-ink/70 max-w-2xl mx-auto">
             Position your brand in front of aspiring makeup artists and makeup lovers. Explore
             sponsorship packages designed to deliver real visibility before, during, and after the

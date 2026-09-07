@@ -36,7 +36,7 @@ const BRAND = {
 };
 
 const EVENT = {
-  title: '3-Day Beginner Makeup Class',
+  title: '3-Days Beginner Makeup Class',
   dates: '4th – 6th February 2027',
   time: 'Morning 9:00 AM | Evening 3:00 PM',
   venue: 'Disclosed to registered students after ticket purchase.',
@@ -145,7 +145,7 @@ function helpText(): string {
     ``,
     `<b>Info commands</b>`,
     `<code>/brand</code> — about Shawty Beauty Studio`,
-    `<code>/event</code> — the 3-Day Makeup Class details`,
+    `<code>/event</code> — the 3-Days Makeup Class details`,
     `<code>/help</code> — this message`,
   ].join('\n');
 }

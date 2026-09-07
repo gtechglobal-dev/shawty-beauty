@@ -35,8 +35,9 @@ export default function PaymentCallback() {
           <CircleCheck className="mx-auto text-green-500 mb-4" size={56} />
           <h1 className="section-title text-2xl mb-3">Payment Successful!</h1>
           <p className="text-ink/70 mb-6">
-            Thank you! Your registration is confirmed. A confirmation email has been sent to you.
-            Kindly Join the WhatsApp community for further updates. Welcome Onboard!
+            Thank you! Your registration is confirmed and your ticket (with QR code) has been sent to your
+            email — download it from there. On each day of the event, scan the QR on your ticket and enter
+            the attendance code the studio shares to check in.
           </p>
           <a href="https://chat.whatsapp.com/LsEBJJVVFAJ0rSr8bsx8Sq" target="_blank" rel="noopener noreferrer" className="btn btn-primary mb-3">
             Join WhatsApp Community

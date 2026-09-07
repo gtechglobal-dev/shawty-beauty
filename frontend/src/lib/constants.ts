@@ -80,7 +80,7 @@ export const makeupServices: Service[] = [
 
 // --- The 3-day event (an advert hosted by Shawty Beauty Studio) ---
 export const program = {
-  title: '3-Day Beginner Makeup Class',
+  title: '3-Days Beginner Makeup Class',
   theme: 'Making Makeup Available and Reachable for All',
   dates: '4th – 6th February 2027',
   duration: '3 Days',
@@ -101,7 +101,7 @@ export const program = {
 }
 
 export interface Ticket {
-  id: 'student' | 'gold'
+  id: string
   label: string
   price: number
   originalPrice?: number
@@ -146,6 +146,57 @@ export const tickets: Ticket[] = [
     includes: ['Full 3-day class', 'Branded shirt / cap'],
   },
 ]
+
+// --- Event model. The whole site (homepage banner, program page, register
+// form, sponsor form) is driven by the LIVE event served by the Diary. This
+// is the ship-with fallback used when the API isn't reachable.
+export interface StudioEvent {
+  id: string
+  slug: string
+  title: string
+  status: 'live' | 'scheduled' | 'ended'
+  bannerImage?: string
+  theme?: string
+  datesLabel?: string
+  durationLabel?: string
+  timeLabel?: string
+  venueNote?: string
+  whoFor: string[]
+  learn: string[]
+  plus?: string
+  bring?: string
+  attendanceDays: number
+  attendanceLabels: string[]
+  tickets: Ticket[]
+  createdAt: string
+  updatedAt: string
+}
+
+export const defaultEvent: StudioEvent = {
+  id: 'evt-beginner-makeup-class',
+  slug: '3-day-beginner-makeup-class',
+  title: program.title,
+  status: 'live',
+  theme: program.theme,
+  datesLabel: program.dates,
+  durationLabel: program.duration,
+  timeLabel: `${program.time.morning} / ${program.time.evening}`,
+  venueNote: 'Venue is disclosed to registered students after ticket purchase.',
+  whoFor: program.whoFor,
+  learn: program.learn,
+  plus: program.plus,
+  bring: program.bring,
+  attendanceDays: 3,
+  attendanceLabels: ['Day 1', 'Day 2', 'Day 3'],
+  tickets,
+  createdAt: '',
+  updatedAt: '',
+}
+
+export function eventRegisterUrl(event: { slug?: string; id: string }): string {
+  const key = event.slug || event.id
+  return `/register?event=${encodeURIComponent(key)}`
+}
 
 export interface SponsorPkg {
   id: 'supporter' | 'partner' | 'featured' | 'title' | 'product' | 'service'

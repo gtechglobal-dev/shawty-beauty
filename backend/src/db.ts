@@ -58,6 +58,7 @@ export interface Registration {
   emergencyContactName: string;
   emergencyContact: string;
   ticketType: TicketType;
+  ticketLabel?: string;
   quantity: number;
   amount: number;
   status: RegistrationStatus;
@@ -72,6 +73,16 @@ export interface Registration {
   processingFee?: number;
   photoBase64?: string;
   telegramPaidNotified?: boolean;
+  // Shawty's Diary: which event this registration belongs to (live event id by default)
+  eventId?: string;
+  // Attendance tracking. Keys are dynamic day slugs (d1, d2, ...) that the
+  // owning event defines via its `attendanceLabels`.
+  attendance?: Record<string, boolean>;
+  present?: boolean;
+  // Ticket delivery: unique token embedded in the ticket QR code (identifies
+  // this registrant when they scan it), and when the ticket email was last sent.
+  ticketToken?: string;
+  ticketEmailedAt?: string;
 }
 
 export async function readRegistrations(
@@ -82,6 +93,7 @@ export async function readRegistrations(
   const query: Record<string, any> = {};
   if (filter?.status) query.status = filter.status;
   if (filter?.ticketType) query.ticketType = filter.ticketType;
+  if (filter?.eventId) query.eventId = filter.eventId;
   const docs = await col.find(query).sort({ createdAt: -1 }).toArray();
   return docs.map(({ _id, ...rest }) => rest);
 }
@@ -103,6 +115,17 @@ export async function findRegistrationByReference(
   const doc = await col.findOne({
     $or: [{ paystackRef: ref }, { paystackReference: ref }],
   });
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  return rest;
+}
+
+export async function findRegistrationByTicketToken(
+  token: string,
+): Promise<Registration | null> {
+  const col = getCollection<Registration>('registrations');
+  if (!col) return null;
+  const doc = await col.findOne({ ticketToken: token });
   if (!doc) return null;
   const { _id, ...rest } = doc;
   return rest;
@@ -168,13 +191,17 @@ export interface Sponsor {
   status: SponsorStatus;
   featured: boolean;
   logoBase64?: string;
+  eventId?: string;
   createdAt: string;
 }
 
-export async function readSponsors(): Promise<Sponsor[]> {
+export async function readSponsors(filter?: Partial<Sponsor>): Promise<Sponsor[]> {
   const col = getCollection<Sponsor>('sponsors');
   if (!col) return [];
-  const docs = await col.find().sort({ createdAt: -1 }).toArray();
+  const query: Record<string, any> = {};
+  if (filter?.status) query.status = filter.status;
+  if (filter?.eventId) query.eventId = filter.eventId;
+  const docs = await col.find(query).sort({ createdAt: -1 }).toArray();
   return docs.map(({ _id, ...rest }) => rest);
 }
 
@@ -269,4 +296,310 @@ export async function readSubscribers(): Promise<Subscriber[]> {
   if (!col) return [];
   const docs = await col.find().sort({ createdAt: -1 }).toArray();
   return docs.map(({ _id, ...rest }) => rest);
+}
+
+export interface Unsubscribed {
+  _id?: ObjectId;
+  email: string;
+  createdAt: string;
+}
+
+/** Record a platform-wide opt-out (newsletter, registrations, sponsors, contacts). */
+export async function addUnsubscribed(email: string): Promise<boolean> {
+  const col = getCollection<Unsubscribed>('unsubscribed');
+  if (!col) throw new Error('Database not connected');
+  try {
+    await col.insertOne({ email, createdAt: new Date().toISOString() } as any);
+  } catch (e: any) {
+    if (e?.code === 11000) return false;
+    throw e;
+  }
+  return true;
+}
+
+export async function readUnsubscribed(): Promise<Unsubscribed[]> {
+  const col = getCollection<Unsubscribed>('unsubscribed');
+  if (!col) return [];
+  const docs = await col.find().sort({ createdAt: -1 }).toArray();
+  return docs.map(({ _id, ...rest }) => rest);
+}
+
+// ------------------------------------------------------------------
+// Events (the central "happening" — site content is driven by events)
+// ------------------------------------------------------------------
+
+export type EventStatus = 'live' | 'scheduled' | 'ended';
+
+export interface EventTicket {
+  id: string;
+  label: string;
+  price: number;
+  originalPrice?: number;
+  promoDeadline?: number;
+  unitName: string;
+  includes: string[];
+  highlighted?: boolean;
+}
+
+export interface StudioEvent {
+  _id?: ObjectId;
+  id: string;
+  slug: string;
+  title: string;
+  status: EventStatus;
+  bannerImage?: string;
+  theme?: string;
+  datesLabel?: string;
+  durationLabel?: string;
+  timeLabel?: string;
+  venueNote?: string;
+  whoFor: string[];
+  learn: string[];
+  plus?: string;
+  bring?: string;
+  attendanceDays: number;
+  attendanceLabels: string[];
+  tickets: EventTicket[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function isValidEventStatus(s: string): s is EventStatus {
+  return s === 'live' || s === 'scheduled' || s === 'ended';
+}
+
+export async function readEvents(filter?: Partial<StudioEvent>): Promise<StudioEvent[]> {
+  const col = getCollection<StudioEvent>('events');
+  if (!col) return [];
+  const query: Record<string, any> = {};
+  if (filter?.status) query.status = filter.status;
+  const docs = await col.find(query).sort({ createdAt: -1 }).toArray();
+  return docs.map(({ _id, ...rest }) => rest);
+}
+
+export async function findEvent(id: string): Promise<StudioEvent | null> {
+  const col = getCollection<StudioEvent>('events');
+  if (!col) return null;
+  const doc = await col.findOne({ id });
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  return rest;
+}
+
+export async function findEventBySlug(slug: string): Promise<StudioEvent | null> {
+  const col = getCollection<StudioEvent>('events');
+  if (!col) return null;
+  const doc = await col.findOne({ slug });
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  return rest;
+}
+
+export async function findLiveEvent(): Promise<StudioEvent | null> {
+  const col = getCollection<StudioEvent>('events');
+  if (!col) return null;
+  const doc = await col.findOne({ status: 'live' });
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  return rest;
+}
+
+export async function writeEvent(ev: StudioEvent): Promise<void> {
+  const col = getCollection<StudioEvent>('events');
+  if (!col) throw new Error('Database not connected');
+  await col.insertOne(ev as any);
+}
+
+export async function updateEvent(
+  id: string,
+  update: Partial<StudioEvent>,
+): Promise<StudioEvent | null> {
+  const col = getCollection<StudioEvent>('events');
+  if (!col) return null;
+  const doc = await col.findOneAndUpdate(
+    { id },
+    { $set: update },
+    { returnDocument: 'after' },
+  );
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  return rest;
+}
+
+export async function deleteEvent(id: string): Promise<boolean> {
+  const col = getCollection<StudioEvent>('events');
+  if (!col) return false;
+  const result = await col.deleteOne({ id });
+  return result.deletedCount > 0;
+}
+
+// The default event that ships with the site — used to seed the database so
+// the diary, homepage, program page and registration all work out of the box.
+export const DEFAULT_EVENT: StudioEvent = {
+  id: 'evt-beginner-makeup-class',
+  slug: '3-day-beginner-makeup-class',
+  title: '3-Days Beginner Makeup Class',
+  status: 'live',
+  theme: 'Making Makeup Available and Reachable for All',
+  datesLabel: '4th – 6th February 2027',
+  durationLabel: '3 Days',
+  timeLabel: '9:00 AM / 3:00 PM',
+  venueNote: 'Venue is disclosed to registered students after ticket purchase.',
+  whoFor: ['Makeup lovers', 'Beginner makeup artists'],
+  learn: [
+    'How to do your own personal makeup',
+    'How to recreate basic makeup looks on friends',
+    'Fundamental beginner makeup techniques',
+    'The difference between being a Makeup Artist and becoming a Beauty CEO',
+  ],
+  plus:
+    'Participants will also be introduced to the business and mindset side of the beauty industry — understanding the difference between simply being a makeup artist and building yourself into a Beauty CEO.',
+  bring: 'Participants should come with their own personal makeup products/tools.',
+  attendanceDays: 3,
+  attendanceLabels: ['Day 1', 'Day 2', 'Day 3'],
+  tickets: [
+    {
+      id: 'student',
+      label: 'Student',
+      price: 3000,
+      originalPrice: 5000,
+      promoDeadline: new Date('2026-12-31T23:59:59').getTime(),
+      unitName: 'person',
+      includes: ['Full 3-day class'],
+      highlighted: true,
+    },
+    {
+      id: 'gold',
+      label: 'Gold',
+      price: 10000,
+      unitName: 'person',
+      includes: ['Full 3-day class', 'Branded shirt / cap'],
+    },
+  ],
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
+/**
+ * Seed a default live event on first ever start so the site always has one
+ * happening to automate. Called after a successful DB connection.
+ */
+export async function ensureSeedEvents(): Promise<void> {
+  const col = getCollection<StudioEvent>('events');
+  if (!col) return;
+  const count = await col.countDocuments();
+  if (count === 0) {
+    await col.insertOne({ ...DEFAULT_EVENT } as any);
+    console.log('Seeded default live event.');
+  }
+  // NOTE: we intentionally never auto-promote a "most recent" event to live.
+  // That would undo an admin's "End event" (leaving no live event shows the
+  // site's "coming soon" state) on the next server restart. Going live is an
+  // explicit admin action via the Make Live button.
+}
+
+// ------------------------------------------------------------------
+// Settings (e.g. stored admin password after a reset)
+// ------------------------------------------------------------------
+
+export async function getSetting(key: string): Promise<string | null> {
+  const col = getCollection<{ _id?: ObjectId; key: string; value: string }>('settings');
+  if (!col) return null;
+  const doc = await col.findOne({ key });
+  return doc?.value ?? null;
+}
+
+export async function setSetting(key: string, value: string): Promise<void> {
+  const col = getCollection<{ _id?: ObjectId; key: string; value: string }>('settings');
+  if (!col) throw new Error('Database not connected');
+  await col.updateOne({ key }, { $set: { value } }, { upsert: true });
+}
+
+// ------------------------------------------------------------------
+// Password-reset tokens (Shawty's Diary)
+// ------------------------------------------------------------------
+
+export async function saveResetToken(token: string, expiresAt: string): Promise<void> {
+  const col = getCollection<{ _id?: ObjectId; token: string; expiresAt: string }>('adminResetTokens');
+  if (!col) throw new Error('Database not connected');
+  await col.insertOne({ token, expiresAt });
+}
+
+/**
+ * Validate and consume a reset token. Returns true only once per token,
+ * and rejects tokens that are past their expiry.
+ */
+export async function consumeResetToken(token: string): Promise<boolean> {
+  const col = getCollection<{ _id?: ObjectId; token: string; expiresAt: string }>('adminResetTokens');
+  if (!col) return false;
+  const doc = await col.findOne({ token });
+  if (!doc) return false;
+  await col.deleteOne({ token });
+  return new Date(doc.expiresAt).getTime() > Date.now();
+}
+
+// ------------------------------------------------------------------
+// Attendance codes (one shared code per event-day, used with the ticket QR)
+// ------------------------------------------------------------------
+
+export interface AttendanceCode {
+  _id?: ObjectId;
+  eventId: string;
+  day: string; // d1, d2, ...
+  codeHash: string;
+  createdAt: string;
+}
+
+/**
+ * Store (or replace) the daily attendance code for an event. Only the bcrypt
+ * hash is kept — the plaintext code is returned once to the admin and can
+ * never be recovered afterwards (generating a new one invalidates the old).
+ */
+export async function setAttendanceCode(
+  eventId: string,
+  day: string,
+  codeHash: string,
+): Promise<AttendanceCode> {
+  const col = getCollection<AttendanceCode>('attendanceCodes');
+  if (!col) throw new Error('Database not connected');
+  const doc = {
+    eventId,
+    day,
+    codeHash,
+    createdAt: new Date().toISOString(),
+  };
+  await col.updateOne(
+    { eventId, day },
+    { $set: doc },
+    { upsert: true },
+  );
+  return doc;
+}
+
+export async function listAttendanceCodes(
+  eventId: string,
+): Promise<{ day: string; createdAt: string }[]> {
+  const col = getCollection<AttendanceCode>('attendanceCodes');
+  if (!col) return [];
+  const docs = await col.find({ eventId }).toArray();
+  return docs.map(({ _id, codeHash, ...rest }) => rest);
+}
+
+/** Server-side variant that includes the bcrypt hash (never expose publicly). */
+export async function readAttendanceCodes(
+  eventId: string,
+): Promise<AttendanceCode[]> {
+  const col = getCollection<AttendanceCode>('attendanceCodes');
+  if (!col) return [];
+  const docs = await col.find({ eventId }).toArray();
+  return docs.map(({ _id, ...rest }) => rest);
+}
+
+export async function findAttendanceCode(
+  eventId: string,
+  day: string,
+): Promise<AttendanceCode | null> {
+  const col = getCollection<AttendanceCode>('attendanceCodes');
+  if (!col) return null;
+  return col.findOne({ eventId, day });
 }

@@ -6,10 +6,15 @@ import {
   findRegistration,
   findRegistrationByReference,
   updateRegistration,
+  findLiveEvent,
+  findEvent,
   type Registration,
   type TicketType,
+  type EventTicket,
+  type StudioEvent,
 } from '../db.js';
 import { sendTelegramMessage, sendTelegramPhoto, telegramConfigured, escapeHtml } from '../lib/telegram.js';
+import { generateTicketToken, deliverTicketEmail } from '../lib/tickets.js';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || '';
 const PAYSTACK_BASE = 'https://api.paystack.co';
@@ -49,7 +54,24 @@ export const TICKETS: Record<TicketType, TicketMeta> = {
   },
 };
 
-export function ticketPrice(ticket: TicketMeta): number {
+// Tickets now come from the event (live, or the one the form references).
+// This falls back to the legacy TICKETS so older flows keep working.
+export async function resolveTickets(eventId?: string): Promise<{
+  event: StudioEvent | null;
+  tickets: (EventTicket | TicketMeta)[];
+}> {
+  let event: StudioEvent | null = eventId ? await findEvent(eventId) : null;
+  if (!event) event = await findLiveEvent();
+  if (event && event.tickets && event.tickets.length > 0) {
+    return { event, tickets: event.tickets };
+  }
+  return { event: null, tickets: Object.values(TICKETS) };
+}
+
+export function ticketPrice(ticket: { price: number; originalPrice?: number; promoDeadline?: number }): number {
+  if (ticket.originalPrice && ticket.promoDeadline && Date.now() < ticket.promoDeadline) {
+    return ticket.price;
+  }
   if (ticket.originalPrice && Date.now() < PROMO_DEADLINE) return ticket.price;
   return ticket.originalPrice ?? ticket.price;
 }
@@ -72,6 +94,7 @@ interface InitBody {
   hearAbout?: string;
   photoBase64?: string;
   origin?: string;
+  eventId?: string;
 }
 
 function ageFromDob(dob?: string): string | null {
@@ -112,7 +135,7 @@ async function notifyPaidRegistration(reg: Registration): Promise<void> {
     phone: reg.phone,
     email: reg.email,
     instagram: reg.instagram,
-    ticketLabel: TICKETS[reg.ticketType]?.label || reg.ticketType,
+    ticketLabel: TICKETS[reg.ticketType]?.label || reg.ticketLabel || reg.ticketType,
     quantity: reg.quantity,
     subtotal: reg.subtotal || reg.unitPrice * reg.quantity,
     processingFee: reg.processingFee || 0,
@@ -132,6 +155,46 @@ async function notifyPaidRegistration(reg: Registration): Promise<void> {
       .catch(() => sendTelegramMessage(msg).catch(() => {}));
   } else {
     sendTelegramMessage(msg).catch(() => {});
+  }
+}
+
+// ------------------------------------------------------------------
+// Ticket delivery — sends the registrant's PNG ticket (with QR) by email
+// exactly once per registration. Runs on every paid transition; the
+// ticketEmailedAt flag keeps it idempotent.
+// ------------------------------------------------------------------
+async function deliverTicketFor(reg: Registration): Promise<void> {
+  try {
+    if (reg.status !== 'paid' || reg.ticketEmailedAt) return;
+
+    let token = reg.ticketToken;
+    if (!token) {
+      token = generateTicketToken();
+      const updated = await updateRegistration(reg.id, { ticketToken: token });
+      if (!updated) return;
+      reg = { ...reg, ticketToken: token };
+    }
+
+    const event = reg.eventId ? await findEvent(reg.eventId) : await findLiveEvent();
+    const result = await deliverTicketEmail({ registration: reg, event });
+
+    if (result.emailed) {
+      await updateRegistration(reg.id, { ticketEmailedAt: new Date().toISOString() });
+      return;
+    }
+
+    console.error(`Ticket email failed for ${reg.id}:`, result.reason);
+    if (telegramConfigured()) {
+      sendTelegramMessage(
+        `<b>⚠️ Ticket email failed</b>\n` +
+          `Name: ${escapeHtml(reg.fullName)}\n` +
+          `Email: ${escapeHtml(reg.email)}\n` +
+          `Resend from the Diary, or download directly:\n${result.downloadUrl}\n` +
+          `(reason: ${escapeHtml(result.reason || 'unknown')})`,
+      ).catch(() => {});
+    }
+  } catch (err: any) {
+    console.error('Ticket delivery failed:', err.message);
   }
 }
 
@@ -196,7 +259,16 @@ router.post('/initialize', async (req: Request, res: Response) => {
     if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(email)) {
       return res.status(400).json({ error: 'Invalid email address' });
     }
-    const ticket = TICKETS[ticketType];
+
+    // Tickets are governed by the event the form is registering for (the live
+    // event by default). Payment plumbing stays identical.
+    const { event, tickets } = await resolveTickets(body.eventId);
+    if (event && event.status === 'ended') {
+      return res.status(400).json({
+        error: 'This event has ended. Registration is closed — watch out for our future events coming soon.',
+      });
+    }
+    const ticket = tickets.find((t) => t.id === ticketType);
     if (!ticket) {
       return res.status(400).json({ error: 'Invalid ticket type' });
     }
@@ -233,6 +305,8 @@ router.post('/initialize', async (req: Request, res: Response) => {
       processingFee,
       amount: totalAmount,
       status: 'pending',
+      eventId: event?.id,
+      ticketLabel: ticket.label,
       reason: (body.reason || '').trim(),
       hearAbout: (body.hearAbout || '').trim(),
       photoBase64: (body.photoBase64 || '').trim(),
@@ -256,6 +330,8 @@ router.post('/initialize', async (req: Request, res: Response) => {
         callback_url: `${body.origin || process.env.BASE_URL || 'http://localhost:5173'}/register/payment-callback`,
         metadata: {
           registrationId,
+          eventId: event?.id,
+          eventTitle: event?.title,
           ticketType: ticket.id,
           quantity,
           ticketLabel: ticket.label,
@@ -326,6 +402,7 @@ router.post('/verify', async (req: Request, res: Response) => {
         // Notify the studio once that this registration is now PAID
         if (paid) {
           notifyPaidRegistration(paid).catch(() => {});
+          deliverTicketFor(paid).catch(() => {});
         }
       }
       return res.json({
@@ -382,6 +459,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
           console.log(`Webhook: registration ${reg.id} marked as paid (ref ${ref})`);
           if (paid) {
             notifyPaidRegistration(paid).catch(() => {});
+            deliverTicketFor(paid).catch(() => {});
           }
         }
       }
@@ -397,13 +475,22 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
 // Public config endpoint so the frontend knows if Paystack can be used and
 // what ticket pricing looks like (no secrets exposed).
-router.get('/config', (_req: Request, res: Response) => {
+router.get('/config', async (_req: Request, res: Response) => {
   const publicKey = process.env.PAYSTACK_PUBLIC_KEY || '';
+  const { event, tickets } = await resolveTickets();
   res.json({
     paystackEnabled: Boolean(PAYSTACK_SECRET && publicKey),
     publicKey,
     baseUrl: process.env.BASE_URL || 'http://localhost:5173',
-    tickets: Object.values(TICKETS).map((t) => ({ ...t, price: ticketPrice(t) })),
+    event: event
+      ? {
+          id: event.id,
+          slug: event.slug,
+          title: event.title,
+          datesLabel: event.datesLabel,
+        }
+      : null,
+    tickets: tickets.map((t) => ({ ...t, price: ticketPrice(t) })),
   });
 });
 

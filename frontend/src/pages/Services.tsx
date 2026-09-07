@@ -12,7 +12,8 @@ export default function Services() {
         <Reveal variant="up">
           <div className="container py-12 md:py-16 text-center">
             <span className="eyebrow mb-4">Our Services</span>
-            <h1 className="section-title text-4xl md:text-5xl mb-4">Beauty, tailored to you</h1>
+            <span className="ornament mt-3 justify-center">✦</span>
+            <h1 className="section-title text-4xl md:text-5xl my-4">Beauty, tailored to you</h1>
             <p className="text-ink/70 max-w-2xl mx-auto">
               Handcrafted lash extensions and makeup services designed around your natural beauty —
               from everyday soft glam to unforgettable bridal looks.

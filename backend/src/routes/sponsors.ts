@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import {
   writeSponsor,
+  findLiveEvent,
   type Sponsor,
   type SponsorPackageType,
 } from '../db.js';
@@ -103,7 +104,7 @@ export const SPONSOR_PACKAGES: Record<
 
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { brandName, contactName, email, phone, packageType, amount, notes, logoBase64 } = req.body;
+    const { brandName, contactName, email, phone, packageType, amount, notes, logoBase64, eventId } = req.body;
 
     const cleanBrand = (brandName || '').trim();
     const cleanContact = (contactName || '').trim();
@@ -122,6 +123,15 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid sponsor package' });
     }
 
+    // Tie the sponsorship to the current happening (live event by default).
+    let targetEventId: string | undefined;
+    if (typeof eventId === 'string' && eventId) {
+      targetEventId = eventId;
+    } else {
+      const live = await findLiveEvent();
+      targetEventId = live?.id;
+    }
+
     const sponsor: Sponsor = {
       id: uuid(),
       brandName: cleanBrand,
@@ -134,6 +144,7 @@ router.post('/', async (req: Request, res: Response) => {
       status: 'pending',
       featured: packageType === 'featured' || packageType === 'title',
       logoBase64: typeof logoBase64 === 'string' && logoBase64.length > 0 ? logoBase64.slice(0, 300000) : undefined,
+      eventId: targetEventId,
       createdAt: new Date().toISOString(),
     };
 
