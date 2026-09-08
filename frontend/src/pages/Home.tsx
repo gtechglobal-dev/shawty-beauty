@@ -32,10 +32,11 @@ export default function Home() {
   }, [])
 
   // When the owner promotes/ends an event in the Diary, the homepage switches
-  // to the new live event immediately for any visitor on this page.
+  // to the new live event immediately for any visitor on this page. A light
+  // poll backs this up when the socket can't connect.
   useRealtime((type) => {
-    if (type === 'events') refresh()
-  })
+    if (type === 'events' || type === 'poll') refresh()
+  }, { pollMs: 30000 })
 
   const registerUrl = eventRegisterUrl(live)
 
@@ -56,7 +57,7 @@ export default function Home() {
               <p className="eyebrow justify-center">WELCOME TO</p>
               <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.08]">
                 {siteConfig.name}
-                <span className="gradient-text block">Look stunning, feel unstoppable.</span>
+                <span className="gradient-text gradient-text-animate block">Look stunning, feel unstoppable.</span>
               </h1>
               <div className="mx-auto mt-6 flex items-center justify-center gap-3 text-sm sm:text-base font-medium tracking-wide text-ink/70">
                 <span>Premium Services</span>
@@ -77,6 +78,8 @@ export default function Home() {
                 <img
                   src="/images/carousel/event.jpg"
                   alt=""
+                  loading="lazy"
+                  decoding="async"
                   className="absolute inset-0 w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-black/40" />
@@ -109,6 +112,8 @@ export default function Home() {
                 <img
                   src="/images/carousel/event.jpg"
                   alt=""
+                  loading="lazy"
+                  decoding="async"
                   className="absolute inset-0 w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-black/40" />

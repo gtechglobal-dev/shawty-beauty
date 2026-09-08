@@ -103,6 +103,8 @@ export interface SponsorRow {
   contactName: string
   email: string
   phone: string
+  website?: string
+  socials?: { platform: string; handle: string }[]
   packageType: string
   amount: number
   notes: string
@@ -1037,7 +1039,7 @@ export function EventManage({
 }) {
   const [regs, setRegs] = useState<RegistrationRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [codes, setCodes] = useState<Record<string, { createdAt: string }>>({})
+  const [codes, setCodes] = useState<Record<string, { createdAt: string; code?: string }>>({})
   const [generatedCode, setGeneratedCode] = useState<{ day: string; label: string; code: string } | null>(null)
   const [confirmEnd, setConfirmEnd] = useState(false)
   const [genBusy, setGenBusy] = useState<string | null>(null)
@@ -1064,8 +1066,8 @@ export function EventManage({
         getJson(`/api/admin/events/${encodeURIComponent(event.id)}/attendance-codes`, headers),
       ])
       setRegs(r.registrations || [])
-      const map: Record<string, { createdAt: string }> = {}
-      ;(c.codes || []).forEach((cc: { day: string; createdAt: string }) => { map[cc.day] = { createdAt: cc.createdAt } })
+      const map: Record<string, { createdAt: string; code?: string }> = {}
+      ;(c.codes || []).forEach((cc: { day: string; createdAt: string; code?: string }) => { map[cc.day] = { createdAt: cc.createdAt, code: cc.code } })
       setCodes(map)
     } catch (err: any) {
       toast.push(err.message || 'Failed to load', 'err')
@@ -1106,10 +1108,31 @@ export function EventManage({
         headers,
       )
       setGeneratedCode({ day, label, code: data.code })
-      setCodes((prev) => ({ ...prev, [day]: { createdAt: new Date().toISOString() } }))
+      setCodes((prev) => ({ ...prev, [day]: { createdAt: new Date().toISOString(), code: data.code } }))
       toast.push(data.message || 'Attendance code generated.')
     } catch (err: any) {
       toast.push(err.message || 'Failed to generate code', 'err')
+    } finally {
+      setGenBusy(null)
+    }
+  }
+
+  async function revokeDayCode(day: string, label: string) {
+    setGenBusy(day)
+    try {
+      const data = await delJson(
+        `/api/admin/events/${encodeURIComponent(event.id)}/attendance-code?day=${encodeURIComponent(day)}`,
+        headers,
+      )
+      setCodes((prev) => {
+        const next = { ...prev }
+        delete next[day]
+        return next
+      })
+      setGeneratedCode((g) => (g?.day === day ? null : g))
+      toast.push(data.message || `Code for ${label} revoked.`)
+    } catch (err: any) {
+      toast.push(err.message || 'Failed to revoke code', 'err')
     } finally {
       setGenBusy(null)
     }
@@ -1222,15 +1245,43 @@ export function EventManage({
                   <div className="font-semibold text-sm">{label} <span className="text-xs text-muted font-normal">{set ? '· code ready' : '· no code yet'}</span></div>
                   {set && <CircleCheck size={16} className="text-green-600 shrink-0" />}
                 </div>
-                {set && <div className="text-[11px] text-muted mt-1">Set {new Date(codes[k].createdAt).toLocaleString()}</div>}
+                {set && (
+                  <>
+                    <div className="mt-2 rounded-lg bg-white border border-green-100 px-3 py-2 flex items-center justify-between gap-2">
+                      <span className="font-mono font-bold text-lg tracking-[0.2em] text-rose-deep select-all">
+                        {codes[k].code || '••••••'}
+                      </span>
+                      <button
+                        onClick={async () => {
+                          if (!codes[k].code) return
+                          await navigator.clipboard.writeText(codes[k].code)
+                          toast.push(`Code ${codes[k].code} copied to clipboard.`)
+                        }}
+                        title="Copy code"
+                        disabled={!codes[k].code}
+                        className="w-7 h-7 rounded-md bg-black/5 hover:bg-black/10 flex items-center justify-center text-ink/70 transition-colors disabled:opacity-40"
+                      >
+                        <Copy size={13} />
+                      </button>
+                    </div>
+                    <div className="text-[11px] text-muted mt-1.5">
+                      {codes[k].code ? `Active code · set ${new Date(codes[k].createdAt).toLocaleString()}` : 'Existing code predates this update and isn’t viewable'}
+                    </div>
+                  </>
+                )}
                 <button
-                  onClick={() => generateDayCode(k, label)}
+                  onClick={() => (set ? revokeDayCode(k, label) : generateDayCode(k, label))}
                   disabled={genBusy === k}
-                  className="mt-3 w-full text-xs font-semibold rounded-lg py-2 bg-rose-deep text-white hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-1.5"
+                  className={`mt-3 w-full text-xs font-semibold rounded-lg py-2 flex items-center justify-center gap-1.5 disabled:opacity-60 ${
+                    set ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-rose-deep text-white hover:opacity-90'
+                  }`}
                 >
-                  {genBusy === k ? <LoaderCircle size={13} className="animate-spin" /> : <Plus size={13} />}
-                  {set ? 'Regenerate code' : 'Generate code'}
+                  {genBusy === k ? <LoaderCircle size={13} className="animate-spin" /> : set ? <Trash2 size={13} /> : <Plus size={13} />}
+                  {set ? 'Revoke code' : 'Generate code'}
                 </button>
+                {set && !codes[k].code && (
+                  <p className="text-[10px] text-amber-600 mt-1.5">Revoke it and a fresh code will be available again.</p>
+                )}
               </div>
             )
           })}

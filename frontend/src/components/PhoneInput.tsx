@@ -6,9 +6,10 @@ interface Props {
   value: string
   onChange: (v: string) => void
   required?: boolean
+  dial?: string
 }
 
-export default function PhoneInput({ value, onChange, required = true }: Props) {
+export default function PhoneInput({ value, onChange, required = true, dial: dialProp }: Props) {
   const [dial, setDial] = useState('234')
   const [national, setNational] = useState('')
 
@@ -20,6 +21,16 @@ export default function PhoneInput({ value, onChange, required = true }: Props) 
     setDial(c.dial)
     setNational(digits.slice(c.dial.length).slice(0, c.max))
   }, [value])
+
+  // Follow the country selected by the parent: the dial prop wins, and the
+  // existing national digits are kept (trimmed to the new country's length).
+  useEffect(() => {
+    if (!dialProp) return
+    const c = phoneCountries.find((x) => x.dial === dialProp)
+    if (!c || c.dial === dial) return
+    changeDial(dialProp)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dialProp])
 
   function changeNational(raw: string) {
     const digits = raw.replace(/\D/g, '').slice(0, country.max)

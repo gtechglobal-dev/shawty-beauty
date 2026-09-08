@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { CircleCheck, LoaderCircle, CreditCard, Image as ImageIcon, ArrowRight } from 'lucide-react'
 import { formatNgn, nationalities, nationalityNames, defaultEvent, type StudioEvent } from '../lib/constants'
@@ -66,6 +66,7 @@ export default function Register() {
   const [configError, setConfigError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const successRef = useRef<HTMLDivElement>(null)
   const [now, setNow] = useState(() => Date.now())
   const [profilePhoto, setProfilePhoto] = useState('')
   const [photoInvalid, setPhotoInvalid] = useState('')
@@ -105,6 +106,15 @@ export default function Register() {
       setConfigError('Payment may not be configured yet.')
     })
   }, [])
+
+  useEffect(() => {
+    if (success && !loading) {
+      const t = window.setTimeout(() => {
+        successRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 80)
+      return () => window.clearTimeout(t)
+    }
+  }, [success, loading])
 
   const tickets = ev.tickets
   const selected = tickets.find((t) => t.id === form.ticketType) ?? tickets[0]
@@ -326,7 +336,7 @@ export default function Register() {
           </h2>
 
           {success && !loading && (
-            <div className="mb-6 p-4 rounded-xl bg-green-50 border border-green-200 text-green-800 text-sm flex items-start gap-2">
+            <div ref={successRef} className="mb-6 p-4 rounded-xl bg-green-50 border border-green-200 text-green-800 text-sm flex items-start gap-2 scroll-mt-24">
               <CircleCheck size={20} className="shrink-0" />
               <div>
                 <strong>Thank you!</strong> Your registration has been received. If you completed

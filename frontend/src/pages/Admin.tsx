@@ -7,6 +7,7 @@ import { getJson, patchJson } from '../lib/api'
 import { formatNgn, tickets } from '../lib/constants'
 import { useToast } from '../components/Toasts'
 import Modal from '../components/Modal'
+import RichText from '../lib/RichText'
 
 interface Registration {
   id: string
@@ -517,7 +518,12 @@ export default function Admin() {
                   value={sponsorDetails.publicRecognition ? (sponsorDetails.displayName || 'Yes') : 'No — anonymous'}
                 />
                 {sponsorDetails.displayName && <DetailField label="Name to display" value={sponsorDetails.displayName} />}
-                {sponsorDetails.notes && <DetailField label="Message" value={sponsorDetails.notes} />}
+                {sponsorDetails.notes && (
+                  <div className="mt-5 pt-5 border-t border-black/5">
+                    <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-2">Message</h4>
+                    <RichText className="text-sm text-ink/80 leading-relaxed block" text={sponsorDetails.notes} />
+                  </div>
+                )}
               </div>
             </div>
           </Modal>

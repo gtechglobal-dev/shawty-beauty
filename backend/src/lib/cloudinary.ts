@@ -9,6 +9,7 @@ import { v2 as cloudinary } from 'cloudinary';
 
 const BASE_URL = 'https://res.cloudinary.com';
 const DEFAULT_MAX_BYTES = 100 * 1024; // 100 KB
+const UPLOAD_LIMIT_BYTES = 2 * 1024 * 1024; // hard cap on what we send to Cloudinary
 
 const CLOUD = (process.env.CLOUDINARY_CLOUD_NAME || '').trim();
 const KEY = (process.env.CLOUDINARY_API_KEY || '').trim();
@@ -95,13 +96,22 @@ export async function fetchImageBase64(url: string): Promise<string | null> {
 export async function uploadAndStepDown(
   dataUrl: string,
   opts?: { folder?: string; maxWidth?: number; maxBytes?: number },
-): Promise<{ ok: boolean; url?: string; bytes?: number }> {
+): Promise<{ ok: boolean; url?: string; bytes?: number; error?: string }> {
   const parsed = parseDataUrl(dataUrl);
-  if (!parsed) return { ok: false };
-  if (!isCloudinaryConfigured()) return { ok: false };
+  if (!parsed) return { ok: false, error: 'Invalid image data' };
+  if (!isCloudinaryConfigured()) return { ok: false, error: 'Image upload service is not configured' };
 
   const maxBytes = opts?.maxBytes ?? DEFAULT_MAX_BYTES;
   const folder = (opts?.folder || 'shawty-beauty-studio').replace(/\/+$/, '');
+
+  // Guard against oversized payloads flowing to Cloudinary.
+  const decodedBytes = Buffer.from(parsed.base64, 'base64').length;
+  if (decodedBytes > UPLOAD_LIMIT_BYTES) {
+    return {
+      ok: false,
+      error: `Image is too large (${(decodedBytes / 1024 / 1024).toFixed(1)} MB). Please use a smaller image.`,
+    };
+  }
 
   let result;
   try {
@@ -109,12 +119,13 @@ export async function uploadAndStepDown(
       `data:${parsed.mime};base64,${parsed.base64}`,
       { folder, resource_type: 'image', use_filename: false, unique_filename: true },
     );
-  } catch {
-    return { ok: false };
+  } catch (err: any) {
+    console.error('Cloudinary upload failed:', err?.message || err);
+    return { ok: false, error: 'Image upload failed. Please try again.' };
   }
 
   const publicId = result?.public_id;
-  if (!publicId) return { ok: false };
+  if (!publicId) return { ok: false, error: 'Image upload failed. Please try again.' };
 
   // Original already small enough — no step-down needed.
   if ((result.bytes ?? Number.MAX_SAFE_INTEGER) <= maxBytes) {

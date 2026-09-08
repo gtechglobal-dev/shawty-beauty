@@ -315,7 +315,7 @@ router.post('/initialize', async (req: Request, res: Response) => {
     const processingFee = Math.round(subtotal * PROCESSING_FEE_RATE) + PROCESSING_FEE_BASE;
     const totalAmount = subtotal + processingFee; // naira
 
-    // Profile photo: upload to Cloudinary (auto stepped down to ~100 KB); the
+    // Profile photo: upload to Cloudinary (auto stepped down to ~500 KB); the
     // raw base64 is only kept when Cloudinary is unavailable.
     const rawPhoto = (body.photoBase64 || '').trim();
     let photoBase64: string | undefined;
@@ -323,7 +323,8 @@ router.post('/initialize', async (req: Request, res: Response) => {
     if (rawPhoto) {
       const up = await uploadAndStepDown(rawPhoto, {
         folder: 'shawty-beauty-studio/registrations',
-        maxWidth: 900,
+        maxWidth: 1280,
+        maxBytes: 512 * 1024,
       });
       if (up.ok && up.url) photoUrl = up.url;
       else photoBase64 = rawPhoto;

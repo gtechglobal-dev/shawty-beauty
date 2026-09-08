@@ -22,6 +22,28 @@ export const phoneCountries: PhoneCountry[] = [
 
 const sortedCountries = [...phoneCountries].sort((a, b) => b.dial.length - a.dial.length)
 
+// Maps the nationality/label used in forms (Nigerian, Ghanaian, ...) to the
+// matching telephone country dialing code, so the phone input can follow the
+// country the user selects. Countries without a dial entry keep their current
+// selection.
+const nationalityDialMap: Record<string, string> = {
+  Nigerian: '234',
+  Ghanaian: '233',
+  'South African': '27',
+  Kenyan: '254',
+  Emirati: '971',
+  American: '1',
+  Canadian: '1',
+  British: '44',
+  Indian: '91',
+  French: '33',
+  German: '49',
+}
+
+export function dialForNationality(nationality: string): string | undefined {
+  return nationalityDialMap[nationality] || undefined
+}
+
 export function parsePhone(value: string): { country: PhoneCountry; national: string; digits: string } | null {
   const digits = (value || '').replace(/\D/g, '')
   if (!digits) return null

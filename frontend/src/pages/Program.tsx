@@ -35,13 +35,14 @@ export default function Program() {
     })()
   }, [])
 
-  // Live event changes from the Diary land here in real time too.
+  // Live event changes from the Diary land here in real time too, with a
+  // polling fallback when the socket can't connect.
   useRealtime((type) => {
-    if (type === 'events') {
+    if (type === 'events' || type === 'poll') {
       setLoading(false)
       refresh().catch(() => {})
     }
-  })
+  }, { pollMs: 30000 })
 
   const featured = live && live.status === 'live' ? live : null
   const others = events.filter((e) => e.id !== live?.id)

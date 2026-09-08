@@ -31,6 +31,24 @@ function getCollection<T extends { _id?: ObjectId }>(name: string): Collection<T
   return db ? db.collection<T>(name) : null;
 }
 
+// Guard against NoSQL operator injection in query filters. Only plain
+// primitives (string | number | boolean) are ever allowed as filter values;
+// any object ($gt, $regex, ...) or empty value is stripped. Routes that need
+// richer queries must build their own whitelisted query objects.
+function buildSafeQuery(filter: Record<string, unknown>): Record<string, unknown> {
+  const query: Record<string, unknown> = {};
+  for (const key of Object.keys(filter)) {
+    if (key.startsWith('$')) continue; // never trust operator keys
+    const v = filter[key];
+    if (v === undefined || v === null) continue;
+    const t = typeof v;
+    if (t === 'string' || t === 'number' || t === 'boolean') {
+      query[key] = v;
+    }
+  }
+  return query;
+}
+
 // ------------------------------------------------------------------
 // Student Registrations (ticket purchases)
 // ------------------------------------------------------------------
@@ -92,10 +110,7 @@ export async function readRegistrations(
 ): Promise<Registration[]> {
   const col = getCollection<Registration>('registrations');
   if (!col) return [];
-  const query: Record<string, any> = {};
-  if (filter?.status) query.status = filter.status;
-  if (filter?.ticketType) query.ticketType = filter.ticketType;
-  if (filter?.eventId) query.eventId = filter.eventId;
+  const query = buildSafeQuery((filter || {}) as Record<string, unknown>);
   const docs = await col.find(query).sort({ createdAt: -1 }).toArray();
   return docs.map(({ _id, ...rest }) => rest);
 }
@@ -195,6 +210,11 @@ export type SponsorPackageType =
 
 export type SponsorStatus = 'pending' | 'confirmed' | 'cancelled';
 
+export interface SocialHandle {
+  platform: string;
+  handle: string;
+}
+
 export interface Sponsor {
   _id?: ObjectId;
   id: string;
@@ -203,6 +223,8 @@ export interface Sponsor {
   contactName: string;
   email: string;
   phone: string;
+  website?: string;
+  socials?: SocialHandle[];
   packageType: SponsorPackageType;
   amount: number;
   notes: string;
@@ -230,9 +252,7 @@ export interface Sponsor {
 export async function readSponsors(filter?: Partial<Sponsor>): Promise<Sponsor[]> {
   const col = getCollection<Sponsor>('sponsors');
   if (!col) return [];
-  const query: Record<string, any> = {};
-  if (filter?.status) query.status = filter.status;
-  if (filter?.eventId) query.eventId = filter.eventId;
+  const query = buildSafeQuery((filter || {}) as Record<string, unknown>);
   const docs = await col.find(query).sort({ createdAt: -1 }).toArray();
   return docs.map(({ _id, ...rest }) => rest);
 }
@@ -304,6 +324,13 @@ export async function markContactRead(id: string): Promise<boolean> {
   if (!col) return false;
   const result = await col.updateOne({ id }, { $set: { read: true } });
   return result.modifiedCount > 0;
+}
+
+export async function deleteContact(id: string): Promise<boolean> {
+  const col = getCollection<ContactMessage>('contacts');
+  if (!col) return false;
+  const result = await col.deleteOne({ id });
+  return result.deletedCount > 0;
 }
 
 export interface Subscriber {
@@ -404,8 +431,7 @@ export function isValidEventStatus(s: string): s is EventStatus {
 export async function readEvents(filter?: Partial<StudioEvent>): Promise<StudioEvent[]> {
   const col = getCollection<StudioEvent>('events');
   if (!col) return [];
-  const query: Record<string, any> = {};
-  if (filter?.status) query.status = filter.status;
+  const query = buildSafeQuery((filter || {}) as Record<string, unknown>);
   const docs = await col.find(query).sort({ createdAt: -1 }).toArray();
   return docs.map(({ _id, ...rest }) => rest);
 }
@@ -580,18 +606,23 @@ export interface AttendanceCode {
   eventId: string;
   day: string; // d1, d2, ...
   codeHash: string;
+  // Plaintext code kept for admin display (the shared code is meant to be
+  // shown to attendees, so storing it is safe); check-in always compares
+  // against `codeHash`.
+  code?: string;
   createdAt: string;
 }
 
 /**
- * Store (or replace) the daily attendance code for an event. Only the bcrypt
- * hash is kept — the plaintext code is returned once to the admin and can
- * never be recovered afterwards (generating a new one invalidates the old).
+ * Store (or replace) the daily attendance code for an event. Both the bcrypt
+ * hash (used for check-in) and the plaintext (used for admin display) are
+ * kept — generating a new one invalidates the old.
  */
 export async function setAttendanceCode(
   eventId: string,
   day: string,
   codeHash: string,
+  code?: string,
 ): Promise<AttendanceCode> {
   const col = getCollection<AttendanceCode>('attendanceCodes');
   if (!col) throw new Error('Database not connected');
@@ -599,6 +630,7 @@ export async function setAttendanceCode(
     eventId,
     day,
     codeHash,
+    code,
     createdAt: new Date().toISOString(),
   };
   await col.updateOne(
@@ -615,7 +647,24 @@ export async function listAttendanceCodes(
   const col = getCollection<AttendanceCode>('attendanceCodes');
   if (!col) return [];
   const docs = await col.find({ eventId }).toArray();
+  return docs.map(({ _id, codeHash, code, ...rest }) => rest);
+}
+
+/** Admin-facing view that also includes the plaintext code for display. */
+export async function listAttendanceCodeViews(
+  eventId: string,
+): Promise<{ day: string; createdAt: string; code?: string }[]> {
+  const col = getCollection<AttendanceCode>('attendanceCodes');
+  if (!col) return [];
+  const docs = await col.find({ eventId }).toArray();
   return docs.map(({ _id, codeHash, ...rest }) => rest);
+}
+
+export async function revokeAttendanceCode(eventId: string, day: string): Promise<boolean> {
+  const col = getCollection<AttendanceCode>('attendanceCodes');
+  if (!col) return false;
+  const res = await col.deleteOne({ eventId, day });
+  return (res.deletedCount ?? 0) > 0;
 }
 
 /** Server-side variant that includes the bcrypt hash (never expose publicly). */

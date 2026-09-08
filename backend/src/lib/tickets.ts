@@ -192,6 +192,12 @@ export async function buildTicketPng(opts: {
   // its border/foil; gold template keeps the studio-approved position.
   const L = r.ticketType === 'student' ? 59 : 0;
 
+  // Gold ticket: the vertical ISSUED / date / studio-name branding is offset
+  // ~0.5cm (30px) left of the QR-side position; nudge it a further 0.2cm
+  // (~12px) to the left for a ~0.7cm net shift. TICKET NO and the student
+  // ticket are intentionally left untouched.
+  const ISSUE_SHIFT = r.ticketType === 'gold' ? 42 : 0;
+
   // Vertical offset applied to everything except the QR sticker — the studio
   // wanted the text block lower while keeping the QR exactly where it is.
   const DY = 55;
@@ -277,9 +283,9 @@ export async function buildTicketPng(opts: {
   <text x="${CX}" y="${chipY + chipH + 48}" font-family="Poppins" font-size="20" font-weight="600" letter-spacing="2" fill="${palette.muted}" text-anchor="middle">${esc(dates)}</text>
 
   <!-- ===== Vertical "SHAWTY BEAUTY STUDIO" branding (rotated 90°, gold) ===== -->
-  <text transform="rotate(-90 ${1610 - L + 48} ${578})" x="${1610 - L + 48}" y="578" font-family="Poppins" font-size="16" font-weight="600" letter-spacing="3" fill="#FFD700" text-anchor="start">SHAWTY BEAUTY STUDIO</text>
-  <text transform="rotate(-90 ${1500 - L + 30} ${570})" x="${1500 - L + 30}" y="570" font-family="Poppins" font-size="14" font-weight="700" letter-spacing="4" fill="#ffffff" text-anchor="start">ISSUED</text>
-  <text transform="rotate(-90 ${1500 - L + 30} ${470})" x="${1500 - L + 30}" y="470" font-family="Poppins" font-size="19" font-weight="600" letter-spacing="2" fill="#ffffff" text-anchor="start">${esc(issued)}</text>
+  <text transform="rotate(-90 ${1610 - L - ISSUE_SHIFT + 48} ${578})" x="${1610 - L - ISSUE_SHIFT + 48}" y="578" font-family="Poppins" font-size="16" font-weight="600" letter-spacing="3" fill="#FFD700" text-anchor="start">SHAWTY BEAUTY STUDIO</text>
+  <text transform="rotate(-90 ${1500 - L - ISSUE_SHIFT + 30} ${570})" x="${1500 - L - ISSUE_SHIFT + 30}" y="570" font-family="Poppins" font-size="14" font-weight="700" letter-spacing="4" fill="#ffffff" text-anchor="start">ISSUED</text>
+  <text transform="rotate(-90 ${1500 - L - ISSUE_SHIFT + 30} ${470})" x="${1500 - L - ISSUE_SHIFT + 30}" y="470" font-family="Poppins" font-size="19" font-weight="600" letter-spacing="2" fill="#ffffff" text-anchor="start">${esc(issued)}</text>
 
   <!-- ===== Price-tier badge (above the QR, early-bird / full price / gold) ===== -->
   ${priceLogoDataUrl

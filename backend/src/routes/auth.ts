@@ -1,10 +1,12 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
+import { rateLimit } from 'express-rate-limit';
 import { generateToken } from '../middleware/auth.js';
 import { getSetting, setSetting, saveResetToken, consumeResetToken } from '../db.js';
 import { sendPasswordResetEmail, sendSuspiciousActivityEmail, mailConfigured } from '../lib/mailer.js';
 import { sendTelegramMessage, telegramConfigured } from '../lib/telegram.js';
+import { resolveClientIp, lookupIpInfo } from '../lib/clientInfo.js';
 
 const router = Router();
 
@@ -26,7 +28,18 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'nancylawrence545@gmail.com';
 let consecutiveFailedAttempts = 0;
 const MAX_FAILED_ATTEMPTS = 4;
 
-router.post('/login', async (req: Request, res: Response) => {
+// Hard throttle on the login endpoint (per IP) so brute-force can't run
+// indefinitely even across consecutive-failure reset cycles.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: process.env.LOGIN_RATE_LIMIT ? parseInt(process.env.LOGIN_RATE_LIMIT, 10) : 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: { error: 'Too many login attempts. Please wait a few minutes and try again.' },
+});
+
+router.post('/login', loginLimiter, async (req: Request, res: Response) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -69,11 +82,11 @@ router.post('/login', async (req: Request, res: Response) => {
     consecutiveFailedAttempts = 0; // reset after alerting
 
     const timestamp = new Date().toLocaleString('en-NG', { timeZone: 'Africa/Lagos' });
-    const ip = req.ip || req.socket?.remoteAddress || undefined;
+    const { ip, location } = lookupIpInfo(resolveClientIp(req));
 
     // Fire-and-forget: don't block the login response on email delivery.
     if (mailConfigured()) {
-      sendSuspiciousActivityEmail(ADMIN_EMAIL, { attempts, timestamp, ip }).catch((err) =>
+      sendSuspiciousActivityEmail(ADMIN_EMAIL, { attempts, timestamp, ip, location }).catch((err) =>
         console.error('Suspicious-activity email failed:', err.message),
       );
     }
@@ -83,7 +96,8 @@ router.post('/login', async (req: Request, res: Response) => {
         `⚠️ <b>Shawty's Diary — Suspicious login activity</b>\n` +
           `${attempts} consecutive failed password attempts detected.\n` +
           `Time: ${timestamp}` +
-          (ip ? `\nIP: ${ip}` : ''),
+          (ip ? `\nIP: ${ip}` : '') +
+          (location ? `\nLocation: ${location}` : ''),
       ).catch(() => {});
     }
   }
@@ -97,7 +111,15 @@ function handleLogin(res: Response, username: string, ok: boolean) {
   return res.json({ token, username });
 }
 
-router.post('/forgot-password', async (req: Request, res: Response) => {
+const forgotLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many reset requests. Please try again later.' },
+});
+
+router.post('/forgot-password', forgotLimiter, async (req: Request, res: Response) => {
   try {
     const token = randomBytes(24).toString('hex');
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();

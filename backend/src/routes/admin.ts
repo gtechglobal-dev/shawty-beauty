@@ -15,6 +15,7 @@ import {
   deleteSponsor,
   readContacts,
   markContactRead,
+  deleteContact,
   readSubscribers,
   readEvents,
   findEvent,
@@ -22,7 +23,9 @@ import {
   updateEvent,
   deleteEvent,
   setAttendanceCode,
-  listAttendanceCodes,
+  findAttendanceCode,
+  revokeAttendanceCode,
+  listAttendanceCodeViews,
   readUnsubscribed,
   DEFAULT_EVENT,
   isValidEventStatus,
@@ -68,6 +71,7 @@ async function sanitizeBannerImage(value: string): Promise<string | undefined> {
   const up = await uploadAndStepDown(input, {
     folder: 'shawty-beauty-studio/banners',
     maxWidth: 1600,
+    maxBytes: 1024 * 1024,
   });
   return up.ok && up.url ? up.url : input;
 }
@@ -146,7 +150,8 @@ function slugify(s: string): string {
 
 // Daily attendance codes: one shared code per event-day. Attendees scan their
 // ticket QR (which identifies them) and enter this code to be marked present
-// for that day. Only a bcrypt hash is stored; the plaintext is returned once.
+// for that day. Both the bcrypt hash (used for check-in) and the plaintext
+// (kept so admins can always see the active code) are stored.
 const CODE_CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 function generateAttendanceCode(length = 6): string {
@@ -378,8 +383,8 @@ router.delete('/events/:id', authMiddleware, async (req: AuthRequest, res: Respo
   }
 });
 
-// Generate (or replace) the shared attendance code for an event-day. The
-// plaintext code is returned once; afterwards only its hash is stored.
+// Generate the shared attendance code for an event-day. A day can only have
+// one active code — generating is refused until the existing one is revoked.
 router.post('/events/:id/attendance-code', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const current = await findEvent(req.params.id);
@@ -388,9 +393,15 @@ router.post('/events/:id/attendance-code', authMiddleware, async (req: AuthReque
     if (typeof day !== 'string' || !/^d[1-9]\d*$/.test(day)) {
       return res.status(400).json({ error: 'day must be a session key like d1, d2 …' });
     }
+    const existing = await findAttendanceCode(current.id, day);
+    if (existing) {
+      return res
+        .status(409)
+        .json({ error: 'A code is already active for this session. Revoke it before generating a new one.' });
+    }
     const code = generateAttendanceCode(6);
     const codeHash = await bcrypt.hash(code, 6);
-    await setAttendanceCode(current.id, day, codeHash);
+    await setAttendanceCode(current.id, day, codeHash, code);
     res.json({
       success: true,
       day,
@@ -403,12 +414,37 @@ router.post('/events/:id/attendance-code', authMiddleware, async (req: AuthReque
   }
 });
 
-// Which days already have a code set (the codes themselves are not stored).
+// Revoke the active attendance code for an event-day so a new one can be set.
+router.delete('/events/:id/attendance-code', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const current = await findEvent(req.params.id);
+    if (!current) return res.status(404).json({ error: 'Event not found' });
+    const day = String(req.body?.day ?? req.query?.day ?? '');
+    if (typeof day !== 'string' || !/^d[1-9]\d*$/.test(day)) {
+      return res.status(400).json({ error: 'day must be a session key like d1, d2 …' });
+    }
+    const removed = await revokeAttendanceCode(current.id, day);
+    const label = current.attendanceLabels?.[parseInt(day.slice(1), 10) - 1] || day;
+    if (!removed) {
+      return res.status(404).json({ error: `No code is active for ${label}.` });
+    }
+    res.json({
+      success: true,
+      day,
+      message: `Code for ${label} revoked. ${label} is now locked — generate a fresh code when you're ready.`,
+    });
+  } catch (err: any) {
+    console.error('Failed to revoke attendance code:', err.message);
+    res.status(500).json({ error: 'Failed to revoke attendance code' });
+  }
+});
+
+// Which days already have a code set, including the plaintext for display.
 router.get('/events/:id/attendance-codes', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const current = await findEvent(req.params.id);
     if (!current) return res.status(404).json({ error: 'Event not found' });
-    const codes = await listAttendanceCodes(current.id);
+    const codes = await listAttendanceCodeViews(current.id);
     res.json({ codes });
   } catch (err: any) {
     console.error('Failed to load attendance codes:', err.message);
@@ -471,7 +507,7 @@ router.post('/registrations', authMiddleware, async (req: AuthRequest, res: Resp
     const eventId = b.eventId ? String(b.eventId) : undefined;
     const event = eventId ? await findEvent(eventId) : await findLiveEvent();
 
-    // Profile photo: upload to Cloudinary (auto stepped down to ~100 KB); the
+    // Profile photo: upload to Cloudinary (auto stepped down to ~500 KB); the
     // raw base64 is only kept when Cloudinary is unavailable.
     const rawPhoto = typeof b.photoBase64 === 'string' && b.photoBase64 ? b.photoBase64 : undefined;
     let photoBase64: string | undefined;
@@ -479,7 +515,8 @@ router.post('/registrations', authMiddleware, async (req: AuthRequest, res: Resp
     if (rawPhoto) {
       const up = await uploadAndStepDown(rawPhoto, {
         folder: 'shawty-beauty-studio/registrations',
-        maxWidth: 900,
+        maxWidth: 1280,
+        maxBytes: 512 * 1024,
       });
       if (up.ok && up.url) photoUrl = up.url;
       else photoBase64 = rawPhoto;
@@ -745,6 +782,18 @@ router.patch('/contacts/:id/read', authMiddleware, async (req: AuthRequest, res:
   }
 });
 
+router.delete('/contacts/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const deleted = await deleteContact(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Contact not found' });
+    broadcastRealtime('contacts', { id: req.params.id, deleted: true });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('Failed to delete contact:', err.message);
+    res.status(500).json({ error: 'Failed to delete contact' });
+  }
+});
+
 router.get('/subscribers', authMiddleware, async (_req: AuthRequest, res: Response) => {
   try {
     const [subscribers, contacts, registrations, sponsors] = await Promise.all([
@@ -921,6 +970,7 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
     const origin = (req.body?.origin as string) || process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
 
     const failedEmails = new Set<string>();
+    const EMAIL_TIMEOUT_MS = 30_000;
     // Send in small batches so SMTP (Gmail) doesn't throttle us.
     for (let i = 0; i < recipients.length; i += 5) {
       const batch = recipients.slice(i, i + 5);
@@ -929,7 +979,14 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
           try {
             const unsubUrl = `${origin}/api/contact/unsubscribe?email=${encodeURIComponent(email)}`;
             const html = renderBroadcastHtml(subject, blocks, unsubUrl);
-            await sendEmail(email, subject, html, attachments);
+            // Guard against a hang (slow/throttled SMTP) so every recipient is
+            // ultimately tallied as either sent or failed — never left in limbo.
+            await Promise.race([
+              sendEmail(email, subject, html, attachments),
+              new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('SMTP send timed out')), EMAIL_TIMEOUT_MS),
+              ),
+            ]);
           } catch (err: any) {
             failedEmails.add(email);
             console.error(`Broadcast failed for ${email}:`, err.message);

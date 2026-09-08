@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import { rateLimit } from 'express-rate-limit';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, readFileSync } from 'fs';
@@ -19,6 +21,21 @@ const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
 app.set('trust proxy', 1);
+
+// Security headers (CSP, X-Frame-Options, X-Content-Type-Options, etc.).
+app.use(helmet({
+  contentSecurityPolicy: false, // React app + inline-styled emails; kept lenient on purpose
+}));
+
+// Global API rate limit guardrail (configurable via RATE_LIMIT_MAX/h).
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: parseInt(process.env.RATE_LIMIT_MAX || '300', 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again shortly.' },
+});
+app.use('/api', apiLimiter);
 
 app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173' }));
 app.use(express.json({

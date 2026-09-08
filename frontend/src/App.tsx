@@ -60,7 +60,7 @@ export default function App() {
     const t = setTimeout(() => {
       setLoading(false)
       setFading(true)
-    }, 1100)
+    }, 650)
     return () => clearTimeout(t)
   }, [pathname])
 

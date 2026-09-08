@@ -5,9 +5,10 @@ import {
   readSponsors,
   type Sponsor,
   type SponsorPackageType,
+  type SocialHandle,
 } from '../db.js';
 import { sendTelegramMessage, telegramConfigured, escapeHtml } from '../lib/telegram.js';
-import { uploadAndStepDown } from '../lib/cloudinary.js';
+import { uploadAndStepDown, isCloudinaryConfigured } from '../lib/cloudinary.js';
 import { deliverSponsorThankYouEmail } from '../lib/sponsorEmail.js';
 import { isValidPhone, phoneErrorMessage, normalizePhone } from '../lib/phone.js';
 import { broadcastRealtime } from '../lib/realtime.js';
@@ -81,6 +82,8 @@ router.get('/', async (_req: Request, res: Response) => {
         contactName: s.contactName,
         email: s.email,
         phone: s.phone,
+        website: s.website,
+        socials: s.socials,
         logoUrl: s.logoUrl,
         logoBase64: s.logoBase64,
         state: s.state,
@@ -204,6 +207,7 @@ router.post('/', async (req: Request, res: Response) => {
     const contactName = sanitizeText(b.displayName || b.contactName || fullName, 120);
     const email = sanitizeText(b.email, 254).toLowerCase();
     const phone = normalizePhone(sanitizeText(b.phone, 24));
+    const website = sanitizeText(b.website, 250).toLowerCase();
 
     if (!fullName || !email || !phone) {
       return res.status(400).json({ error: 'Full name, email and phone are required' });
@@ -219,6 +223,31 @@ router.post('/', async (req: Request, res: Response) => {
     } else if (!isValidPhone(phone)) {
       return res.status(400).json({ error: 'Please enter a valid phone number with its country code' });
     }
+
+    // Optional website: normalize to a https?:// URL or drop it.
+    let cleanWebsite: string | undefined;
+    if (website) {
+      const trimmed = website.replace(/^ws:\/\//, 'http://').replace(/^www\./, 'https://www.');
+      if (/^(https?:\/\/)?([a-z0-9-]+\.)+[a-z0-9-]+(\/[^\s]*)?$/i.test(trimmed)) {
+        cleanWebsite = trimmed.startsWith('http') ? trimmed : `https://${trimmed}`;
+      }
+      // If it doesn't parse as a URL, treat it as empty rather than storing junk.
+    }
+
+    // Optional social media handles: only accept a known platform with a
+    // non-empty handle, sanitized to safe characters.
+    const ALLOWED_PLATFORMS = new Set([
+      'Instagram', 'Facebook', 'TikTok', 'X (Twitter)', 'YouTube',
+      'LinkedIn', 'Snapchat', 'Threads', 'WhatsApp',
+    ]);
+    const cleanSocials: SocialHandle[] | undefined = Array.isArray(b.socials)
+      ? b.socials
+          .map((s: any) => ({
+            platform: sanitizeText(s?.platform, 30),
+            handle: sanitizeText(s?.handle, 120),
+          }))
+          .filter((s: SocialHandle) => ALLOWED_PLATFORMS.has(s.platform) && Boolean(s.handle))
+      : undefined;
 
     const sponsorType = sanitizeText(b.sponsorType, 30);
     const supportAreas = Array.isArray(b.supportAreas)
@@ -291,12 +320,22 @@ router.post('/', async (req: Request, res: Response) => {
     let logoBase64Clean: string | undefined;
     let logoUrl: string | undefined;
     if (rawLogoBase64) {
-      const up = await uploadAndStepDown(rawLogoBase64, {
-        folder: 'shawty-beauty-studio/sponsors',
-        maxWidth: 900,
-      });
-      if (up.ok && up.url) logoUrl = up.url;
-      else logoBase64Clean = rawLogoBase64;
+      if (isCloudinaryConfigured()) {
+        const up = await uploadAndStepDown(rawLogoBase64, {
+          folder: 'shawty-beauty-studio/sponsors',
+          maxWidth: 900,
+          maxBytes: 300 * 1024,
+        });
+        if (up.ok && up.url) {
+          logoUrl = up.url;
+        } else {
+          // Uploading is the norm — a failed upload is a real problem, surface it.
+          return res.status(400).json({ error: up.error || 'We could not upload your logo. Please try again.' });
+        }
+      } else {
+        // No Cloudinary configured — keep the legacy base64-in-DB behaviour.
+        logoBase64Clean = rawLogoBase64;
+      }
     }
 
     const reference = await generateReference();
@@ -308,6 +347,8 @@ router.post('/', async (req: Request, res: Response) => {
       contactName: contactName || fullName,
       email,
       phone,
+      website: cleanWebsite,
+      socials: cleanSocials,
       packageType,
       amount,
       notes: message,

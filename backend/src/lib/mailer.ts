@@ -119,7 +119,7 @@ export async function sendPasswordResetEmail(to: string, resetLink: string): Pro
  */
 export async function sendSuspiciousActivityEmail(
   to: string,
-  details: { attempts: number; timestamp: string; ip?: string },
+  details: { attempts: number; timestamp: string; ip?: string; location?: string },
 ): Promise<void> {
   if (!mailConfigured()) {
     throw new Error('SMTP is not configured');
@@ -146,7 +146,7 @@ export async function sendSuspiciousActivityEmail(
               </p>
               <p style="margin: 0; font-size: 13px; color: #6b3030; line-height: 1.6;">
                 Failed attempts: <strong>${details.attempts}</strong><br/>
-                Time: <strong>${details.timestamp}</strong>${details.ip ? `<br/>IP address: <strong>${details.ip}</strong>` : ''}
+                Time: <strong>${details.timestamp}</strong>${details.ip ? `<br/>IP address: <strong>${details.ip}</strong>` : ''}${details.location ? `<br/>Location: <strong>${details.location}</strong>` : ''}
               </p>
             </div>
             <p style="color: #98808c; font-size: 13px; line-height: 1.6; margin: 0 0 22px;">

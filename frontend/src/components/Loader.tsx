@@ -15,7 +15,7 @@ export default function Loader({
       onTransitionEnd={(e) => {
         if (e.target === e.currentTarget && fading && onFadeEnd) onFadeEnd()
       }}
-      className={`fixed inset-0 z-[200] flex flex-col items-center justify-center bg-gradient-to-b from-cream via-blush to-cream transition-opacity duration-500 ease-out ${fading ? 'opacity-0' : 'opacity-100'}`}
+      className={`fixed inset-0 z-[200] flex flex-col items-center justify-center bg-gradient-to-b from-cream via-blush to-cream transition-opacity duration-300 ease-out ${fading ? 'opacity-0' : 'opacity-100'}`}
       style={{ minHeight: '100dvh' }}>
       <div className="relative w-20 h-20">
         <div className="absolute inset-0 rounded-full bg-gradient-to-br from-rose via-pinkgold to-gold opacity-30 blur-md animate-pulse" />

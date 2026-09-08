@@ -74,6 +74,10 @@ export default function Footer() {
         <div className="container pt-6 pb-10 text-center text-xs text-muted">
           <span className="ornament mb-3">✦</span>
           <p className="mt-3">© {new Date().getFullYear()} {siteConfig.name}. All rights reserved.</p>
+          <p className="mt-2">
+            Site built by <span className="font-semibold text-pinkgold">Gtech-Global</span> · Contact:{" "}
+            <a href="tel:+2349054867749" className="text-pinkgold hover:text-white transition-colors">+234 905 486 7749</a>
+          </p>
         </div>
       </div>
     </footer>

@@ -20,14 +20,19 @@ import {
   Sparkles,
   Image,
   Send,
+  Copy,
+  Trash2,
   X,
+  Download,
 } from 'lucide-react'
-import { getJson, patchJson, postJson } from '../lib/api'
+import { getJson, patchJson, postJson, delJson } from '../lib/api'
 import { isLoggedIn, clearAuthToken, storeAuthToken } from '../lib/authState'
 import { useRealtime, type RealtimeEventType, type RealtimeStatus } from '../lib/useRealtime'
 import { formatNgn, type StudioEvent } from '../lib/constants'
 import { useToast } from '../components/Toasts'
 import Modal from '../components/Modal'
+import { downloadImage } from '../lib/image'
+import RichText from '../lib/RichText'
 import {
   EventsHome,
   EventEditor,
@@ -112,14 +117,19 @@ export default function Diary() {
   const [sponsors, setSponsors] = useState<SponsorRow[]>([])
   const [sponsorDetails, setSponsorDetails] = useState<SponsorRow | null>(null)
   const [sponsorToggle, setSponsorToggle] = useState<SponsorRow | null>(null)
+  const [sponsorDeleteTarget, setSponsorDeleteTarget] = useState<SponsorRow | null>(null)
   const [sponsorContactAction, setSponsorContactAction] = useState<{ kind: 'call' | 'whatsapp' | 'email'; phone: string; email: string } | null>(null)
   const [sponsorEmailOpen, setSponsorEmailOpen] = useState(false)
   const [sponsorEmailSubject, setSponsorEmailSubject] = useState('')
   const [sponsorEmailMessage, setSponsorEmailMessage] = useState('')
+  const [sponsorLogoPreview, setSponsorLogoPreview] = useState<string>('')
   const [contactAction, setContactAction] = useState<{ kind: 'call' | 'whatsapp'; phone: string } | null>(null)
   const [contactDetails, setContactDetails] = useState<ContactMsg | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<ContactMsg | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [sponsorDeleting, setSponsorDeleting] = useState(false)
   const [reloadTick, setReloadTick] = useState(0)
   const [notice, setNotice] = useState<RealtimeNotice | null>(null)
   const noticeTimer = useRef<number | undefined>(undefined)
@@ -127,7 +137,28 @@ export default function Diary() {
   const toast = useToast()
   const headers = { Authorization: `Bearer ${token}` }
 
-  const rtStatus = useRealtime((type) => handleRealtime(type))
+  // Sponsor logo lightbox: Escape closes and the page stays locked while open.
+  useEffect(() => {
+    if (!sponsorLogoPreview) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSponsorLogoPreview('')
+    }
+    document.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+    }
+  }, [sponsorLogoPreview])
+
+  const sponsorLogoSrc = (s: SponsorRow | null): string => {
+    if (!s) return ''
+    if (s.logoUrl) return s.logoUrl
+    if (!s.logoBase64) return ''
+    return s.logoBase64.startsWith('data:') ? s.logoBase64 : `data:image/png;base64,${s.logoBase64}`
+  }
+
+  const rtStatus = useRealtime((type) => handleRealtime(type), { pollMs: 15000 })
 
   // Flashing next to the wrong edge on light mode: silence the notice pill a
   // moment after it appears so it never blocks the tab rail.
@@ -184,6 +215,11 @@ export default function Diary() {
 
   function handleRealtime(type: RealtimeEventType) {
     if (type === 'hello') return
+    if (type === 'poll') {
+      // Socket is down — silently refresh instead of flashing a notice banner.
+      setReloadTick((t) => t + 1)
+      return
+    }
     setReloadTick((t) => t + 1)
     const text = NOTICE_LABEL[type]
     if (text) setNotice({ text, key: Date.now() })
@@ -395,6 +431,22 @@ export default function Diary() {
     }
   }
 
+  async function deleteContact(id: string) {
+    setDeleting(true)
+    try {
+      await delJson(`/api/admin/contacts/${id}`, headers)
+      setContacts((cs) => cs.filter((c) => c.id !== id))
+      if (contactDetails?.id === id) setContactDetails(null)
+      setDeleteTarget(null)
+      toast.push('Message deleted.')
+    } catch (err: any) {
+      setDeleteTarget(null)
+      toast.push(err.message || 'Failed to delete message', 'err')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   async function sendSponsorEmail() {
     if (!sponsorEmailSubject.trim() || !sponsorEmailMessage.trim()) {
       toast.push('Add both a subject and a message.', 'err')
@@ -419,6 +471,22 @@ export default function Diary() {
       toast.push(err.message || 'Failed to send email', 'err')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function deleteSponsor(target: SponsorRow) {
+    setSponsorDeleting(true)
+    try {
+      await delJson(`/api/admin/sponsors/${target.id}`, headers)
+      setSponsors((list) => list.filter((x) => x.id !== target.id))
+      if (sponsorDetails?.id === target.id) setSponsorDetails(null)
+      setSponsorDeleteTarget(null)
+      toast.push('Sponsor deleted.')
+    } catch (err: any) {
+      setSponsorDeleteTarget(null)
+      toast.push(err.message || 'Failed to delete sponsor', 'err')
+    } finally {
+      setSponsorDeleting(false)
     }
   }
 
@@ -569,6 +637,34 @@ export default function Diary() {
     if (s === 'sponsors') { getJson('/api/admin/sponsors', headers).then((d) => setSponsors(d.sponsors || [])).catch(() => {}) }
   }
 
+  async function copyAllEmails() {
+    const list = subscribers.map((s) => s.email).filter(Boolean)
+    if (list.length === 0) {
+      toast.push('No emails to copy.', 'err')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(list.join(', '))
+      toast.push(`Copied ${list.length} email${list.length === 1 ? '' : 's'}.`)
+    } catch {
+      // Clipboard API may be unavailable (non-secure context) — fall back to
+      // a temporary textarea + execCommand for maximum compatibility.
+      const ta = document.createElement('textarea')
+      ta.value = list.join(', ')
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      try {
+        document.execCommand('copy')
+        toast.push(`Copied ${list.length} email${list.length === 1 ? '' : 's'}.`)
+      } catch {
+        toast.push('Could not copy emails.', 'err')
+      }
+      document.body.removeChild(ta)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-cream via-blush/40 to-cream text-ink">
       {/* Sticky top bar */}
@@ -716,7 +812,6 @@ export default function Diary() {
                 <button onClick={() => setSponsorEmailOpen(true)} className="flex items-center gap-1.5 btn btn-outline !py-2" title="Email every sponsor">
                   <Send size={14} /> Send Email to Sponsors
                 </button>
-                <button onClick={() => reloadAll()} className="btn btn-outline !py-2">Refresh</button>
               </div>
             </div>
             <div className="overflow-x-auto">
@@ -755,6 +850,16 @@ export default function Diary() {
                         <div className="text-xs font-medium">{sp.contactName}</div>
                         <div className="text-xs text-muted">{sp.email}</div>
                         {sp.phone && <div className="text-xs text-muted">{sp.phone}</div>}
+                        {sp.website && (
+                          <a
+                            href={sp.website}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-rose-deep hover:underline break-all"
+                          >
+                            <ExternalLink size={10} /> {sp.website.replace(/^https?:\/\//, '')}
+                          </a>
+                        )}
                         <button
                           onClick={() => setSponsorDetails(sp)}
                           className="mt-2 flex items-center gap-1 text-xs font-semibold text-rose-deep hover:underline cursor-pointer"
@@ -765,17 +870,26 @@ export default function Diary() {
                       <td className="px-6 py-3">{PACKAGE_LABELS[sp.packageType] || sp.packageType}</td>
                       <td className="px-6 py-3">{sp.amount > 0 ? formatNgn(sp.amount) : 'In-kind'}</td>
                       <td className="px-6 py-3">
-                        <button
-                          onClick={() => setSponsorToggle(sp)}
-                          className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-full border transition-colors ${
-                            sp.deactivated
-                              ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'
-                              : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
-                          }`}
-                          title={sp.deactivated ? 'Reactivate sponsor' : 'Deactivate sponsor'}
-                        >
-                          <Power size={12} /> {sp.deactivated ? 'Reactivate' : 'Deactivate'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setSponsorToggle(sp)}
+                            className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-full border transition-colors ${
+                              sp.deactivated
+                                ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'
+                                : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+                            }`}
+                            title={sp.deactivated ? 'Reactivate sponsor' : 'Deactivate sponsor'}
+                          >
+                            <Power size={12} /> {sp.deactivated ? 'Reactivate' : 'Deactivate'}
+                          </button>
+                          <button
+                            onClick={() => setSponsorDeleteTarget(sp)}
+                            title="Delete sponsor"
+                            className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-full border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                          >
+                            <Trash2 size={12} /> Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -806,14 +920,24 @@ export default function Diary() {
                     {c.phone && <div className="text-sm text-ink/70">{c.phone}</div>}
                   </div>
                   <div className="flex items-center gap-2">
-                    {!c.read && (
-                      <button onClick={() => markContactRead(c.id)} className="tag-chip cursor-pointer hover:opacity-80">Mark read</button>
-                    )}
                     {!c.read && <span className="tag-chip !bg-green-100 !text-green-700">Unread</span>}
                     <span className="text-xs text-muted">{new Date(c.createdAt).toLocaleString()}</span>
+                    <button
+                      onClick={() => setDeleteTarget(c)}
+                      title="Delete message"
+                      className="w-8 h-8 rounded-full bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
-                <a onClick={() => setContactDetails(c)} className="text-emerald-600 hover:underline cursor-pointer text-xs mt-3 inline-block">
+                <a
+                  onClick={() => {
+                    setContactDetails(c)
+                    if (!c.read) markContactRead(c.id)
+                  }}
+                  className="text-emerald-600 hover:underline cursor-pointer text-xs mt-3 inline-block"
+                >
                   View details
                 </a>
               </div>
@@ -830,7 +954,10 @@ export default function Diary() {
                 <h3 className="font-semibold text-lg">All registered emails ({subscribers.length})</h3>
                 <p className="text-sm text-muted">Every email on the platform — newsletter, registration, sponsor &amp; contact messages — deduplicated.</p>
               </div>
-              <button onClick={() => reloadAll()} className="btn btn-outline !py-2">Refresh</button>
+              <div className="flex items-center gap-2">
+                <button onClick={copyAllEmails} className="btn btn-outline !py-2" title="Copy all emails to the clipboard, comma-separated"><Copy size={14} /> Copy all emails</button>
+                <button onClick={() => reloadAll()} className="btn btn-outline !py-2">Refresh</button>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -1038,11 +1165,26 @@ export default function Diary() {
               <Handshake className="text-rose-dark" size={26} />
             </div>
             {(sponsorDetails.logoUrl || sponsorDetails.logoBase64) && (
-              <img
-                src={sponsorDetails.logoUrl || (sponsorDetails.logoBase64!.startsWith('data:') ? sponsorDetails.logoBase64! : `data:image/png;base64,${sponsorDetails.logoBase64!}`)}
-                alt={`${sponsorDetails.brandName} brand identification`}
-                className="h-28 w-auto mx-auto rounded-xl border border-black/10 object-contain bg-white p-2 mt-4"
-              />
+              <div className="mt-4 flex flex-col items-center gap-2">
+                <button
+                  onClick={() => setSponsorLogoPreview(sponsorLogoSrc(sponsorDetails))}
+                  title="View full image"
+                  className="rounded-xl border border-black/10 bg-white p-2 cursor-zoom-in transition-transform hover:scale-105"
+                >
+                  <img
+                    src={sponsorLogoSrc(sponsorDetails)}
+                    alt={`${sponsorDetails.brandName} brand identification`}
+                    className="h-28 w-auto object-contain max-w-full"
+                  />
+                </button>
+                <button
+                  onClick={() => downloadImage(sponsorLogoSrc(sponsorDetails), `${sponsorDetails.brandName} logo`)}
+                  title="Download image"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-rose-dark hover:text-rose transition-colors"
+                >
+                  <Download size={14} /> Download image
+                </button>
+              </div>
             )}
             <h3 className="font-display text-2xl font-bold mt-3">{sponsorDetails.brandName}</h3>
             {sponsorDetails.reference && <p className="text-xs text-muted mt-1">{sponsorDetails.reference}</p>}
@@ -1092,6 +1234,34 @@ export default function Diary() {
             <DetailField label="Date submitted" value={sponsorDetails.createdAt ? new Date(sponsorDetails.createdAt).toLocaleString() : '—'} />
           </div>
 
+          {(sponsorDetails.socials?.length || sponsorDetails.website) && (
+            <div className="mt-5 pt-5 border-t border-black/5">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-3">Online presence</h4>
+              <div className="grid sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                {sponsorDetails.website && (
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Website</div>
+                    <a
+                      href={sponsorDetails.website}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-rose-deep font-medium hover:underline inline-flex items-center gap-1 break-all"
+                    >
+                      <ExternalLink size={12} /> {sponsorDetails.website}
+                    </a>
+                  </div>
+                )}
+                {sponsorDetails.socials?.map((s, i) => (
+                  <div key={i}>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">{s.platform}</div>
+                    <div className="font-medium break-words">@{s.handle}</div>
+                  </div>
+                ))}
+                {!sponsorDetails.socials?.length && <DetailField label="Social media" value="Not provided" />}
+              </div>
+            </div>
+          )}
+
           {(sponsorDetails.supportAreas?.length || sponsorDetails.sponsorshipType) && (
             <div className="mt-5 pt-5 border-t border-black/5">
               <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-3">Sponsorship details</h4>
@@ -1105,7 +1275,12 @@ export default function Diary() {
                 />
               </div>
               {sponsorDetails.address && <DetailField label="Address" value={sponsorDetails.address} />}
-              {sponsorDetails.notes && <DetailField label="Message" value={sponsorDetails.notes} />}
+              {sponsorDetails.notes && (
+                <div className="mt-5 pt-5 border-t border-black/5">
+                  <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-2">Message</h4>
+                  <RichText className="text-sm text-ink/80 leading-relaxed block" text={sponsorDetails.notes} />
+                </div>
+              )}
             </div>
           )}
 
@@ -1119,6 +1294,33 @@ export default function Diary() {
             </button>
           </div>
         </Modal>
+      )}
+
+      {sponsorLogoPreview && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" role="dialog" aria-modal="true" onClick={() => setSponsorLogoPreview('')}>
+          <button
+            onClick={() => setSponsorLogoPreview('')}
+            aria-label="Close preview"
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white hover:bg-white/20 flex items-center justify-center transition-colors"
+          >
+            <X size={20} />
+          </button>
+          <img
+            src={sponsorLogoPreview}
+            alt="Sponsor logo preview"
+            className="max-w-full max-h-[82vh] object-contain rounded-xl bg-white p-2 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              downloadImage(sponsorLogoPreview, 'sponsor-logo')
+            }}
+            className="absolute bottom-6 left-1/2 -translate-x-1/2 inline-flex items-center gap-2 rounded-full bg-rose text-white px-5 py-2.5 text-sm font-semibold hover:bg-rose-deep transition-colors"
+          >
+            <Download size={16} /> Download image
+          </button>
+        </div>
       )}
 
       {sponsorToggle && (
@@ -1142,6 +1344,67 @@ export default function Diary() {
               disabled={saving}
             >
               {saving ? <LoaderCircle size={18} className="animate-spin" /> : (sponsorToggle.deactivated ? 'Reactivate' : 'Deactivate')}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {sponsorDeleteTarget && (
+        <Modal open onClose={() => !sponsorDeleting && setSponsorDeleteTarget(null)}>
+          <div className="text-center mb-5">
+            <div className="w-16 h-16 mx-auto rounded-full bg-red-50 border border-red-100 flex items-center justify-center mb-4">
+              <Trash2 className="text-red-600" size={28} />
+            </div>
+            <h3 className="text-xl font-bold">Delete this sponsor?</h3>
+            <p className="text-sm text-muted mt-2 max-w-sm mx-auto">
+              This will permanently remove{" "}
+              <span className="font-medium text-ink">{sponsorDeleteTarget.brandName}</span> and all of
+              their sponsorship details. This cannot be undone.
+            </p>
+          </div>
+          <div className="rounded-xl bg-blush/50 border border-rose/10 px-4 py-3 text-sm text-ink/70 mb-5">
+            <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted mb-1">Sponsor</span>
+            {sponsorDeleteTarget.brandName}
+            {sponsorDeleteTarget.email && <span className="block text-xs text-muted mt-0.5">{sponsorDeleteTarget.email}</span>}
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => !sponsorDeleting && setSponsorDeleteTarget(null)} className="btn btn-light flex-1" disabled={sponsorDeleting}>Cancel</button>
+            <button
+              onClick={() => deleteSponsor(sponsorDeleteTarget)}
+              className="btn flex-1 bg-red-500 text-white hover:bg-red-600"
+              disabled={sponsorDeleting}
+            >
+              {sponsorDeleting ? <><LoaderCircle size={18} className="animate-spin" /> Deleting…</> : 'Delete sponsor'}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {deleteTarget && (
+        <Modal open onClose={() => !deleting && setDeleteTarget(null)}>
+          <div className="text-center mb-5">
+            <div className="w-16 h-16 mx-auto rounded-full bg-red-50 border border-red-100 flex items-center justify-center mb-4">
+              <Trash2 className="text-red-600" size={28} />
+            </div>
+            <h3 className="text-xl font-bold">Delete this message?</h3>
+            <p className="text-sm text-muted mt-2 max-w-sm mx-auto">
+              This will permanently remove the message from{" "}
+              <span className="font-medium text-ink">{deleteTarget.name}</span> and it cannot be
+              undone.
+            </p>
+          </div>
+          <div className="rounded-xl bg-blush/50 border border-rose/10 px-4 py-3 text-sm text-ink/70 mb-5">
+            <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted mb-1">Subject</span>
+            {deleteTarget.subject || 'General message'}
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => !deleting && setDeleteTarget(null)} className="btn btn-light flex-1" disabled={deleting}>Cancel</button>
+            <button
+              onClick={() => deleteContact(deleteTarget.id)}
+              className="btn flex-1 bg-red-500 text-white hover:bg-red-600"
+              disabled={deleting}
+            >
+              {deleting ? <><LoaderCircle size={18} className="animate-spin" /> Deleting…</> : 'Delete message'}
             </button>
           </div>
         </Modal>

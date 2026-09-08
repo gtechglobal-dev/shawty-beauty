@@ -7,15 +7,22 @@ import {
   ImagePlus,
   X,
   ArrowRight,
+  Plus,
+  Trash2,
+  AtSign,
+  Phone,
+  MessageCircle,
 } from 'lucide-react'
 import { getJson, postJson } from '../lib/api'
 import { fetchLiveEvent } from '../lib/events'
 import PhoneInput from '../components/PhoneInput'
 import Reveal from '../components/Reveal'
 import Modal from '../components/Modal'
-import { phoneErrorMessage } from '../lib/phone'
+import { phoneErrorMessage, dialForNationality } from '../lib/phone'
 import { nationalities, nationalityNames } from '../lib/constants'
-import { resizeImageBase64 } from '../lib/image'
+import { optimizeLogoBase64 } from '../lib/image'
+import RichText from '../lib/RichText'
+import { useRealtime } from '../lib/useRealtime'
 
 const SPONSOR_TYPE_OPTIONS = [
   'Individual',
@@ -52,6 +59,18 @@ const USAGE_PREFERENCE_OPTIONS = [
   'Where most needed',
 ]
 
+const SOCIAL_PLATFORM_OPTIONS = [
+  'Instagram',
+  'Facebook',
+  'TikTok',
+  'X (Twitter)',
+  'YouTube',
+  'LinkedIn',
+  'Snapchat',
+  'Threads',
+  'WhatsApp',
+]
+
 type RecognitionChoice = '' | 'yes' | 'no'
 
 interface SponsorCard {
@@ -59,6 +78,8 @@ interface SponsorCard {
   name: string
   contactName?: string
   email: string
+  website?: string
+  socials?: { platform: string; handle: string }[]
   phone?: string
   logoUrl?: string
   logoBase64?: string
@@ -68,6 +89,14 @@ interface SponsorCard {
   notes?: string
   supportAreas?: string[]
   sponsorshipType?: string
+}
+
+function logoSrc(s: SponsorCard): string {
+  if (s.logoUrl) return s.logoUrl
+  if (s.logoBase64) {
+    return s.logoBase64.startsWith('data:') ? s.logoBase64 : `data:image/png;base64,${s.logoBase64}`
+  }
+  return ''
 }
 
 function formatAmountInput(raw: string): string {
@@ -84,7 +113,8 @@ export default function Sponsor() {
     fullName: '',
     phone: '',
     email: '',
-    country: '',
+    website: '',
+    country: 'Nigerian',
     state: '',
     address: '',
     supportAreas: [] as string[],
@@ -96,7 +126,9 @@ export default function Sponsor() {
     displayName: '',
   })
   const [consent, setConsent] = useState(false)
+  const [socials, setSocials] = useState<{ platform: string; handle: string }[]>([{ platform: '', handle: '' }])
   const [formError, setFormError] = useState('')
+  const [websiteError, setWebsiteError] = useState('')
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState('')
   const [eventId, setEventId] = useState('')
@@ -106,15 +138,64 @@ export default function Sponsor() {
   const [sponsorsLoading, setSponsorsLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [viewSponsor, setViewSponsor] = useState<SponsorCard | null>(null)
+  const [previewImage, setPreviewImage] = useState('')
+  const [contactAction, setContactAction] = useState<{ name: string; phone: string } | null>(null)
   const formRef = useRef<HTMLDivElement>(null)
+  const successRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    fetchLiveEvent().then((ev) => setEventId(ev.id)).catch(() => {})
-    getJson('/api/sponsors')
+  function loadSponsors(silent = false) {
+    if (!silent) setSponsorsLoading(true)
+    return getJson('/api/sponsors')
       .then((data) => setSponsors(data.sponsors || []))
       .catch(() => setSponsors([]))
       .finally(() => setSponsorsLoading(false))
+  }
+
+  useEffect(() => {
+    fetchLiveEvent().then((ev) => setEventId(ev.id)).catch(() => {})
+    loadSponsors()
   }, [])
+
+  // New/updated sponsors from the Diary land on this page in real time, with a
+  // polling fallback when the socket can't connect.
+  useRealtime((type) => {
+    if (type === 'sponsors' || type === 'poll') loadSponsors(true)
+  }, { pollMs: 30000 })
+
+  useEffect(() => {
+    if (submitted) {
+      const t = window.setTimeout(() => {
+        successRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 80)
+      return () => window.clearTimeout(t)
+    }
+  }, [submitted])
+
+  useEffect(() => {
+    if (!previewImage) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPreviewImage('')
+    }
+    window.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+    }
+  }, [previewImage])
+
+  useEffect(() => {
+    if (!contactAction) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setContactAction(null)
+    }
+    window.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+    }
+  }, [contactAction])
 
   function openForm() {
     setShowForm(true)
@@ -139,10 +220,11 @@ export default function Sponsor() {
     }
     setLogoError('')
     const reader = new FileReader()
+    reader.onerror = () => setLogoError('We could not read that file. Please try again.')
     reader.onload = () => {
-      resizeImageBase64(reader.result as string, 1600)
+      optimizeLogoBase64(reader.result as string, { maxBytes: 300 * 1024, maxDim: 900 })
         .then(setLogoBase64)
-        .catch(() => setLogoBase64(reader.result as string))
+        .catch(() => setLogoError('We could not optimize that image. Please try a different one.'))
     }
     reader.readAsDataURL(file)
   }
@@ -179,6 +261,26 @@ export default function Sponsor() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setFormError('')
+    let websiteClean = form.website.trim()
+    if (websiteClean && !/^[a-z][a-z0-9+.-]*:\/\//i.test(websiteClean)) {
+      websiteClean = 'https://' + websiteClean
+    }
+    if (websiteClean) {
+      let parsed: URL | null = null
+      try {
+        parsed = new URL(websiteClean)
+      } catch {
+        parsed = null
+      }
+      const valid = parsed !== null && (parsed.protocol === 'http:' || parsed.protocol === 'https:')
+      if (!valid) {
+        setWebsiteError('Please enter a valid website address, e.g. www.example.com or https://example.com/page')
+        document.getElementById('sponsor-website')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        return
+      }
+      update('website', websiteClean)
+    }
+    setWebsiteError('')
     const phoneErr = phoneErrorMessage(form.phone)
     if (phoneErr) {
       setFormError(phoneErr)
@@ -202,6 +304,10 @@ export default function Sponsor() {
         fullName: form.fullName,
         email: form.email,
         phone: form.phone,
+        website: websiteClean || undefined,
+        socials: socials
+          .filter((s) => s.platform && s.handle.trim())
+          .map((s) => ({ platform: s.platform, handle: s.handle.trim() })),
         sponsorType: form.sponsorType,
         country: form.country,
         state: form.state,
@@ -219,7 +325,12 @@ export default function Sponsor() {
       })
       setSubmitted(res.reference || '')
     } catch (err: any) {
-      setFormError(err.message || 'Something went wrong. Please try again.')
+      const message = err.message || 'Something went wrong. Please try again.'
+      setFormError(message)
+      if (/image|logo|upload/i.test(message)) {
+        setLogoError(message)
+        document.getElementById('sponsor-logo')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
     } finally {
       setLoading(false)
     }
@@ -299,13 +410,24 @@ export default function Sponsor() {
                 <div key={s.id} className="card overflow-hidden text-center w-40">
                   <div className="h-24 bg-blush/40 flex items-center justify-center overflow-hidden p-2">
                     {s.logoUrl || s.logoBase64 ? (
-                      <img
-                        src={s.logoUrl || (s.logoBase64!.startsWith('data:') ? s.logoBase64! : `data:image/png;base64,${s.logoBase64!}`)}
-                        alt={s.name}
-                        className="h-full w-auto max-w-full object-contain"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => setPreviewImage(logoSrc(s))}
+                        aria-label={`View ${s.name} logo`}
+                        className="w-full h-24 bg-blush/40 flex items-center justify-center overflow-hidden p-2 group cursor-zoom-in"
+                      >
+                        <img
+                          src={logoSrc(s)}
+                          alt={`${s.name} logo`}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-full w-auto max-w-full object-contain transition-transform duration-500 group-hover:scale-110"
+                        />
+                      </button>
                     ) : (
-                      <span className="font-display text-3xl font-bold text-rose-deep">{s.name.charAt(0)}</span>
+                      <div className="h-24 bg-blush/40 flex items-center justify-center overflow-hidden p-2">
+                        <span className="font-display text-3xl font-bold text-rose-deep">{s.name.charAt(0)}</span>
+                      </div>
                     )}
                   </div>
                   <div className="p-3">
@@ -339,11 +461,18 @@ export default function Sponsor() {
                 <div className="flex items-center gap-4 mb-5">
                   <div className="w-16 h-16 rounded-2xl bg-blush flex items-center justify-center overflow-hidden">
                     {viewSponsor.logoUrl || viewSponsor.logoBase64 ? (
-                      <img
-                        src={viewSponsor.logoUrl || (viewSponsor.logoBase64!.startsWith('data:') ? viewSponsor.logoBase64! : `data:image/png;base64,${viewSponsor.logoBase64!}`)}
-                        alt={viewSponsor.name}
-                        className="h-full w-auto max-w-full object-contain"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => setPreviewImage(logoSrc(viewSponsor))}
+                        aria-label={`View ${viewSponsor.name} logo`}
+                        className="h-full w-full flex items-center justify-center cursor-zoom-in"
+                      >
+                        <img
+                          src={logoSrc(viewSponsor)}
+                          alt={`${viewSponsor.name} logo`}
+                          className="h-full w-auto max-w-full object-contain"
+                        />
+                      </button>
                     ) : (
                       <span className="font-display text-3xl font-bold text-rose-deep">{viewSponsor.name.charAt(0)}</span>
                     )}
@@ -381,7 +510,7 @@ export default function Sponsor() {
                   {viewSponsor.notes && (
                     <div>
                       <span className="text-xs text-muted uppercase tracking-wide font-semibold">About them</span>
-                      <p className="text-ink/80 mt-0.5 leading-relaxed">{viewSponsor.notes}</p>
+                      <RichText className="text-ink/80 mt-0.5 leading-relaxed block" text={viewSponsor.notes} />
                     </div>
                   )}
                 </div>
@@ -389,26 +518,111 @@ export default function Sponsor() {
                 <div className="mt-6 pt-5 border-t border-black/5 space-y-2">
                   <span className="text-xs text-muted uppercase tracking-wide font-semibold">Contact</span>
                   <div className="flex flex-col gap-1.5">
+                    {viewSponsor.website && (
+                      <a className="text-sm font-medium text-rose-dark hover:text-rose transition-colors break-all" href={viewSponsor.website} target="_blank" rel="noreferrer">
+                        {viewSponsor.website} ↗
+                      </a>
+                    )}
                     {viewSponsor.email && (
                       <a className="text-sm font-medium text-rose-dark hover:text-rose transition-colors break-all" href={`mailto:${viewSponsor.email}`}>{viewSponsor.email}</a>
                     )}
                     {viewSponsor.phone && (
-                      <a className="text-sm font-medium text-rose-dark hover:text-rose transition-colors" href={`tel:${viewSponsor.phone.replace(/\s+/g, '')}`}>{viewSponsor.phone}</a>
+                      <button
+                        type="button"
+                        onClick={() => setContactAction({ name: viewSponsor.name || 'this sponsor', phone: viewSponsor.phone! })}
+                        className="text-sm font-medium text-rose-dark hover:text-rose transition-colors text-left"
+                      >
+                        {viewSponsor.phone}
+                      </button>
                     )}
                     {viewSponsor.address && (
                       <span className="text-sm text-ink/70">{viewSponsor.address}</span>
                     )}
                   </div>
                 </div>
+
+                {viewSponsor.socials && viewSponsor.socials.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-1.5">
+                    {viewSponsor.socials.map((s, i) => (
+                      <span key={i} className="tag-chip !py-1 text-[11px]">{s.platform} · @{s.handle}</span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </Modal>
+
+          {contactAction && (
+            <div
+              className="fixed inset-0 z-[85] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+              onClick={() => setContactAction(null)}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Contact by phone or WhatsApp"
+            >
+              <div className="card bg-white rounded-3xl p-6 w-full max-w-xs" onClick={(e) => e.stopPropagation()}>
+                <h4 className="font-semibold text-lg text-center">Get in touch with {contactAction.name}?</h4>
+                <p className="text-sm text-muted text-center mt-1.5">{contactAction.phone}</p>
+                <div className="grid grid-cols-2 gap-3 mt-6">
+                  <a
+                    href={`tel:${contactAction.phone.replace(/\s+/g, '')}`}
+                    onClick={() => setContactAction(null)}
+                    className="btn btn-outline flex items-center justify-center gap-2"
+                  >
+                    <Phone size={16} /> Call
+                  </a>
+                  <a
+                    href={`https://wa.me/${contactAction.phone.replace(/[^\d]/g, '').replace(/^0/, '234')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => setContactAction(null)}
+                    className="btn flex items-center justify-center gap-2 bg-green-500 text-white hover:bg-green-600"
+                  >
+                    <MessageCircle size={16} /> WhatsApp
+                  </a>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setContactAction(null)}
+                  className="w-full mt-4 text-xs text-muted hover:text-ink transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {previewImage && (
+            <div
+              className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-6"
+              onClick={() => setPreviewImage('')}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Sponsor logo preview"
+            >
+              <button
+                type="button"
+                onClick={() => setPreviewImage('')}
+                aria-label="Close preview"
+                className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/15 text-white hover:bg-white/30 transition-colors flex items-center justify-center"
+              >
+                <X size={18} />
+              </button>
+              <img
+                src={previewImage}
+                alt="Sponsor logo"
+                onClick={(e) => e.stopPropagation()}
+                decoding="async"
+                className="max-h-[85vh] max-w-[92vw] object-contain rounded-xl bg-white p-4 shadow-2xl"
+              />
+            </div>
+          )}
 
           {showForm && (
           <div ref={formRef} className="mt-12 scroll-mt-8">
             <div className="max-w-2xl mx-auto">
           {submitted ? (
-            <div className="card p-8 sm:p-10 text-center">
+            <div ref={successRef} className="card p-8 sm:p-10 text-center scroll-mt-24">
               <div className="w-16 h-16 mx-auto rounded-full bg-green-100 text-green-600 flex items-center justify-center mb-5">
                 <HeartHandshake size={32} />
               </div>
@@ -467,13 +681,63 @@ export default function Sponsor() {
                   <div>
                     <label className="field-label">Phone Number *</label>
                     <div className="mt-2">
-                      <PhoneInput value={form.phone} onChange={(v) => update('phone', v)} />
+                      <PhoneInput value={form.phone} onChange={(v) => update('phone', v)} dial={dialForNationality(form.country)} />
                     </div>
                   </div>
                   <div>
                     <label className="field-label">Email Address *</label>
                     <input type="email" className="input-field" value={form.email} required
                       onChange={(e) => update('email', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="field-label">Website Address <span className="text-muted font-normal">(optional)</span></label>
+                    <input id="sponsor-website" type="text" inputMode="url" className="input-field" value={form.website} placeholder="e.g. www.example.com"
+                      onChange={(e) => { update('website', e.target.value); if (websiteError) setWebsiteError('') }} />
+                    {websiteError && <p className="mt-1.5 text-sm text-red-600" role="alert">{websiteError}</p>}
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="field-label">Social Media Handles <span className="text-muted font-normal">(optional)</span></label>
+                    <p className="text-xs text-muted mt-1 mb-3">
+                      Select the platforms you're on and add your username or handle for each.
+                    </p>
+                    <div className="space-y-2.5">
+                      {socials.map((s, i) => (
+                        <div key={i} className="flex flex-row items-center gap-2 flex-nowrap">
+                          <select
+                            className="input-field flex-1 min-w-0"
+                            value={s.platform}
+                            onChange={(e) => setSocials((arr) => arr.map((x, j) => (j === i ? { ...x, platform: e.target.value } : x)))}
+                          >
+                            <option value="">Platform</option>
+                            {SOCIAL_PLATFORM_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+                          </select>
+                          <div className="relative flex-1 min-w-0">
+                            <AtSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                            <input
+                              className="input-field !pl-8 w-full min-w-0"
+                              value={s.handle}
+                              placeholder="Your username / handle"
+                              onChange={(e) => setSocials((arr) => arr.map((x, j) => (j === i ? { ...x, handle: e.target.value } : x)))}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSocials((arr) => arr.filter((_, j) => j !== i))}
+                            className="shrink-0 p-2.5 rounded-lg border border-black/10 text-ink/50 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
+                            title="Remove platform"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSocials((arr) => [...arr, { platform: '', handle: '' }])}
+                      className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-rose-deep hover:underline cursor-pointer"
+                    >
+                      <Plus size={15} /> Add another platform
+                    </button>
                   </div>
                   <div className="min-w-0">
                     <label className="field-label">Country / Nationality *</label>
@@ -605,7 +869,7 @@ export default function Sponsor() {
                   </div>
                 )}
                 {nameVisible && (
-                  <div>
+                  <div id="sponsor-logo">
                     <label className="field-label">
                       {form.sponsorType === 'Individual'
                         ? 'Identification Document (optional)'
@@ -638,7 +902,7 @@ export default function Sponsor() {
                         <span className="text-sm text-ink/70 font-medium">
                           {form.sponsorType === 'Individual' ? 'Upload identification document' : 'Upload logo'}
                         </span>
-                        <span className="text-xs text-muted">JPG, PNG or WebP · max 2MB</span>
+                        <span className="text-xs text-muted">JPG, PNG or WebP · max 2MB · auto-optimized</span>
                       </label>
                     )}
                     {logoError && <div className="mt-2 text-sm text-red-600">{logoError}</div>}
