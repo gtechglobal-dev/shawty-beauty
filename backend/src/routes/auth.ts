@@ -13,10 +13,13 @@ const router = Router();
 
 // Default Shawty's Diary credentials. Environment variables can override the
 // username and the default password, and a password reset (below) persists a
-// new password in the database which then takes precedence.
+// new password in the database which then takes precedence. The shipped
+// default only works out-of-the-box: as soon as either ADMIN_PASSWORD or a
+// stored password hash exists, the published default stops being valid.
 const DEFAULT_USERNAME = 'Shawty';
 const DEFAULT_PASSWORD = 'Shawty2026';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || DEFAULT_USERNAME;
+const envPasswordSet = Boolean(process.env.ADMIN_PASSWORD);
 const ENV_PASSWORD_HASH = bcrypt.hashSync(
   process.env.ADMIN_PASSWORD || DEFAULT_PASSWORD,
   10,
@@ -49,24 +52,25 @@ router.post('/login', loginLimiter, async (req: Request, res: Response) => {
 
   let authenticated = false;
 
-  // 1) Stored password (set via a previous password reset) always wins.
+  // 1) Stored password (set via a previous password reset) wins.
   let storedHash: string | null = null;
   try {
     storedHash = await getSetting('adminPasswordHash');
   } catch {
     storedHash = null;
   }
-  if (!authenticated && storedHash && username === DEFAULT_USERNAME) {
+  if (!authenticated && username === DEFAULT_USERNAME && storedHash) {
     authenticated = bcrypt.compareSync(password, storedHash);
   }
 
-  // 2) The documented defaults (Shawty / Shawty2026) always work.
-  if (!authenticated && username === DEFAULT_USERNAME && password === DEFAULT_PASSWORD) {
-    authenticated = true;
+  // 2) Environment-configured credentials (ADMIN_USERNAME / ADMIN_PASSWORD).
+  if (!authenticated && username === ADMIN_USERNAME && envPasswordSet) {
+    authenticated = bcrypt.compareSync(password, ENV_PASSWORD_HASH);
   }
 
-  // 3) Environment-configured credentials.
-  if (!authenticated && username === ADMIN_USERNAME && bcrypt.compareSync(password, ENV_PASSWORD_HASH)) {
+  // 3) The shipped defaults (Shawty / Shawty2026) only work on a fresh
+  // install — i.e. when no stronger credential has been configured yet.
+  if (!authenticated && username === DEFAULT_USERNAME && !storedHash && !envPasswordSet && password === DEFAULT_PASSWORD) {
     authenticated = true;
   }
 

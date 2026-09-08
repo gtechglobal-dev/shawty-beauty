@@ -2,7 +2,12 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
 // Fallback only for local dev; set a strong JWT_SECRET in the environment.
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-insecure-secret-do-not-use-in-production';
+const DEV_FALLBACK = 'dev-only-insecure-secret-do-not-use-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || DEV_FALLBACK;
+
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === DEV_FALLBACK) {
+  console.warn('WARNING: JWT_SECRET is not set in production — admin tokens are forgeable. Set a strong JWT_SECRET.');
+}
 
 export interface AuthRequest extends Request {
   admin?: { username: string };
