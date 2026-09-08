@@ -214,13 +214,11 @@ export default function Home() {
           {/* Sponsorship CTA */}
           <Reveal variant="zoom" delay={100}>
             <div className="mt-8 mx-auto max-w-3xl">
-              <div className="relative overflow-hidden isolate rounded-3xl silk-dark text-white p-5 sm:p-6 md:p-7 border border-white/10">
-                {/* animated aurora background */}
-                <div aria-hidden className="absolute -top-14 -right-14 w-52 h-52 rounded-full bg-rose/25 blur-2xl float-slow" />
-                <div aria-hidden className="absolute -bottom-16 -left-12 w-60 h-60 rounded-full bg-pinkgold/20 blur-2xl float" />
-                <div aria-hidden className="absolute top-10 left-1/3 w-40 h-40 rounded-full bg-gold/15 blur-3xl float-slow" />
-                {/* passing sheen */}
-                <span aria-hidden className="absolute inset-0 shimmer opacity-30 mix-blend-screen pointer-events-none" />
+              <div className="relative overflow-hidden isolate rounded-3xl silk-dark-deep text-white p-5 sm:p-6 md:p-7 border border-white/10">
+                {/* drifting nebula waves */}
+                <span aria-hidden className="nebula -top-12 -left-16 w-[340px] h-[120px] bg-rose/50" />
+                <span aria-hidden className="nebula bottom-6 -right-16 w-[380px] h-[100px] bg-pinkgold/40" style={{ animationDelay: '-6s', animationDuration: '20s' }} />
+                <span aria-hidden className="nebula top-1/2 left-[30%] w-[300px] h-[90px] bg-gold/35" style={{ animationDelay: '-11s', animationDuration: '22s' }} />
                 {/* twinkling sponsor sparkles */}
                 <span aria-hidden className="shine absolute top-7 left-[12%] w-1.5 h-1.5 rounded-full bg-gold shadow-[0_0_10px_2px_rgba(232,169,184,0.7)]" style={{ animationDelay: '0s' }} />
                 <span aria-hidden className="shine absolute top-11 right-[18%] w-1 h-1 rounded-full bg-pinkgold shadow-[0_0_8px_2px_rgba(232,169,184,0.6)]" style={{ animationDelay: '-0.9s' }} />
@@ -239,7 +237,7 @@ export default function Home() {
                         <div key={l.grab} className="spot absolute inset-0 flex items-start" style={{ animationDelay: `${-i * 4}s` }}>
                           <div className="w-full">
                             <p className="gradient-text gradient-text-animate font-display text-2xl sm:text-3xl font-bold leading-tight">{l.grab}</p>
-                            <p className="text-white/70 text-sm sm:text-base mt-2">{l.sub}</p>
+                            <p className="text-white/85 text-sm sm:text-base mt-2">{l.sub}</p>
                           </div>
                         </div>
                       ))}
@@ -263,7 +261,7 @@ export default function Home() {
                       <Link to="/sponsor" className="btn btn-light ping-soft !py-3 px-7 relative shadow-[0_18px_40px_-14px_rgba(42,27,34,0.9)] hover:scale-[1.02] transition-transform">
                         Partner With Us <ArrowRight size={18} />
                       </Link>
-                      <p className="text-[11px] text-white/50 mt-3 flex items-center justify-center gap-1.5">
+                      <p className="text-[11px] text-white/70 mt-3 flex items-center justify-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" /> A few partner slots still open
                       </p>
                     </div>
@@ -363,12 +361,21 @@ export default function Home() {
 
       {/* ===== INSTAGRAM CTA ===== */}
       <section className="section-pad silk-dark relative overflow-hidden">
+        <img
+          src="/images/studio1.png"
+          alt=""
+          aria-hidden
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 w-full h-full object-cover opacity-20 mix-blend-overlay"
+        />
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-ink/60 via-transparent to-ink/60" />
         <Reveal variant="up">
         <div className="container text-center relative z-10">
           <span className="ornament mb-5 justify-center"><Sparkles size={12} aria-hidden /></span>
-          <InstagramIcon size={30} className="mx-auto text-rose my-4" />
+          <InstagramIcon size={30} className="mx-auto text-gold my-4" />
           <h2 className="section-title text-white mb-3">Follow the journey</h2>
-          <p className="text-muted mb-6">See fresh looks and behind-the-scenes on Instagram.</p>
+          <p className="text-white/80 mb-6">See fresh looks and behind-the-scenes on Instagram.</p>
           <a href={siteConfig.instagram} target="_blank" rel="noreferrer" className="btn btn-light">
             <InstagramIcon size={18} /> {siteConfig.instagramHandle}
           </a>

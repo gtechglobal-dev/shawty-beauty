@@ -349,6 +349,7 @@ h1, h2, h3, .font-display {
   .float,
   .float-slow,
   .shimmer,
+  .nebula,
   .marquee-track,
   .alert-blink,
   .ping-soft::after,
@@ -613,6 +614,34 @@ h1, h2, h3, .font-display {
     radial-gradient(900px 420px at 80% -10%, rgba(232, 169, 184, 0.20), transparent 55%),
     radial-gradient(700px 380px at 8% 120%, rgba(232, 169, 184, 0.12), transparent 55%),
     linear-gradient(160deg, #8a3547, #5f2436);
+}
+
+/* Deeper, moodier silk panel — used on the homepage partnership advert */
+.silk-dark-deep {
+  background:
+    radial-gradient(900px 420px at 80% -10%, rgba(232, 169, 184, 0.16), transparent 55%),
+    radial-gradient(700px 380px at 8% 120%, rgba(200, 104, 126, 0.10), transparent 55%),
+    linear-gradient(160deg, #4a1d2e 0%, #33121f 55%, #200a12 100%);
+}
+
+.silk-dark-deep .gradient-text {
+  background-image: linear-gradient(115deg, #ffffff 0%, #f4b9c8 40%, #f3cdd6 75%, #fff5f6 100%);
+}
+
+/* Drifting nebula waves — soft luminous bands that float across the panel
+   like smoke or silk, looping continuously. */
+@keyframes nebulaDrift {
+  0%, 100% { transform: translate3d(-20%, 0, 0) scale(1); opacity: 0.55; }
+  50% { transform: translate3d(15%, -10%, 0) scale(1.18); opacity: 0.85; }
+}
+.nebula {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(56px);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: nebulaDrift 16s ease-in-out infinite;
+  will-change: transform, opacity;
 }
 
 .silk-dark::before {
