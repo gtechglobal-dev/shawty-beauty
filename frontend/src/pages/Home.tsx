@@ -53,7 +53,7 @@ export default function Home() {
               <div className="flex justify-center mb-6">
                 <span className="ornament">✦</span>
               </div>
-              <p className="eyebrow justify-center">Welcome to Shawty</p>
+              <p className="eyebrow justify-center">WELCOME TO</p>
               <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.08]">
                 {siteConfig.name}
                 <span className="gradient-text block">Look stunning, feel unstoppable.</span>

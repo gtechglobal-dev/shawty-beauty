@@ -12,6 +12,7 @@ import { getJson, postJson } from '../lib/api'
 import { fetchLiveEvent } from '../lib/events'
 import PhoneInput from '../components/PhoneInput'
 import Reveal from '../components/Reveal'
+import Modal from '../components/Modal'
 import { phoneErrorMessage } from '../lib/phone'
 import { nationalities, nationalityNames } from '../lib/constants'
 import { resizeImageBase64 } from '../lib/image'
@@ -56,11 +57,17 @@ type RecognitionChoice = '' | 'yes' | 'no'
 interface SponsorCard {
   id: string
   name: string
+  contactName?: string
   email: string
+  phone?: string
   logoUrl?: string
   logoBase64?: string
   state?: string
   country?: string
+  address?: string
+  notes?: string
+  supportAreas?: string[]
+  sponsorshipType?: string
 }
 
 function formatAmountInput(raw: string): string {
@@ -98,6 +105,7 @@ export default function Sponsor() {
   const [sponsors, setSponsors] = useState<SponsorCard[]>([])
   const [sponsorsLoading, setSponsorsLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [viewSponsor, setViewSponsor] = useState<SponsorCard | null>(null)
   const formRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -178,6 +186,10 @@ export default function Sponsor() {
     }
     if (form.supportAreas.length === 0) {
       setFormError('Please select at least one area you would like to support.')
+      return
+    }
+    if (!form.message.trim()) {
+      setFormError('Please tell us about your organization, who you are, and the services you render.')
       return
     }
     if (!consent) {
@@ -298,12 +310,17 @@ export default function Sponsor() {
                   </div>
                   <div className="p-3">
                     <div className="font-semibold text-xs">{s.name}</div>
-                    <div className="text-[11px] text-muted mt-0.5 break-all">{s.email}</div>
                     {(s.state || s.country) && (
                       <div className="text-[11px] text-muted mt-0.5">
                         {(s.state ? s.state + (s.country ? ', ' : '') : '') + (s.country || '')}
                       </div>
                     )}
+                    <button
+                      onClick={() => setViewSponsor(s)}
+                      className="mt-2 text-[11px] font-semibold text-rose-dark hover:text-rose transition-colors inline-flex items-center gap-1"
+                    >
+                      View Details <ArrowRight size={11} />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -315,6 +332,77 @@ export default function Sponsor() {
               <HeartHandshake size={18} /> Partner with us today <ArrowRight size={16} />
             </button>
           </div>
+
+          <Modal open={viewSponsor !== null} onClose={() => setViewSponsor(null)}>
+            {viewSponsor && (
+              <div>
+                <div className="flex items-center gap-4 mb-5">
+                  <div className="w-16 h-16 rounded-2xl bg-blush flex items-center justify-center overflow-hidden">
+                    {viewSponsor.logoUrl || viewSponsor.logoBase64 ? (
+                      <img
+                        src={viewSponsor.logoUrl || (viewSponsor.logoBase64!.startsWith('data:') ? viewSponsor.logoBase64! : `data:image/png;base64,${viewSponsor.logoBase64!}`)}
+                        alt={viewSponsor.name}
+                        className="h-full w-auto max-w-full object-contain"
+                      />
+                    ) : (
+                      <span className="font-display text-3xl font-bold text-rose-deep">{viewSponsor.name.charAt(0)}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-display text-xl font-bold leading-tight">{viewSponsor.name}</h3>
+                    {viewSponsor.contactName && viewSponsor.contactName !== viewSponsor.name && (
+                      <div className="text-sm text-muted mt-0.5">{viewSponsor.contactName}</div>
+                    )}
+                    {(viewSponsor.state || viewSponsor.country) && (
+                      <div className="text-xs text-muted mt-0.5">
+                        {(viewSponsor.state ? viewSponsor.state + (viewSponsor.country ? ', ' : '') : '') + (viewSponsor.country || '')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-3 text-sm">
+                  {viewSponsor.sponsorshipType && (
+                    <div>
+                      <span className="text-xs text-muted uppercase tracking-wide font-semibold">Sponsorship</span>
+                      <p className="text-ink/80 mt-0.5">{viewSponsor.sponsorshipType}</p>
+                    </div>
+                  )}
+                  {viewSponsor.supportAreas && viewSponsor.supportAreas.length > 0 && (
+                    <div>
+                      <span className="text-xs text-muted uppercase tracking-wide font-semibold">What they support</span>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {viewSponsor.supportAreas.map((a) => (
+                          <span key={a} className="tag-chip text-[11px] !py-1">{a}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {viewSponsor.notes && (
+                    <div>
+                      <span className="text-xs text-muted uppercase tracking-wide font-semibold">About them</span>
+                      <p className="text-ink/80 mt-0.5 leading-relaxed">{viewSponsor.notes}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-6 pt-5 border-t border-black/5 space-y-2">
+                  <span className="text-xs text-muted uppercase tracking-wide font-semibold">Contact</span>
+                  <div className="flex flex-col gap-1.5">
+                    {viewSponsor.email && (
+                      <a className="text-sm font-medium text-rose-dark hover:text-rose transition-colors break-all" href={`mailto:${viewSponsor.email}`}>{viewSponsor.email}</a>
+                    )}
+                    {viewSponsor.phone && (
+                      <a className="text-sm font-medium text-rose-dark hover:text-rose transition-colors" href={`tel:${viewSponsor.phone.replace(/\s+/g, '')}`}>{viewSponsor.phone}</a>
+                    )}
+                    {viewSponsor.address && (
+                      <span className="text-sm text-ink/70">{viewSponsor.address}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </Modal>
 
           {showForm && (
           <div ref={formRef} className="mt-12 scroll-mt-8">
@@ -481,10 +569,11 @@ export default function Sponsor() {
                   </div>
                 </div>
                 <div>
-                  <label className="field-label">Additional Message / Instructions (optional)</label>
+                  <label className="field-label">TELL US ABOUT YOUR ORGANIZATION / WHO YOU ARE / SERVICES RENDERED *</label>
                   <textarea className="input-field" rows={3} value={form.message}
                     onChange={(e) => update('message', e.target.value)}
-                    placeholder="Tell us anything else we should know about your sponsorship." />
+                    placeholder="Tell us about your organization, who you are, and the services you render."
+                    required />
                 </div>
               </div>
 

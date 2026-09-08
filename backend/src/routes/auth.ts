@@ -103,7 +103,7 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
     await saveResetToken(token, expiresAt);
 
-    const baseUrl = (req.body?.origin as string) || process.env.BASE_URL || 'http://localhost:5173';
+    const baseUrl = (process.env.BASE_URL || req.body?.origin || 'http://localhost:5173').replace(/\/+$/, '');
     const resetLink = `${baseUrl}/diary?reset=${token}`;
 
     let emailed = false;

@@ -495,7 +495,7 @@ h1, h2, h3, .font-display {
 
 /* ===== Ornamental divider (small diamond between hairlines) ===== */
 .ornament {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 9px;

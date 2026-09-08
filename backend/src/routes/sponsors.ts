@@ -78,11 +78,17 @@ router.get('/', async (_req: Request, res: Response) => {
       sponsors: visible.map((s) => ({
         id: s.id,
         name: s.displayName || s.contactName || s.brandName,
+        contactName: s.contactName,
         email: s.email,
+        phone: s.phone,
         logoUrl: s.logoUrl,
         logoBase64: s.logoBase64,
         state: s.state,
         country: s.country,
+        address: s.address,
+        notes: s.notes,
+        supportAreas: s.supportAreas,
+        sponsorshipType: s.sponsorshipType,
       })),
     });
   } catch (err: any) {
@@ -237,6 +243,9 @@ router.post('/', async (req: Request, res: Response) => {
       }
       if (supportAreas.length === 0 || !supportAreas.every((a: string) => SUPPORT_AREAS.includes(a))) {
         return res.status(400).json({ error: 'Please select at least one area you would like to support' });
+      }
+      if (!message) {
+        return res.status(400).json({ error: 'Please tell us about your organization, who you are, and the services you render' });
       }
       if (!SPONSORSHIP_TYPES.includes(sponsorshipType)) {
         return res.status(400).json({ error: 'Please select a sponsorship type' });

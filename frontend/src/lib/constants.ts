@@ -8,6 +8,7 @@ export const siteConfig = {
   whatsapp: 'https://wa.me/2349163198567',
   instagram: 'https://instagram.com/shawtys_beauty_studio',
   instagramHandle: '@shawtys_beauty_studio',
+  location: 'Owerri, Imo State, Nigeria',
 }
 
 // --- Beauty services (the core business) ---

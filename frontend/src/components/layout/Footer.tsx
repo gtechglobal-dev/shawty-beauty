@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Mail, Phone, MapPin, MessageCircle } from 'lucide-react'
+import { Mail, Phone, MapPin } from 'lucide-react'
 import InstagramIcon from '../icons/InstagramIcon'
 import { siteConfig } from '../../lib/constants'
 
@@ -26,14 +26,6 @@ export default function Footer() {
             {siteConfig.owner}. {siteConfig.tagline}. From soft glam and bridal makeup to
             classic and volume lashes, we help you look and feel your best.
           </p>
-          <a
-            href={siteConfig.whatsapp}
-            target="_blank"
-            rel="noreferrer"
-            className="btn btn-primary mt-5 !py-2.5 !px-5"
-          >
-            <MessageCircle size={16} /> Book on WhatsApp
-          </a>
         </div>
 
         <div>
@@ -67,7 +59,12 @@ export default function Footer() {
             </li>
             <li className="flex items-center sm:items-start justify-center sm:justify-start gap-2.5">
               <MapPin size={16} className="text-rose mt-0.5 shrink-0" />
-              <span>Nigeria</span>
+              <a
+                href={`https://www.google.com/maps/search/${encodeURIComponent(siteConfig.location)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-white transition-colors"
+              >{siteConfig.location}</a>
             </li>
           </ul>
         </div>
