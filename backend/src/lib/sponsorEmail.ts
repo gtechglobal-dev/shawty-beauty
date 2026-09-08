@@ -2,11 +2,11 @@ import { sendEmail } from './mailer.js';
 
 function escapeHtml(s: string): string {
   return String(s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/&/g, '&')
+    .replace(/</g, '<')
+    .replace(/>/g, '>')
+    .replace(/"/g, '"')
+    .replace(/'/g, "&apos;");
 }
 
 export async function deliverSponsorThankYouEmail(opts: {
@@ -16,7 +16,9 @@ export async function deliverSponsorThankYouEmail(opts: {
   eventTitle?: string;
 }): Promise<{ emailed: boolean; reason?: string }> {
   const { name, email, reference, eventTitle } = opts;
-  try {
+  const EMAIL_TIMEOUT_MS = 30_000;
+
+  const sendPromise = (async () => {
     const html = `
       <div style="font-family: Arial, Helvetica, sans-serif; background: #fdf9f4; padding: 32px 16px;">
         <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #f0dbe4;">
@@ -63,7 +65,15 @@ export async function deliverSponsorThankYouEmail(opts: {
       </div>`;
 
     await sendEmail(email, `Thank you for supporting Shawty Beauty Studio \u2014 ${reference}`, html);
-    return { emailed: true };
+    return { emailed: true } as const;
+  })();
+
+  const timeoutPromise = new Promise<{ emailed: false; reason: string }>((_, reject) =>
+    setTimeout(() => reject(new Error('SMTP send timed out')), EMAIL_TIMEOUT_MS)
+  );
+
+  try {
+    return await Promise.race([sendPromise, timeoutPromise]);
   } catch (err: any) {
     return { emailed: false, reason: err?.message || 'Unknown error' };
   }
