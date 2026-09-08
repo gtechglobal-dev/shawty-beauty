@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { generateToken } from '../middleware/auth.js';
 import { getSetting, setSetting, saveResetToken, consumeResetToken } from '../db.js';
-import { sendPasswordResetEmail } from '../lib/mailer.js';
+import { sendPasswordResetEmail, sendSuspiciousActivityEmail, mailConfigured } from '../lib/mailer.js';
 import { sendTelegramMessage, telegramConfigured } from '../lib/telegram.js';
 
 const router = Router();
@@ -22,12 +22,18 @@ const ENV_PASSWORD_HASH = bcrypt.hashSync(
 // Email that password-reset instructions are sent to.
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'nancylawrence545@gmail.com';
 
+// Track consecutive failed login attempts to detect brute-force activity.
+let consecutiveFailedAttempts = 0;
+const MAX_FAILED_ATTEMPTS = 4;
+
 router.post('/login', async (req: Request, res: Response) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password required' });
   }
+
+  let authenticated = false;
 
   // 1) Stored password (set via a previous password reset) always wins.
   let storedHash: string | null = null;
@@ -36,18 +42,50 @@ router.post('/login', async (req: Request, res: Response) => {
   } catch {
     storedHash = null;
   }
-  if (storedHash && username === DEFAULT_USERNAME) {
-    return handleLogin(res, username, bcrypt.compareSync(password, storedHash));
+  if (!authenticated && storedHash && username === DEFAULT_USERNAME) {
+    authenticated = bcrypt.compareSync(password, storedHash);
   }
 
   // 2) The documented defaults (Shawty / Shawty2026) always work.
-  if (username === DEFAULT_USERNAME && password === DEFAULT_PASSWORD) {
-    return handleLogin(res, username, true);
+  if (!authenticated && username === DEFAULT_USERNAME && password === DEFAULT_PASSWORD) {
+    authenticated = true;
   }
 
   // 3) Environment-configured credentials.
-  if (username === ADMIN_USERNAME && bcrypt.compareSync(password, ENV_PASSWORD_HASH)) {
+  if (!authenticated && username === ADMIN_USERNAME && bcrypt.compareSync(password, ENV_PASSWORD_HASH)) {
+    authenticated = true;
+  }
+
+  if (authenticated) {
+    consecutiveFailedAttempts = 0;
     return handleLogin(res, username, true);
+  }
+
+  // Wrong password — track the attempt.
+  consecutiveFailedAttempts++;
+
+  if (consecutiveFailedAttempts > MAX_FAILED_ATTEMPTS) {
+    const attempts = consecutiveFailedAttempts;
+    consecutiveFailedAttempts = 0; // reset after alerting
+
+    const timestamp = new Date().toLocaleString('en-NG', { timeZone: 'Africa/Lagos' });
+    const ip = req.ip || req.socket?.remoteAddress || undefined;
+
+    // Fire-and-forget: don't block the login response on email delivery.
+    if (mailConfigured()) {
+      sendSuspiciousActivityEmail(ADMIN_EMAIL, { attempts, timestamp, ip }).catch((err) =>
+        console.error('Suspicious-activity email failed:', err.message),
+      );
+    }
+
+    if (telegramConfigured()) {
+      sendTelegramMessage(
+        `⚠️ <b>Shawty's Diary — Suspicious login activity</b>\n` +
+          `${attempts} consecutive failed password attempts detected.\n` +
+          `Time: ${timestamp}` +
+          (ip ? `\nIP: ${ip}` : ''),
+      ).catch(() => {});
+    }
   }
 
   return res.status(401).json({ error: 'Invalid credentials' });

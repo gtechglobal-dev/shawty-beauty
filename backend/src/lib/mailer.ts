@@ -112,3 +112,54 @@ export async function sendPasswordResetEmail(to: string, resetLink: string): Pro
     `,
   });
 }
+
+/**
+ * Send a suspicious-activity alert when too many wrong passwords are attempted.
+ * Throws if SMTP is not configured or the send fails.
+ */
+export async function sendSuspiciousActivityEmail(
+  to: string,
+  details: { attempts: number; timestamp: string; ip?: string },
+): Promise<void> {
+  if (!mailConfigured()) {
+    throw new Error('SMTP is not configured');
+  }
+  const transporter = makeTransporter();
+  await transporter.sendMail({
+    from: fromAddress(),
+    to,
+    subject: '⚠️ Shawty\u2019s Diary — Suspicious Login Activity',
+    html: `
+      <div style="font-family: Arial, Helvetica, sans-serif; background: #fdf9f4; padding: 32px 16px; border-radius: 16px;">
+        <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #f0dbe4;">
+          <div style="padding: 28px 32px 8px;">
+            <h1 style="font-family: Georgia, serif; font-size: 22px; font-weight: 600; margin: 0 0 6px; color: #2a1b22;">Shawty&rsquo;s Diary</h1>
+            <p style="color: #98808c; font-size: 13px; margin: 0 0 20px;">Security alert</p>
+            <p style="color: #2a1b22; font-size: 14px; line-height: 1.6; margin: 0 0 22px;">
+              Someone entered an <strong>incorrect password ${details.attempts} times in a row</strong>
+              on your Shawty&rsquo;s Diary login. This could indicate a brute-force
+              attempt or an unauthorized person trying to access your account.
+            </p>
+            <div style="background: #fff4f4; border: 1px solid #f5d5d5; border-radius: 10px; padding: 16px 20px; margin: 0 0 22px;">
+              <p style="margin: 0 0 6px; font-size: 13px; color: #b33;">
+                <strong>Event details</strong>
+              </p>
+              <p style="margin: 0; font-size: 13px; color: #6b3030; line-height: 1.6;">
+                Failed attempts: <strong>${details.attempts}</strong><br/>
+                Time: <strong>${details.timestamp}</strong>${details.ip ? `<br/>IP address: <strong>${details.ip}</strong>` : ''}
+              </p>
+            </div>
+            <p style="color: #98808c; font-size: 13px; line-height: 1.6; margin: 0 0 22px;">
+              If this was you, you can safely ignore this email. If you did not
+              attempt these logins, consider changing your password immediately
+              via the <strong>Forgot Password</strong> link on the login page.
+            </p>
+          </div>
+          <div style="background: #f6e3ec; padding: 12px 32px;">
+            <p style="margin: 0; color: #914e6c; font-size: 12px;">© ${new Date().getFullYear()} Shawty Beauty Studio</p>
+          </div>
+        </div>
+      </div>
+    `,
+  });
+}
