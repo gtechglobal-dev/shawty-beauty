@@ -5,7 +5,9 @@ import { siteConfig } from '../../lib/constants'
 
 export default function Footer() {
   return (
-    <footer className="silk-dark relative text-cream mt-20">
+    <footer className="silk-dark relative text-cream mt-20 overflow-hidden">
+      {/* soft vignette so text stays legible over the silk glows */}
+      <div aria-hidden className="absolute inset-0 pointer-events-none bg-[radial-gradient(130%_120%_at_50%_15%,rgba(20,6,12,0.10)_0%,rgba(20,6,12,0.42)_100%)]" />
       {/* top hairline */}
       <div className="relative z-10 h-px bg-gradient-to-r from-transparent via-pinkgold/60 to-transparent" />
 
@@ -22,7 +24,7 @@ export default function Footer() {
               Shawty Beauty Studio
             </span>
           </div>
-          <p className="text-muted text-sm max-w-md leading-relaxed mx-auto sm:mx-0">
+          <p className="text-cream/75 text-sm max-w-md leading-relaxed mx-auto sm:mx-0">
             {siteConfig.owner}. {siteConfig.tagline}. From soft glam and bridal makeup to
             classic and volume lashes, we help you look and feel your best.
           </p>
@@ -30,7 +32,7 @@ export default function Footer() {
 
         <div>
           <h4 className="font-semibold mb-4 text-sm tracking-[0.18em] uppercase text-pinkgold">Quick Links</h4>
-          <ul className="space-y-2.5 text-sm text-muted">
+          <ul className="space-y-2.5 text-sm text-cream/75">
             <li><Link to="/" className="hover:text-white transition-colors">Home</Link></li>
             <li><Link to="/services" className="hover:text-white transition-colors">Our Services</Link></li>
             <li><Link to="/program" className="hover:text-white transition-colors">Our Events</Link></li>
@@ -42,23 +44,23 @@ export default function Footer() {
 
         <div>
           <h4 className="font-semibold mb-4 text-sm tracking-[0.18em] uppercase text-pinkgold">Get in Touch</h4>
-          <ul className="space-y-3 text-sm text-muted">
+          <ul className="space-y-3 text-sm text-cream/75">
             <li className="flex items-center sm:items-start justify-center sm:justify-start gap-2.5">
-              <InstagramIcon size={16} className="text-rose mt-0.5 shrink-0" />
+              <InstagramIcon size={16} className="text-pinkgold mt-0.5 shrink-0" />
               <a href={siteConfig.instagram} target="_blank" rel="noreferrer" className="hover:text-white transition-colors">
                 {siteConfig.instagramHandle}
               </a>
             </li>
             <li className="flex items-center sm:items-start justify-center sm:justify-start gap-2.5">
-              <Mail size={16} className="text-rose mt-0.5 shrink-0" />
+              <Mail size={16} className="text-pinkgold mt-0.5 shrink-0" />
               <a href={`mailto:${siteConfig.email}`} className="hover:text-white break-all transition-colors">{siteConfig.email}</a>
             </li>
             <li className="flex items-center sm:items-start justify-center sm:justify-start gap-2.5">
-              <Phone size={16} className="text-rose mt-0.5 shrink-0" />
+              <Phone size={16} className="text-pinkgold mt-0.5 shrink-0" />
               <a href={`tel:${siteConfig.phoneRaw}`} className="hover:text-white transition-colors">{siteConfig.phone}</a>
             </li>
             <li className="flex items-center sm:items-start justify-center sm:justify-start gap-2.5">
-              <MapPin size={16} className="text-rose mt-0.5 shrink-0" />
+              <MapPin size={16} className="text-pinkgold mt-0.5 shrink-0" />
               <a
                 href={`https://www.google.com/maps/search/${encodeURIComponent(siteConfig.location)}`}
                 target="_blank"
@@ -71,7 +73,7 @@ export default function Footer() {
       </div>
 
       <div className="relative z-10 border-t border-white/10">
-        <div className="container pt-6 pb-10 text-center text-xs text-muted">
+        <div className="container pt-6 pb-10 text-center text-xs text-cream/70">
           <span className="ornament mb-3">✦</span>
           <p className="mt-3">© {new Date().getFullYear()} {siteConfig.name}. All rights reserved.</p>
           <p className="mt-2">

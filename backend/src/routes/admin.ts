@@ -44,6 +44,7 @@ import { uploadAndStepDown } from '../lib/cloudinary.js';
 import { isValidPhone, normalizePhone } from '../lib/phone.js';
 import { broadcastRealtime } from '../lib/realtime.js';
 import { siteBaseUrl } from '../lib/baseUrl.js';
+import { getSiteSettings, updateSiteSettings, DEFAULT_TICKER } from '../db.js';
 
 const router = Router();
 
@@ -1031,6 +1032,47 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
   } catch (err: any) {
     console.error('Broadcast failed:', err.message);
     res.status(500).json({ error: 'Failed to send broadcasts' });
+  }
+});
+
+// ------------------------------------------------------------------
+// Site settings (homepage scrolling ticker)
+// ------------------------------------------------------------------
+
+router.get('/settings', authMiddleware, async (_req: AuthRequest, res: Response) => {
+  try {
+    res.json(await getSiteSettings());
+  } catch (err: any) {
+    console.error('Failed to load settings:', err.message);
+    res.status(500).json({ error: 'Failed to load settings' });
+  }
+});
+
+router.put('/settings', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const t = req.body?.ticker || {};
+    const sanitized = {
+      ticker: {
+        enabled: typeof t.enabled === 'boolean' ? t.enabled : DEFAULT_TICKER.enabled,
+        messages: Array.isArray(t.messages)
+          ? t.messages.map((m: any) => String(m).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim()).filter(Boolean).slice(0, 40)
+          : [], // empty messages are fine — admin may intend to hide everything
+        bgColor:
+          typeof t.bgColor === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(String(t.bgColor))
+            ? String(t.bgColor)
+            : DEFAULT_TICKER.bgColor,
+        textColor:
+          typeof t.textColor === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(String(t.textColor))
+            ? String(t.textColor)
+            : DEFAULT_TICKER.textColor,
+      },
+    };
+    const updated = await updateSiteSettings(sanitized);
+    broadcastRealtime('settings', { changed: 'ticker' });
+    res.json({ success: true, settings: updated });
+  } catch (err: any) {
+    console.error('Failed to update settings:', err.message);
+    res.status(500).json({ error: 'Failed to update settings' });
   }
 });
 

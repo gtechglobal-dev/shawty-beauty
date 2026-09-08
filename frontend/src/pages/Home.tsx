@@ -15,6 +15,7 @@ import Reveal from '../components/Reveal'
 import CountUp from '../components/CountUp'
 import { siteConfig, defaultEvent, eventRegisterUrl } from '../lib/constants'
 import { fetchLiveEventOrNull, type StudioEvent } from '../lib/events'
+import { getJson } from '../lib/api'
 import { useRealtime } from '../lib/useRealtime'
 
 const sponsorLines = [
@@ -24,15 +25,66 @@ const sponsorLines = [
   { grab: 'Be the brand behind the beauty.', sub: 'From product sampling to the main stage — be unforgettable.' },
 ]
 
+const TICKER_FALLBACK = {
+  enabled: true,
+  messages: [
+    '3BMC — 3 Days Beginner Makeup Class',
+    'Registrations Open Now!',
+    'Early Bird Offer Ends Soon!',
+    'Partnership open for brands that wish to collaborate',
+    'Partner With Us',
+  ],
+  bgColor: '#5f2436',
+  textColor: '#fdf0f2',
+}
+
+// A ticker line can carry a link two ways:
+//   "Register Now → https://wa.me/…"      label + external URL (arrow syntax)
+//   "https://shawny.example/"               bare URL line
+// "Partner With Us" keeps its built-in link to the sponsor page.
+function renderTickerMsg(msg: string, color: string) {
+  const arrow = msg.match(/^(.*?)\s*(?:→|->)\s*(.+)$/s)
+  if (arrow && /^https?:\/\//.test(arrow[2].trim())) {
+    const href = arrow[2].trim()
+    const label = arrow[1].trim() || href
+    return (
+      <a href={href} target="_blank" rel="noreferrer" className="underline underline-offset-4" style={{ color }}>{label}</a>
+    )
+  }
+  if (/^https?:\/\//.test(msg)) {
+    return (
+      <a href={msg} target="_blank" rel="noreferrer" className="underline underline-offset-4" style={{ color }}>{msg}</a>
+    )
+  }
+  if (msg === 'Partner With Us') {
+    return <Link to="/sponsor" className="underline underline-offset-4" style={{ color }}>Partner With Us</Link>
+  }
+  return <span>{msg}</span>
+}
+
 export default function Home() {
   const [live, setLive] = useState<StudioEvent>(defaultEvent)
   const [hasLive, setHasLive] = useState(false)
+  const [ticker, setTicker] = useState(TICKER_FALLBACK)
 
-  const refresh = () =>
+  const refresh = () => {
     fetchLiveEventOrNull().then((ev) => {
       setLive(ev ?? defaultEvent)
       setHasLive(Boolean(ev))
     })
+    getJson('/api/settings')
+      .then((d: any) => {
+        if (d?.ticker) {
+          setTicker({
+            enabled: typeof d.ticker.enabled === 'boolean' ? d.ticker.enabled : TICKER_FALLBACK.enabled,
+            messages: Array.isArray(d.ticker.messages) && d.ticker.messages.length ? d.ticker.messages : TICKER_FALLBACK.messages,
+            bgColor: d.ticker.bgColor || TICKER_FALLBACK.bgColor,
+            textColor: d.ticker.textColor || TICKER_FALLBACK.textColor,
+          })
+        }
+      })
+      .catch(() => {})
+  }
 
   useEffect(() => {
     refresh()
@@ -40,15 +92,38 @@ export default function Home() {
 
   // When the owner promotes/ends an event in the Diary, the homepage switches
   // to the new live event immediately for any visitor on this page. A light
-  // poll backs this up when the socket can't connect.
+  // poll backs this up when the socket can't connect. Ticker changes from the
+  // admin are applied on the same cycle.
   useRealtime((type) => {
-    if (type === 'events' || type === 'poll') refresh()
+    if (type === 'events' || type === 'settings' || type === 'poll') refresh()
   }, { pollMs: 30000 })
 
   const registerUrl = eventRegisterUrl(live)
 
   return (
     <>
+      {/* ===== Scrolling announcement ticker (locked below the header) ===== */}
+      {ticker.enabled && ticker.messages.length > 0 && (
+        <div
+          className="sticky top-16 md:top-[72px] z-40 overflow-hidden border-b"
+          style={{ backgroundColor: ticker.bgColor, color: ticker.textColor, borderColor: ticker.bgColor }}
+        >
+          <div className="marquee-track flex items-center">
+            {[0, 1].map((i) => (
+              <div key={i} className="flex shrink-0 items-center gap-10 pr-10 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider whitespace-nowrap">
+                {ticker.messages.map((msg, j) => (
+                  <span key={j} className="flex items-center gap-2.5" style={{ color: ticker.textColor }}>
+                    <Sparkles size={12} className="shrink-0" style={{ color: ticker.textColor }} aria-hidden />
+                    {renderTickerMsg(msg, ticker.textColor)}
+                    <span style={{ color: ticker.textColor }}>·</span>
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ===== HERO ===== */}
       <section className="relative overflow-hidden bg-gradient-to-b from-blush via-rose/15 to-cream">
         <div className="absolute top-0 right-0 w-[460px] h-[460px] rounded-full bg-rose/20 blur-3xl -z-10 float-slow" />
@@ -59,7 +134,7 @@ export default function Home() {
           <Reveal variant="up">
             <div className="text-center mb-8 md:mb-10">
               <div className="flex justify-center mb-6">
-                <span className="ornament">✦</span>
+                <span className="ornament"><Sparkles size={12} aria-hidden /></span>
               </div>
               <p className="eyebrow justify-center">WELCOME TO</p>
               <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.08]">
@@ -89,16 +164,16 @@ export default function Home() {
                   decoding="async"
                   className="absolute inset-0 w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-black/40" />
+                <div className="absolute inset-0 bg-gradient-to-r from-ink/90 via-ink/70 to-ink/40" />
                 <span className="relative flex w-3 h-3 shrink-0 z-10" aria-hidden>
-                  <span className="absolute inline-flex h-full w-full rounded-full bg-rose opacity-80 animate-ping" />
-                  <span className="relative inline-flex rounded-full w-3 h-3 bg-rose" />
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-80 animate-ping" />
+                  <span className="relative inline-flex rounded-full w-3 h-3 bg-green-500" />
                 </span>
                 <p className="relative z-10 text-cream/95 text-sm sm:text-base leading-snug flex items-center gap-2 flex-wrap justify-center">
                   <span className="font-bold text-white">{live.title}</span> &mdash;{' '}
                   {live.datesLabel && <span className="text-white/85">{live.datesLabel} &mdash; </span>}
                   <span className="text-pinkgold font-semibold tracking-wide uppercase text-[13px]">Tickets On Sale</span>
-                  <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide bg-red-600 text-white px-2.5 py-1 rounded-full animate-pulse">
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide bg-green-500 text-white px-2.5 py-1 rounded-full animate-pulse">
                     <span className="relative flex w-1.5 h-1.5">
                       <span className="absolute inline-flex h-full w-full rounded-full bg-white opacity-75 animate-ping" />
                       <span className="relative inline-flex rounded-full w-1.5 h-1.5 bg-white" />
@@ -106,7 +181,7 @@ export default function Home() {
                     Live
                   </span>
                 </p>
-                <Link to={registerUrl} className="relative z-10 btn shrink-0 w-full sm:w-auto !bg-white !text-ink font-bold alert-blink border border-white/40 hover:!bg-cream">
+                <Link to={registerUrl} className="relative z-10 btn shrink-0 w-full sm:w-auto !bg-[linear-gradient(135deg,#ffffff_0%,#d1d5db_55%,#9ca3af_100%)] !text-[#321d24] font-bold alert-blink border border-white/25 hover:!bg-[linear-gradient(135deg,#f9fafb_0%,#cbd5e1_55%,#94a3b8_100%)]">
                   Secure Your Ticket <ArrowRight size={18} />
                 </Link>
               </div>
@@ -123,7 +198,7 @@ export default function Home() {
                   decoding="async"
                   className="absolute inset-0 w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-black/40" />
+                <div className="absolute inset-0 bg-gradient-to-r from-ink/90 via-ink/70 to-ink/40" />
                 <div className="relative z-10">
                   <span className="text-xs font-bold uppercase tracking-[0.2em] text-pinkgold">Masterclasses &amp; Events</span>
                   <p className="text-cream text-base sm:text-lg font-semibold mt-1">
@@ -147,15 +222,15 @@ export default function Home() {
                 {/* passing sheen */}
                 <span aria-hidden className="absolute inset-0 shimmer opacity-30 mix-blend-screen pointer-events-none" />
                 {/* twinkling sponsor sparkles */}
-                <span aria-hidden className="shine absolute top-7 left-[12%] w-1.5 h-1.5 rounded-full bg-gold shadow-[0_0_10px_2px_rgba(217,164,104,0.6)]" style={{ animationDelay: '0s' }} />
-                <span aria-hidden className="shine absolute top-11 right-[18%] w-1 h-1 rounded-full bg-pinkgold shadow-[0_0_8px_2px_rgba(217,164,104,0.55)]" style={{ animationDelay: '-0.9s' }} />
-                <span aria-hidden className="shine absolute bottom-11 left-[28%] w-1.5 h-1.5 rounded-full bg-rose shadow-[0_0_10px_2px_rgba(217,138,160,0.6)]" style={{ animationDelay: '-1.6s' }} />
-                <span aria-hidden className="shine absolute bottom-9 right-[10%] w-1 h-1 rounded-full bg-gold shadow-[0_0_8px_2px_rgba(217,164,104,0.55)]" style={{ animationDelay: '-2.2s' }} />
-                <span aria-hidden className="float-slow absolute top-4 left-[55%] text-pinkgold/70 text-sm">✦</span>
+                <span aria-hidden className="shine absolute top-7 left-[12%] w-1.5 h-1.5 rounded-full bg-gold shadow-[0_0_10px_2px_rgba(232,169,184,0.7)]" style={{ animationDelay: '0s' }} />
+                <span aria-hidden className="shine absolute top-11 right-[18%] w-1 h-1 rounded-full bg-pinkgold shadow-[0_0_8px_2px_rgba(232,169,184,0.6)]" style={{ animationDelay: '-0.9s' }} />
+                <span aria-hidden className="shine absolute bottom-11 left-[28%] w-1.5 h-1.5 rounded-full bg-rose shadow-[0_0_10px_2px_rgba(200,104,126,0.7)]" style={{ animationDelay: '-1.6s' }} />
+                <span aria-hidden className="shine absolute bottom-9 right-[10%] w-1 h-1 rounded-full bg-gold shadow-[0_0_8px_2px_rgba(232,169,184,0.6)]" style={{ animationDelay: '-2.2s' }} />
+                <span aria-hidden className="float-slow absolute top-4 left-[55%] text-gold/80"><Sparkles size={15} /></span>
 
                 <div className="relative">
                   <div className="text-center sm:text-left">
-                    <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-pinkgold border border-pinkgold/35 rounded-full px-3.5 py-1.5 mb-3 bg-white/5 backdrop-blur-sm">
+                    <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-gold border border-gold/40 rounded-full px-3.5 py-1.5 mb-3 bg-white/5 backdrop-blur-sm">
                       <Handshake size={13} /> Sponsorship &amp; Partnerships
                     </span>
 
@@ -290,7 +365,7 @@ export default function Home() {
       <section className="section-pad silk-dark relative overflow-hidden">
         <Reveal variant="up">
         <div className="container text-center relative z-10">
-          <span className="ornament mb-5 justify-center">✦</span>
+          <span className="ornament mb-5 justify-center"><Sparkles size={12} aria-hidden /></span>
           <InstagramIcon size={30} className="mx-auto text-rose my-4" />
           <h2 className="section-title text-white mb-3">Follow the journey</h2>
           <p className="text-muted mb-6">See fresh looks and behind-the-scenes on Instagram.</p>

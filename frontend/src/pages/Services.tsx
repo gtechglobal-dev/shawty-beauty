@@ -8,7 +8,7 @@ export default function Services() {
   return (
     <div>
       {/* Header */}
-      <section className="bg-gradient-to-br from-blush via-cream to-white border-b border-black/5">
+      <section className="bg-gradient-to-br from-blush via-cream to-white border-b border-[#321d24]/10">
         <Reveal variant="up">
           <div className="container py-12 md:py-16 text-center">
             <span className="eyebrow mb-4">Our Services</span>
@@ -23,7 +23,7 @@ export default function Services() {
       </section>
 
       {/* Lash services */}
-      <section className="section-pad bg-white">
+      <section className="section-pad bg-[#fdf6f7]">
         <div className="container">
           <Reveal variant="left">
             <div className="max-w-2xl mb-10 md:mb-12 text-center md:text-left mx-auto md:mx-0">

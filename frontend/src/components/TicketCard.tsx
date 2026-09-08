@@ -34,10 +34,10 @@ export default function TicketCard({
       <div className="ticket-mask bg-white flex flex-col w-full h-full">
       {/* Ticket header */}
       <div
-        className={`flex items-center justify-between px-4 py-2.5 text-white text-sm font-bold tracking-wide ${
+        className={`flex items-center justify-between px-4 py-2.5 ${isStudent ? 'text-white' : 'text-[#3a2a16]'} text-sm font-bold tracking-wide ${
           isStudent
             ? 'bg-gradient-to-r from-rose-dark to-rose'
-            : 'bg-gradient-to-r from-pinkgold to-gold'
+            : 'bg-gradient-to-r from-[#e9cf7c] via-[#d6b356] to-[#bf9640]'
         }`}
       >
         <span className="flex items-center gap-1.5">
@@ -56,11 +56,11 @@ export default function TicketCard({
       </div>
 
       {/* Perforated divider */}
-      <div className="relative border-t-2 border-dashed border-ink/20">
+      <div className="relative border-t-2 border-dashed border-[#4a3038]/20">
         <span className="absolute left-1/2 -translate-x-1/2 -top-[3px] flex gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-ink/30" />
-          <span className="w-1.5 h-1.5 rounded-full bg-ink/30" />
-          <span className="w-1.5 h-1.5 rounded-full bg-ink/30" />
+          <span className="w-1.5 h-1.5 rounded-full bg-[#4a3038]/30" />
+          <span className="w-1.5 h-1.5 rounded-full bg-[#4a3038]/30" />
+          <span className="w-1.5 h-1.5 rounded-full bg-[#4a3038]/30" />
         </span>
       </div>
 
@@ -68,23 +68,23 @@ export default function TicketCard({
       <div className="px-4 pt-2.5 pb-3">
         <div className="flex flex-wrap items-baseline gap-2">
           {promoActive && (
-            <span className="text-base font-semibold text-muted line-through">
+            <span className="text-base font-semibold text-[#4a3038]/60 line-through">
               {formatNgn(t.originalPrice!)}
             </span>
           )}
-          <span className="font-display text-2xl font-bold text-rose-dark">
+          <span className="font-display text-2xl font-bold text-[#5f2436]">
             {formatNgn(price)}
             {isStudent && promoActive && (
-              <span className="ml-1.5 align-middle inline-block text-[10px] font-bold text-muted normal-case">
+              <span className="ml-1.5 align-middle inline-block text-[10px] font-bold text-[#4a3038]/60 normal-case">
                 (Early Bird)
               </span>
             )}
           </span>
         </div>
-        <div className="text-xs text-muted">per {t.unitName}</div>
+        <div className="text-xs text-[#4a3038]/70">per {t.unitName}</div>
 
         {promoActive && (
-          <div className="text-xs font-medium text-rose-dark mt-1.5">
+          <div className="text-xs font-medium text-[#5f2436] mt-1.5">
             <Timer size={12} className="inline -mt-0.5 mr-1" />
             Promo ends in{' '}
             <span className="font-bold tabular-nums">{formatCountdown(remaining)}</span>
@@ -92,20 +92,20 @@ export default function TicketCard({
         )}
 
         {t.description && (
-          <p className="text-xs text-ink/70 leading-snug mt-2">{t.description}</p>
+          <p className="text-xs text-[#4a3038]/75 leading-snug mt-2">{t.description}</p>
         )}
 
-        <ul className="space-y-1.5 text-xs text-ink/75 mt-2">
+        <ul className="space-y-1.5 text-xs text-[#4a3038]/80 mt-2">
           {t.includes.map((inc) => (
             <li key={inc} className="flex items-start gap-1.5">
-              <CircleCheck size={13} className="text-rose shrink-0 mt-0.5" />
+              <CircleCheck size={13} className="text-[#c2647e] shrink-0 mt-0.5" />
               {inc}
             </li>
           ))}
         </ul>
 
         {t.highlighted && (
-          <span className="inline-flex text-[10px] font-bold uppercase tracking-wide bg-rose text-white px-2 py-0.5 rounded-full mt-2 w-fit">
+          <span className="inline-flex text-[10px] font-bold uppercase tracking-wide bg-[#7a3045] text-white px-2 py-0.5 rounded-full mt-2 w-fit">
             Popular
           </span>
         )}
@@ -113,10 +113,10 @@ export default function TicketCard({
 
       {/* Bottom band - matches the header fill */}
       <div
-        className={`mt-auto flex items-center justify-end px-4 py-1.5 text-white/95 text-[10px] font-bold uppercase tracking-[0.25em] ${
+        className={`mt-auto flex items-center justify-end px-4 py-1.5 ${isStudent ? 'text-white/95' : 'text-[#3a2a16]/95'} text-[10px] font-bold uppercase tracking-[0.25em] ${
           isStudent
             ? 'bg-gradient-to-r from-rose-dark to-rose'
-            : 'bg-gradient-to-r from-pinkgold to-gold'
+            : 'bg-gradient-to-r from-[#e9cf7c] via-[#d6b356] to-[#bf9640]'
         }`}
       >
         <span className="inline-flex items-center gap-1">

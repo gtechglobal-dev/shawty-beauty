@@ -23,8 +23,8 @@ function whatsappGroupFor(registration?: {
 
 export default function PaymentCallback() {
   const [params] = useSearchParams()
-  const reference = params.get('reference') || ''
-  const [state, setState] = useState<'loading' | 'paid' | 'failed'>('loading')
+  const reference = params.get('reference') || params.get('trxref') || ''
+  const [state, setState] = useState<'loading' | 'processing' | 'paid' | 'failed'>('loading')
   const [whatsappLink, setWhatsappLink] = useState<string>(WHATSAPP_COMMUNITY_DEFAULT)
 
   useEffect(() => {
@@ -32,14 +32,49 @@ export default function PaymentCallback() {
       setState('failed')
       return
     }
-    postJson('/api/paystack/verify', { reference })
-      .then((data) => {
-        setState(data.paid ? 'paid' : 'failed')
-        if (data.paid && data.registration) {
-          setWhatsappLink(whatsappGroupFor(data.registration))
+    let cancelled = false
+
+    async function verify(retries = 3) {
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          const data = await postJson('/api/paystack/verify', { reference })
+          if (cancelled) return
+          if (data.paid) {
+            setState('paid')
+            try {
+              sessionStorage.removeItem('shawyty_register_draft_v1')
+            } catch {
+              /* ignore */
+            }
+            if (data.registration) {
+              setWhatsappLink(whatsappGroupFor(data.registration))
+            }
+            return
+          }
+          // Transaction still settling — show a wait state and retry.
+          if (data.status === 'processing' || data.status === 'pending') {
+            setState('processing')
+          }
+          if (attempt === retries) {
+            setState('failed')
+            return
+          }
+          await new Promise((r) => setTimeout(r, 2500))
+        } catch {
+          if (cancelled) return
+          if (attempt === retries) {
+            setState('failed')
+            return
+          }
+          await new Promise((r) => setTimeout(r, 2000))
         }
-      })
-      .catch(() => setState('failed'))
+      }
+    }
+
+    verify()
+    return () => {
+      cancelled = true
+    }
   }, [reference])
 
   return (
@@ -50,6 +85,14 @@ export default function PaymentCallback() {
           <LoaderCircle className="mx-auto text-rose animate-spin mb-4" size={44} />
           <h1 className="section-title text-2xl mb-2">Verifying payment…</h1>
           <p className="text-muted text-sm">Please wait while we confirm your transaction.</p>
+        </div>
+      )}
+
+      {state === 'processing' && (
+        <div className="card p-12">
+          <LoaderCircle className="mx-auto text-rose animate-spin mb-4" size={44} />
+          <h1 className="section-title text-2xl mb-2">Still confirming your payment…</h1>
+          <p className="text-muted text-sm">Your payment is being settled. This can take a few seconds — hold on.</p>
         </div>
       )}
 

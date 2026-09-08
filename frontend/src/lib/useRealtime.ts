@@ -8,6 +8,7 @@ export type RealtimeEventType =
   | 'sponsors'
   | 'events'
   | 'attendance'
+  | 'settings'
   // Synthetic event emitted by the polling fallback (below) — identical
   // handling to the matching data type so pages stay live even where
   // WebSockets are unavailable.

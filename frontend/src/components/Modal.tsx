@@ -35,7 +35,7 @@ export default function Modal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-ink/60 backdrop-blur-sm" onClick={onClose} />
       <div
-        className={`relative card w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} bg-white max-h-[85vh] flex flex-col overflow-hidden rounded-3xl`}
+        className={`relative card w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} max-h-[85vh] flex flex-col overflow-hidden rounded-3xl`}
       >
         <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-rose/40 to-transparent" />
         <button

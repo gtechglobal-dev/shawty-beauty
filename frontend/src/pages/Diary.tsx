@@ -24,6 +24,7 @@ import {
   Trash2,
   X,
   Download,
+  ScrollText,
 } from 'lucide-react'
 import { getJson, patchJson, postJson, delJson } from '../lib/api'
 import { isLoggedIn, clearAuthToken, storeAuthToken } from '../lib/authState'
@@ -42,6 +43,7 @@ import {
   type DiaryTotals,
   type SponsorRow,
 } from './diary/Events'
+import TickerPanel from '../components/TickerPanel'
 
 // ---------- Types ----------
 
@@ -63,7 +65,7 @@ interface Subscriber {
   unsubscribed?: boolean
 }
 
-type Section = 'events' | 'sponsors' | 'messages' | 'subscribers'
+type Section = 'events' | 'sponsors' | 'messages' | 'subscribers' | 'settings'
 type SubView = 'home' | 'manage' | 'editor'
 
 interface GroupedData {
@@ -95,7 +97,7 @@ export default function Diary() {
   const [screen, setScreen] = useState<'login' | 'forgot' | 'reset'>(resetToken ? 'reset' : 'login')
   const [section, setSection] = useState<Section>(() => {
     const s = searchParams.get('section')
-    return s === 'sponsors' || s === 'messages' || s === 'subscribers' ? s : 'events'
+    return s === 'sponsors' || s === 'messages' || s === 'subscribers' || s === 'settings' ? s : 'events'
   })
   const [subView, setSubView] = useState<SubView>(() => {
     const s = searchParams.get('sub')
@@ -733,6 +735,12 @@ export default function Diary() {
             label="Emails"
             count={subscribers.length}
           />
+          <TabPill
+            active={section === 'settings'}
+            onClick={() => goSection('settings')}
+            icon={ScrollText}
+            label="Scrolling Text"
+          />
         </div>
       </nav>
 
@@ -993,6 +1001,9 @@ export default function Diary() {
             </div>
           </div>
         )}
+
+        {/* ---------- SCROLLING TEXT (homepage ticker) ---------- */}
+        {section === 'settings' && <TickerPanel token={token} />}
       </main>
 
       {/* Transient realtime notice */}

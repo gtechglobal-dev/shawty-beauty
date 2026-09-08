@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import {
   LoaderCircle, LogOut, LayoutDashboard, Users, Handshake,
   MessageSquare, Ticket, Crown, TrendingUp, ChevronDown, Phone, MessageCircle, Mail,
+  ScrollText,
 } from 'lucide-react'
 import { getJson, patchJson } from '../lib/api'
 import { formatNgn, tickets } from '../lib/constants'
 import { useToast } from '../components/Toasts'
 import Modal from '../components/Modal'
 import RichText from '../lib/RichText'
+import TickerPanel from '../components/TickerPanel'
 
 interface Registration {
   id: string
@@ -91,9 +93,9 @@ export default function Admin() {
   const [password, setPassword] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
 
-  const [tab, setTab] = useState<'stats' | 'registrations' | 'sponsors' | 'contacts'>(() => {
+  const [tab, setTab] = useState<'stats' | 'registrations' | 'sponsors' | 'contacts' | 'ticker'>(() => {
     const t = new URLSearchParams(window.location.search).get('tab')
-    return t === 'registrations' || t === 'sponsors' || t === 'contacts' ? t : 'stats'
+    return t === 'registrations' || t === 'sponsors' || t === 'contacts' || t === 'ticker' ? t : 'stats'
   })
   const [stats, setStats] = useState<any>(null)
   const [registrations, setRegistrations] = useState<Registration[]>([])
@@ -224,6 +226,7 @@ export default function Admin() {
             ['registrations', 'Registrations', Users],
             ['sponsors', 'Sponsors', Handshake],
             ['contacts', 'Messages', MessageSquare],
+            ['ticker', 'Scrolling Text', ScrollText],
           ] as const).map(([id, label, Icon]) => (
             <button key={id} onClick={() => { setTab(id); refresh(id) }}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold transition-colors ${
@@ -474,6 +477,8 @@ export default function Admin() {
           </div>
         )}
 
+        {tab === 'ticker' && <TickerPanel token={token} />}
+
         {sponsorDetails && (
           <Modal open wide onClose={() => setSponsorDetails(null)}>
             <div className="text-center mb-6">
@@ -645,6 +650,7 @@ function DetailField({ label, value }: { label: string; value?: string }) {
     </div>
   )
 }
+
 
 async function getJsonThis(url: string, body: any) {
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })

@@ -507,6 +507,78 @@ export async function deleteEvent(id: string): Promise<boolean> {
   return result.deletedCount > 0;
 }
 
+// ------------------------------------------------------------------
+// Site settings (single document: _id 'site') — homepage scrolling ticker
+// ------------------------------------------------------------------
+
+export interface TickerSettings {
+  enabled: boolean;
+  messages: string[];
+  bgColor: string;
+  textColor: string;
+}
+
+export interface SiteSettings {
+  ticker: TickerSettings;
+}
+
+export const DEFAULT_TICKER: TickerSettings = {
+  enabled: true,
+  messages: [
+    '3BMC — 3 Days Beginner Makeup Class',
+    'Registrations Open Now!',
+    'Early Bird Offer Ends Soon!',
+    'Partnership open for brands that wish to collaborate',
+    'Partner With Us',
+  ],
+  bgColor: '#5f2436',
+  textColor: '#fdf0f2',
+};
+
+interface SettingsDoc {
+  _id?: ObjectId;
+  id?: string;
+  ticker?: Partial<TickerSettings>;
+}
+
+export async function getSiteSettings(): Promise<SiteSettings> {
+  const col = getCollection<SettingsDoc>('settings');
+  if (!col) return { ticker: { ...DEFAULT_TICKER, messages: [...DEFAULT_TICKER.messages] } };
+  const doc = await col.findOne({ id: 'site' });
+  const t = doc?.ticker;
+  return {
+    ticker: {
+      enabled: typeof t?.enabled === 'boolean' ? t.enabled : DEFAULT_TICKER.enabled,
+      messages: Array.isArray(t?.messages)
+        ? t.messages.map((m: any) => String(m).trim()).filter(Boolean)
+        : [...DEFAULT_TICKER.messages],
+      bgColor: typeof t?.bgColor === 'string' && t.bgColor ? t.bgColor : DEFAULT_TICKER.bgColor,
+      textColor: typeof t?.textColor === 'string' && t.textColor ? t.textColor : DEFAULT_TICKER.textColor,
+    },
+  };
+}
+
+export async function updateSiteSettings(update: Partial<SiteSettings>): Promise<SiteSettings> {
+  const col = getCollection<SettingsDoc>('settings');
+  if (!col) return { ticker: { ...DEFAULT_TICKER, messages: [...DEFAULT_TICKER.messages] } };
+  const existing = await getSiteSettings();
+  const ticker: TickerSettings = {
+    enabled:
+      typeof update.ticker?.enabled === 'boolean' ? update.ticker.enabled : existing.ticker.enabled,
+    messages: Array.isArray(update.ticker?.messages)
+      ? update.ticker.messages.map((m: any) => String(m).trim()).filter(Boolean)
+      : existing.ticker.messages,
+    bgColor: update.ticker?.bgColor || existing.ticker.bgColor,
+    textColor: update.ticker?.textColor || existing.ticker.textColor,
+  };
+  await col.updateOne(
+    { id: 'site' },
+    { $set: { ticker, updatedAt: new Date().toISOString() } },
+    { upsert: true },
+  );
+  return { ticker };
+}
+
 // The default event that ships with the site — used to seed the database so
 // the diary, homepage, program page and registration all work out of the box.
 export const DEFAULT_EVENT: StudioEvent = {

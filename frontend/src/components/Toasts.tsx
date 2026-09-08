@@ -62,7 +62,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           {toasts.map((t) => (
             <div
               key={t.id}
-              className={`pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-xl border shadow-lg shadow-ink/10 bg-white text-ink text-sm min-w-[260px] max-w-md ${
+              className={`pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-xl border shadow-lg shadow-[#321d24]/20 bg-white text-[#321d24] text-sm min-w-[260px] max-w-md ${
                 t.leaving ? 'toast-out' : 'toast-in'
               } ${t.type === 'ok' ? 'border-green-200' : 'border-red-200'}`}
             >
@@ -74,7 +74,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               <span className="flex-1 leading-snug">{t.text}</span>
               <button
                 onClick={() => dismiss(t.id)}
-                className="shrink-0 text-muted hover:text-ink transition-colors"
+                className="shrink-0 text-muted hover:text-[#321d24] transition-colors"
                 aria-label="Dismiss"
               >
                 <X size={16} />

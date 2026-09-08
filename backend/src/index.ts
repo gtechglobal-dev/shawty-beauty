@@ -14,6 +14,7 @@ import paystackRouter from './routes/paystack.js';
 import sponsorsRouter from './routes/sponsors.js';
 import eventsRouter from './routes/events.js';
 import ticketsRouter from './routes/tickets.js';
+import settingsRouter from './routes/settings.js';
 import { startTelegramAdminBot } from './lib/telegramAdminBot.js';
 import { initRealtime } from './lib/realtime.js';
 import { siteBaseUrl } from './lib/baseUrl.js';
@@ -65,6 +66,7 @@ app.use('/api/paystack', paystackRouter);
 app.use('/api/sponsors', sponsorsRouter);
 app.use('/api/events', eventsRouter);
 app.use('/api/tickets', ticketsRouter);
+app.use('/api/settings', settingsRouter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', db: isDbConnected(), timestamp: new Date().toISOString() });
@@ -75,6 +77,12 @@ const frontendDist = resolve(__dirname, '..', '..', 'frontend', 'dist');
 
 if (existsSync(frontendDist)) {
   app.use(express.static(frontendDist, { index: false, redirect: false }));
+  // Never let the SPA fallback swallow API requests: an unknown/missing API
+  // route must return a JSON 404 so the frontend can surface a real error
+  // instead of silently "succeeding" against an HTML page.
+  app.use('/api', (_req, res) => {
+    res.status(404).json({ error: 'API endpoint not found' });
+  });
   app.get('*', (req, res) => {
     const indexFile = resolve(frontendDist, 'index.html');
     if (!existsSync(indexFile)) {

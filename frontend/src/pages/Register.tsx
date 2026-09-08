@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
-import { CircleCheck, LoaderCircle, CreditCard, Image as ImageIcon, ArrowRight } from 'lucide-react'
+import { CircleCheck, LoaderCircle, CreditCard, Image as ImageIcon, ArrowRight, ArrowLeft } from 'lucide-react'
 import { formatNgn, nationalities, nationalityNames, defaultEvent, type StudioEvent } from '../lib/constants'
 import { resolveRegisterEvent, ticketPrice } from '../lib/events'
 import { postJson } from '../lib/api'
@@ -52,23 +52,69 @@ const hearOptions = ['Instagram', 'Facebook', 'WhatsApp', 'Friend / Word of mout
 const PROCESSING_FEE_RATE = 0.015 // 1.5% of ticket amount
 const PROCESSING_FEE_BASE = 100 // + ₦100 fixed
 
+const STORAGE_KEY = 'shawyty_register_draft_v1'
+
+interface Draft {
+  form: FormState
+  sameAsPhone: boolean
+  sameAsName: boolean
+  profilePhoto: string
+  step: 'form' | 'review'
+}
+
+function loadDraft(): Partial<Draft> | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as Partial<Draft>) : null
+  } catch {
+    return null
+  }
+}
+
+function saveDraft(d: Draft) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(d))
+  } catch {
+    /* storage may be unavailable — ignore */
+  }
+}
+
+function clearDraft() {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function Register() {
   const [searchParams] = useSearchParams()
   const ticketParam = searchParams.get('ticket')
   const eventParam = searchParams.get('event')
 
   const [ev, setEv] = useState<StudioEvent>(defaultEvent)
+  const draft = useMemo(() => loadDraft(), [])
   const [form, setForm] = useState<FormState>(() => {
+    const base = draft?.form ? { ...initial, ...draft.form } : { ...initial }
     const valid = defaultEvent.tickets.some((t) => t.id === ticketParam)
-    return { ...initial, ticketType: valid ? ticketParam! : initial.ticketType }
+    if (valid) base.ticketType = ticketParam!
+    return base
   })
   const [config, setConfig] = useState<PaystackConfig | null>(null)
   const [configError, setConfigError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [step, setStep] = useState<'form' | 'review'>(draft?.step ?? 'form')
+  const [transitioning, setTransitioning] = useState(false)
+  const scrollAfterStepRef = useRef(false)
+  const formRef = useRef<HTMLFormElement>(null)
+  const reviewRef = useRef<HTMLDivElement>(null)
+  const loaderRef = useRef<HTMLDivElement>(null)
   const successRef = useRef<HTMLDivElement>(null)
   const [now, setNow] = useState(() => Date.now())
-  const [profilePhoto, setProfilePhoto] = useState('')
+  const [sameAsPhone, setSameAsPhone] = useState(draft?.sameAsPhone ?? false)
+  const [sameAsName, setSameAsName] = useState(draft?.sameAsName ?? false)
+  const [profilePhoto, setProfilePhoto] = useState(draft?.profilePhoto ?? '')
   const [photoInvalid, setPhotoInvalid] = useState('')
   const toast = useToast()
   const navigate = useNavigate()
@@ -102,6 +148,10 @@ export default function Register() {
   }, [])
 
   useEffect(() => {
+    saveDraft({ form, sameAsPhone, sameAsName, profilePhoto, step })
+  }, [form, sameAsPhone, sameAsName, profilePhoto, step])
+
+  useEffect(() => {
     fetchPaystackConfig().then(setConfig).catch(() => {
       setConfigError('Payment may not be configured yet.')
     })
@@ -128,8 +178,82 @@ export default function Register() {
     setForm((f) => ({ ...f, [key]: value }))
   }
 
-  const [sameAsPhone, setSameAsPhone] = useState(false)
-  const [sameAsName, setSameAsName] = useState(false)
+  type FieldKey = keyof FormState
+  type Errors = Partial<Record<FieldKey | 'photo', string>>
+  const [errors, setErrors] = useState<Errors>({})
+  const [touched, setTouched] = useState<Partial<Record<FieldKey | 'photo', boolean>>>({})
+
+  function validateField(k: FieldKey): string {
+    const v = String(form[k])
+    switch (k) {
+      case 'fullName': return v.trim() ? '' : 'Please enter your full name'
+      case 'phone': return phoneErrorMessage(v) || ''
+      case 'email': return /^\S+@\S+\.\S+$/.test(v) ? '' : 'Please enter a valid email address'
+      case 'dateOfBirth': return v ? '' : 'Select your date of birth'
+      case 'nationality': return v ? '' : 'Select your nationality'
+      case 'state': return v.trim() ? '' : 'State of residence is required'
+      case 'address': return v.trim() ? '' : 'Please enter your address'
+      case 'experienceLevel': return v ? '' : 'Select your experience level'
+      case 'emergencyContactName': return sameAsName || v.trim() ? '' : 'Emergency contact name is required'
+      case 'emergencyContact': return !v ? '' : isValidPhone(v) ? '' : 'Please enter a valid emergency contact number'
+      case 'reason': return v.trim() ? '' : 'Tell us what you hope to learn'
+      case 'hearAbout': return v ? '' : 'Select how you heard about the program'
+      case 'quantity': return Number(v) >= 1 && Number(v) <= 10 ? '' : 'Quantity must be between 1 and 10'
+      default: return ''
+    }
+  }
+
+  function showError(k: FieldKey | 'photo'): string {
+    return errors[k] && touched[k] ? (errors[k] as string) : ''
+  }
+
+  function touch(k: FieldKey | 'photo') {
+    setTouched((t) => ({ ...t, [k]: true }))
+    setErrors((e) => {
+      const msg = k === 'photo' ? (profilePhoto ? '' : 'Please upload a profile photo') : validateField(k)
+      return e[k] === msg ? e : { ...e, [k]: msg }
+    })
+  }
+
+  function change(k: FieldKey, v: FormState[FieldKey]) {
+    update(k, v)
+    if (touched[k]) {
+      setErrors((e) => {
+        const msg = validateField(k)
+        return e[k] === msg ? e : { ...e, [k]: msg }
+      })
+    }
+  }
+
+  function touchedCls(k: FieldKey): string {
+    return showError(k) ? ' !border-red-400' : ''
+  }
+
+  function fieldErr(k: FieldKey | 'photo') {
+    const m = showError(k)
+    return m ? <p className="text-xs text-red-600 mt-1">{m}</p> : null
+  }
+
+  function scrollToEl(el: HTMLElement | null) {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+    })
+  }
+
+  useEffect(() => {
+    if (transitioning) {
+      scrollToEl(loaderRef.current)
+    }
+  }, [transitioning])
+
+  useEffect(() => {
+    if (scrollAfterStepRef.current && step === 'review' && !transitioning) {
+      scrollAfterStepRef.current = false
+      scrollToEl(reviewRef.current)
+    }
+  }, [step, transitioning])
 
   function handlePhoto(file?: File) {
     if (!file) return
@@ -230,15 +354,39 @@ export default function Register() {
     }
   }
 
-  async function handleManualRegister(e: React.FormEvent) {
+  function handleNext(e: React.FormEvent) {
     e.preventDefault()
-    if (!validateContactInfo()) return
-    setLoading(true)
-    if (!profilePhoto) {
-      toast.push('Please upload a profile photo to complete your registration.', 'err')
-      setLoading(false)
+    const all: FieldKey[] = [
+      'fullName', 'phone', 'email', 'dateOfBirth', 'nationality', 'state',
+      'address', 'experienceLevel', 'emergencyContactName', 'emergencyContact',
+      'reason', 'hearAbout', 'quantity',
+    ]
+    const next: Errors = {}
+    all.forEach((k) => {
+      const m = validateField(k)
+      if (m) next[k] = m
+    })
+    if (!profilePhoto) next.photo = 'Please upload a profile photo'
+    setErrors(next)
+    setTouched(Object.fromEntries(all.map((k) => [k, true])) as Partial<Record<FieldKey | 'photo', boolean>>)
+    setTouched((t) => ({ ...t, photo: true }))
+    if (Object.keys(next).length > 0) {
+      scrollToEl(formRef.current)
       return
     }
+    setStep('review')
+    scrollAfterStepRef.current = true
+    setTransitioning(true)
+    window.setTimeout(() => setTransitioning(false), 1500)
+  }
+
+  function handleBack() {
+    setStep('form')
+    scrollToEl(formRef.current)
+  }
+
+  async function handleProceedToPayment() {
+    setLoading(true)
     try {
       if (config?.paystackEnabled === true) {
         await handlePayWithPaystack()
@@ -263,19 +411,36 @@ export default function Register() {
         photoBase64: profilePhoto || undefined,
         eventId: ev.id,
       })
+      clearDraft()
       setLoading(false)
       setSuccess(true)
+      setStep('form')
     } catch (err: any) {
       toast.push(err.message || 'Something went wrong. Please try again.', 'err')
       setLoading(false)
     }
   }
 
+  const details = [
+    { label: 'Full Name', value: form.fullName },
+    { label: 'Phone Number', value: form.phone },
+    { label: 'Email Address', value: form.email },
+    { label: 'Instagram Handle', value: form.instagram || '—' },
+    { label: 'Date of Birth', value: form.dateOfBirth },
+    { label: 'Nationality', value: form.nationality },
+    { label: 'State of Residence', value: form.state },
+    { label: 'Address', value: form.address },
+    { label: 'Makeup Experience Level', value: form.experienceLevel },
+    { label: 'Emergency Contact', value: form.emergencyContactName ? `${form.emergencyContactName} — ${form.emergencyContact || '—'}` : '—' },
+    { label: 'What you hope to learn', value: form.reason },
+    { label: 'How did you hear about it', value: form.hearAbout },
+  ]
+
   return (
     <div>
-      <section className="shadow-lg relative overflow-hidden bg-gradient-to-br from-rose-deep via-rose-dark to-pinkgold">
+      <section className="shadow-lg relative overflow-hidden bg-gradient-to-br from-rose-deep via-rose-dark via-45% to-pinkgold">
         <img src="/images/carousel/event.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/70 to-black/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#2f0f19]/95 via-[#6a2a3d]/80 to-[#8a3547]/60" />
         <div className="container py-8 md:py-10 text-center relative">
           <Reveal variant="up">
             <h1 className="font-display text-3xl md:text-5xl font-bold text-white leading-tight mb-2">
@@ -302,12 +467,12 @@ export default function Register() {
         </div>
       </section>
 
-      <div className={`container section-pad ${ended ? 'max-w-3xl' : ''} grid ${ended ? '' : 'lg:grid-cols-[1fr_380px] gap-8 lg:gap-10'} items-start min-w-0`}>
+      <div className={`container section-pad ${ended ? 'max-w-3xl' : 'max-w-4xl'} items-start`}>
         {ended ? (
           <>
             <Reveal variant="up">
               <div className="card p-8 sm:p-12 text-center overflow-hidden relative">
-                <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] bg-black/10 text-ink/60 px-4 py-1.5 rounded-full mb-6">
+                <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] bg-[#7a3045]/8 text-[#7a3045] px-4 py-1.5 rounded-full mb-6">
                   Past Event · Registration Closed
                 </span>
                 <h2 className="font-display text-3xl md:text-4xl font-bold leading-tight">This event has ended</h2>
@@ -326,14 +491,118 @@ export default function Register() {
               </div>
             </Reveal>
           </>
+        ) : transitioning ? (
+        <Reveal variant="up">
+          <div ref={loaderRef} className="card p-12 sm:p-16 text-center scroll-mt-24 min-w-0 flex flex-col items-center justify-center gap-5" aria-live="polite">
+            <span className="relative w-20 h-20">
+              <span className="absolute inset-0 rounded-full border-4 border-rose/15 border-t-rose animate-spin" />
+              <span className="absolute inset-2 rounded-full bg-gradient-to-br from-rose to-rose-deep flex items-center justify-center text-white font-display text-3xl font-bold">
+                S
+              </span>
+            </span>
+            <p className="text-ink/80 font-medium">Preparing your registration…</p>
+            <p className="text-xs text-muted">Just a moment while we get everything ready.</p>
+          </div>
+        </Reveal>
+        ) : step === 'review' ? (
+        <Reveal variant="up">
+        <div ref={reviewRef} className="card p-6 sm:p-8 min-w-0 scroll-mt-24">
+          <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+            <div>
+              <h2 className="font-display text-2xl md:text-3xl font-bold">Confirm Your Details</h2>
+              <p className="text-sm text-muted mt-1">Review everything below before proceeding to payment.</p>
+            </div>
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-rose border border-rose/30 bg-rose/5 rounded-full px-3 py-1.5">
+              Step 2 of 2
+            </span>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-x-6 gap-y-4 min-w-0">
+            {details.map((d) => (
+              <div key={d.label} className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">{d.label}</p>
+                <p className="text-sm text-ink/90 mt-0.5 break-words">{d.value}</p>
+              </div>
+            ))}
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Profile Photo</p>
+              {profilePhoto ? (
+                <img src={profilePhoto} alt="preview" className="w-16 h-16 rounded-xl object-cover border border-[#321d24]/15 mt-1" />
+              ) : (
+                <p className="text-sm text-red-600 mt-1">Missing — go back and upload a photo</p>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-7 pt-6 border-t border-[#321d24]/10">
+            <h3 className="font-semibold mb-3">Order Summary</h3>
+            {selected && (
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span>{selected.label} × {form.quantity}</span>
+                <span className="text-muted">{formatNgn(subtotal)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-sm mb-2 text-muted">
+              <span>Processing fee (1.5% + ₦100)</span>
+              <span>{formatNgn(processingFee)}</span>
+            </div>
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#321d24]/10">
+              <span className="text-ink/70">Total</span>
+              <span className="font-display text-2xl font-bold">{formatNgn(total)}</span>
+            </div>
+          </div>
+
+          {selected && selected.includes.length > 0 && (
+            <div className="mt-7 pt-6 border-t border-[#321d24]/10">
+              <h3 className="font-semibold mb-3">What's included</h3>
+              <ul className="space-y-2 text-sm text-ink/70">
+                {selected.includes.map((inc) => (
+                  <li key={inc} className="flex items-start gap-2">
+                    <CircleCheck className="text-rose shrink-0 mt-0.5" size={15} />
+                    {inc}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {(ev.venueNote || ev.bring || ev.timeLabel) && (
+            <div className="mt-7 pt-6 border-t border-[#321d24]/10">
+              <h3 className="font-semibold mb-3">Good to know</h3>
+              <ul className="space-y-2 text-sm text-ink/75">
+                {ev.venueNote && <li>• {ev.venueNote}</li>}
+                {ev.bring && <li>• {ev.bring}</li>}
+                {ev.timeLabel && <li>• Sessions at: {ev.timeLabel}</li>}
+              </ul>
+            </div>
+          )}
+
+          <div className="mt-8 flex flex-row items-stretch gap-2">
+            <button type="button" onClick={handleBack} className="btn btn-outline flex-1 flex items-center justify-center gap-1 px-1 py-2 text-[11px] whitespace-nowrap sm:text-[13px] sm:px-2 sm:py-2.5">
+              <ArrowLeft size={13} /> Back to Edit
+            </button>
+            <button type="button" onClick={handleProceedToPayment} disabled={loading} className="btn btn-primary flex-1 flex items-center justify-center gap-1 px-1 py-2 text-[11px] whitespace-nowrap sm:text-[13px] sm:px-2 sm:py-2.5">
+              {loading ? <><LoaderCircle size={13} className="animate-spin" /> Processing…</> : "Proceed to Payment"}
+            </button>
+          </div>
+          <p className="text-xs text-muted text-center mt-3">
+            Secure payment via Paystack. {config?.paystackEnabled ? '' : 'If payment isn’t available yet, your registration will still be recorded.'}
+          </p>
+        </div>
+        </Reveal>
         ) : (
         <>
         {/* FORM */}
         <Reveal variant="up">
-        <form onSubmit={handleManualRegister} className="card p-6 sm:p-8 min-w-0">
-          <h2 className="font-display text-xl md:text-2xl font-bold mb-5">
-            Provide the following Info
-          </h2>
+        <form ref={formRef} onSubmit={handleNext} className="card p-6 sm:p-8 min-w-0 scroll-mt-24">
+          <div className="flex items-start justify-between gap-4 mb-5">
+            <h2 className="font-display text-xl md:text-2xl font-bold">
+              Provide the following Info
+            </h2>
+            <span className="hidden sm:inline-flex shrink-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-rose border border-rose/30 bg-rose/5 rounded-full px-3 py-1.5">
+              Step 1 of 2
+            </span>
+          </div>
 
           {success && !loading && (
             <div ref={successRef} className="mb-6 p-4 rounded-xl bg-green-50 border border-green-200 text-green-800 text-sm flex items-start gap-2 scroll-mt-24">
@@ -356,17 +625,20 @@ export default function Register() {
           <div className="grid sm:grid-cols-2 gap-5 min-w-0">
             <div className="min-w-0">
               <label className="field-label">Full Name *</label>
-              <input className="input-field" value={form.fullName}
-                onChange={(e) => update('fullName', e.target.value)} required placeholder="Jane Doe" />
+              <input className={`input-field${touchedCls('fullName')}`} value={form.fullName}
+                onChange={(e) => change('fullName', e.target.value)} onBlur={() => touch('fullName')} placeholder="Jane Doe" />
+              {fieldErr('fullName')}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0" onBlur={() => touch('phone')}>
               <label className="field-label">Phone Number *</label>
-              <PhoneInput value={form.phone} onChange={(v) => update('phone', v)} />
+              <PhoneInput value={form.phone} onChange={(v) => change('phone', v)} />
+              {fieldErr('phone')}
             </div>
             <div className="min-w-0">
               <label className="field-label">Email Address *</label>
-              <input type="email" className="input-field" value={form.email}
-                onChange={(e) => update('email', e.target.value)} required placeholder="you@email.com" />
+              <input type="email" className={`input-field${touchedCls('email')}`} value={form.email}
+                onChange={(e) => change('email', e.target.value)} onBlur={() => touch('email')} placeholder="you@email.com" />
+              {fieldErr('email')}
             </div>
             <div className="min-w-0">
               <label className="field-label">Instagram Handle</label>
@@ -375,59 +647,66 @@ export default function Register() {
             </div>
             <div className="min-w-0">
               <label className="field-label">Date of Birth *</label>
-              <input type="date" className="input-field" value={form.dateOfBirth}
-                onChange={(e) => update('dateOfBirth', e.target.value)} required />
+              <input type="date" className={`input-field${touchedCls('dateOfBirth')}`} value={form.dateOfBirth}
+                onChange={(e) => change('dateOfBirth', e.target.value)} onBlur={() => touch('dateOfBirth')} />
+              {fieldErr('dateOfBirth')}
             </div>
             <div className="min-w-0">
               <label className="field-label">Nationality *</label>
               {form.nationality && !nationalityNames.includes(form.nationality) ? (
-                <input className="input-field" value={form.nationality === 'Other' ? '' : form.nationality}
-                  onChange={(e) => { update('state', ''); update('nationality', e.target.value) }}
-                  required placeholder="Type your nationality (e.g. Tanzanian)" autoFocus />
+                <input className={`input-field${touchedCls('nationality')}`} value={form.nationality === 'Other' ? '' : form.nationality}
+                  onChange={(e) => { update('state', ''); change('nationality', e.target.value) }}
+                  onBlur={() => touch('nationality')}
+                  placeholder="Type your nationality (e.g. Tanzanian)" autoFocus />
               ) : (
-                <select className="input-field w-full min-w-0" value={form.nationality}
-                  onChange={(e) => { update('state', ''); update('nationality', e.target.value) }} required>
+                <select className={`input-field w-full min-w-0${touchedCls('nationality')}`} value={form.nationality}
+                  onChange={(e) => { update('state', ''); change('nationality', e.target.value) }} onBlur={() => touch('nationality')}>
                   <option value="">Select nationality</option>
                   {nationalityNames.map((n) => <option key={n} value={n}>{n}</option>)}
                   <option value="Other">Other</option>
                 </select>
               )}
+              {fieldErr('nationality')}
             </div>
             <div className="min-w-0">
               <label className="field-label">State of Residence *</label>
               {nationalities[form.nationality] ? (
-                <select className="input-field w-full min-w-0" value={form.state}
-                  onChange={(e) => update('state', e.target.value)} required>
+                <select className={`input-field w-full min-w-0${touchedCls('state')}`} value={form.state}
+                  onChange={(e) => change('state', e.target.value)} onBlur={() => touch('state')}>
                   <option value="">Select state</option>
                   {nationalities[form.nationality].map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               ) : (
-                <input className="input-field" value={form.state}
-                  onChange={(e) => update('state', e.target.value)} required placeholder="Type your state / region" />
+                <input className={`input-field${touchedCls('state')}`} value={form.state}
+                  onChange={(e) => change('state', e.target.value)} onBlur={() => touch('state')} placeholder="Type your state / region" />
               )}
+              {fieldErr('state')}
             </div>
             <div className="sm:col-span-2 min-w-0">
               <label className="field-label">Address *</label>
-              <input className="input-field" value={form.address}
-                onChange={(e) => update('address', e.target.value)} required placeholder="Street, area, city" />
+              <input className={`input-field${touchedCls('address')}`} value={form.address}
+                onChange={(e) => change('address', e.target.value)} onBlur={() => touch('address')} placeholder="Street, area, city" />
+              {fieldErr('address')}
             </div>
             <div className="min-w-0">
               <label className="field-label">Makeup Experience Level *</label>
-              <select className="input-field w-full min-w-0" value={form.experienceLevel}
-                onChange={(e) => update('experienceLevel', e.target.value)} required>
+              <select className={`input-field w-full min-w-0${touchedCls('experienceLevel')}`} value={form.experienceLevel}
+                onChange={(e) => change('experienceLevel', e.target.value)} onBlur={() => touch('experienceLevel')}>
                 <option value="">Select level</option>
                 {experienceOptions.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
+              {fieldErr('experienceLevel')}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0" onBlur={() => touch('emergencyContact')}>
               <label className="field-label">Emergency Contact Number *</label>
               <PhoneInput
                 value={form.emergencyContact}
                 onChange={(v) => {
                   setSameAsPhone(false)
-                  update('emergencyContact', v)
+                  change('emergencyContact', v)
                 }}
               />
+              {fieldErr('emergencyContact')}
               <label className="flex items-center gap-2 mt-2 text-xs text-ink/75 cursor-pointer select-none">
                 <input
                   type="checkbox"
@@ -435,7 +714,11 @@ export default function Register() {
                   onChange={(e) => {
                     const on = e.target.checked
                     setSameAsPhone(on)
-                    if (on) update('emergencyContact', form.phone)
+                    if (on) {
+                      update('emergencyContact', form.phone)
+                      setTouched((t) => ({ ...t, emergencyContact: true }))
+                      setErrors((er) => ({ ...er, emergencyContact: '' }))
+                    }
                   }}
                   className="accent-rose w-4 h-4"
                 />
@@ -445,15 +728,16 @@ export default function Register() {
             <div className="min-w-0">
               <label className="field-label">Emergency Contact Name *</label>
               <input
-                className="input-field"
+                className={`input-field${touchedCls('emergencyContactName')}`}
                 value={form.emergencyContactName}
                 onChange={(e) => {
                   setSameAsName(false)
-                  update('emergencyContactName', e.target.value)
+                  change('emergencyContactName', e.target.value)
                 }}
-                required
+                onBlur={() => touch('emergencyContactName')}
                 placeholder="Name of emergency contact"
               />
+              {fieldErr('emergencyContactName')}
               <label className="flex items-center gap-2 mt-2 text-xs text-ink/75 cursor-pointer select-none">
                 <input
                   type="checkbox"
@@ -461,7 +745,11 @@ export default function Register() {
                   onChange={(e) => {
                     const on = e.target.checked
                     setSameAsName(on)
-                    if (on) update('emergencyContactName', form.fullName)
+                    if (on) {
+                      update('emergencyContactName', form.fullName)
+                      setTouched((t) => ({ ...t, emergencyContactName: true }))
+                      setErrors((er) => ({ ...er, emergencyContactName: '' }))
+                    }
                   }}
                   className="accent-rose w-4 h-4"
                 />
@@ -470,16 +758,18 @@ export default function Register() {
             </div>
             <div className="sm:col-span-2 min-w-0">
               <label className="field-label">What do you hope to learn from this program? *</label>
-              <textarea className="input-field" rows={3} value={form.reason}
-                onChange={(e) => update('reason', e.target.value)} required placeholder="Tell us what you'd love to take away from the class" />
+              <textarea className={`input-field${touchedCls('reason')}`} rows={3} value={form.reason}
+                onChange={(e) => change('reason', e.target.value)} onBlur={() => touch('reason')} placeholder="Tell us what you'd love to take away from the class" />
+              {fieldErr('reason')}
             </div>
             <div className="sm:col-span-2 min-w-0">
               <label className="field-label">How did you hear about the program? *</label>
-              <select className="input-field w-full min-w-0" value={form.hearAbout}
-                onChange={(e) => update('hearAbout', e.target.value)} required>
+              <select className={`input-field w-full min-w-0${touchedCls('hearAbout')}`} value={form.hearAbout}
+                onChange={(e) => change('hearAbout', e.target.value)} onBlur={() => touch('hearAbout')}>
                 <option value="">Select an option</option>
                 {hearOptions.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
+              {fieldErr('hearAbout')}
             </div>
 
             <div className="sm:col-span-2 min-w-0">
@@ -490,19 +780,20 @@ export default function Register() {
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={(e) => { setPhotoInvalid(''); handlePhoto(e.target.files?.[0]) }}
+                    onChange={(e) => { setPhotoInvalid(''); setTouched((t) => ({ ...t, photo: true })); handlePhoto(e.target.files?.[0]) }}
                   />
-                  <div className={`flex items-center justify-center gap-2 border-2 border-dashed rounded-xl px-4 py-6 text-sm transition-colors ${profilePhoto ? 'border-rose bg-rose/5 text-rose-dark' : 'border-ink/20 text-muted hover:border-rose/40 hover:text-rose-dark'}`}>
+                  <div className={`flex items-center justify-center gap-2 border-2 border-dashed rounded-xl px-4 py-6 text-sm transition-colors ${profilePhoto ? 'border-rose bg-rose/5 text-rose-dark' : showError('photo') || photoInvalid ? 'border-red-400 text-red-600' : 'border-ink/20 text-muted hover:border-rose/40 hover:text-rose-dark'}`}>
                     {profilePhoto ? <CircleCheck size={18} /> : <ImageIcon size={18} />}
                     {profilePhoto ? 'Photo attached — tap to change' : 'Tap to upload a photo (required)'}
                   </div>
                 </label>
                 {profilePhoto && (
-                  <img src={profilePhoto} alt="preview" className="w-16 h-16 rounded-xl object-cover border border-black/10 shrink-0" />
+                  <img src={profilePhoto} alt="preview" className="w-16 h-16 rounded-xl object-cover border border-[#321d24]/15 shrink-0" />
                 )}
               </div>
               {photoInvalid && <p className="text-xs text-red-600 mt-1">{photoInvalid}</p>}
-              {!profilePhoto && <p className="text-xs text-muted mt-1">A recent photo is required to verify your identity at the venue.</p>}
+              {fieldErr('photo')}
+              {!profilePhoto && !photoInvalid && <p className="text-xs text-muted mt-1">A recent photo is required to verify your identity at the venue.</p>}
             </div>
 
             <div className="sm:col-span-2">
@@ -517,89 +808,34 @@ export default function Register() {
                       checked={form.ticketType === t.id}
                       onChange={() => update('ticketType', t.id)}
                       className="sr-only"
-                      required
                     />
                     <TicketCard t={t} now={now} showRadio selected={form.ticketType === t.id} className="h-full" />
                   </label>
                 ))}
               </div>
+              {selected && (
+                <p className="mt-3 text-sm text-red-600 font-bold uppercase flex items-center gap-1.5">
+                  <CircleCheck size={15} className="text-red-500" /> {selected.label.toUpperCase()} TICKET SELECTED
+                </p>
+              )}
             </div>
 
             <div className="sm:col-span-2">
               <label className="field-label">Quantity *</label>
-              <input type="number" min={1} max={10} className="input-field w-full sm:max-w-44" value={form.quantity}
-                onChange={(e) => update('quantity', Math.max(1, Number(e.target.value)))}
+              <input type="number" min={1} max={10} className={`input-field w-full sm:max-w-44${touchedCls('quantity')}`} value={form.quantity}
+                onChange={(e) => change('quantity', Math.max(1, Number(e.target.value)))}
+                onBlur={() => touch('quantity')}
                 placeholder="Number of tickets" />
+              {fieldErr('quantity')}
             </div>
           </div>
 
-          <div className="mt-8 pt-6 border-t border-black/8">
-            <div className="flex items-center justify-between text-sm text-muted mb-1">
-              <span>Ticket amount ({form.quantity} × {formatNgn(selectedPrice)})</span>
-              <span>{formatNgn(subtotal)}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm text-muted mb-3">
-              <span>Processing fee (1.5% + ₦100)</span>
-              <span>{formatNgn(processingFee)}</span>
-            </div>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-ink/70">Total</span>
-              <span className="font-display text-2xl font-bold">{formatNgn(total)}</span>
-            </div>
-            <button type="submit" className="btn btn-primary w-full" disabled={loading}>
-              {loading ? <><LoaderCircle size={18} className="animate-spin" /> Processing…</> : 'Proceed to Payment'}
+          <div className="mt-8 pt-6 border-t border-[#321d24]/10">
+            <button type="submit" className="btn btn-primary w-full">
+              Next <ArrowRight size={18} />
             </button>
-            <p className="text-xs text-muted text-center mt-3">
-              Secure payment via Paystack. {config?.paystackEnabled ? '' : 'If payment isn’t available yet, your registration will still be recorded.'}
-            </p>
           </div>
         </form>
-        </Reveal>
-
-        {/* SUMMARY SIDEBAR */}
-        <Reveal variant="right" delay={150}>
-        <aside className="space-y-6 min-w-0">
-          <div className="card p-6 card-hover">
-            <h3 className="font-semibold mb-4">Order Summary</h3>
-            {selected && (
-              <>
-                <div className="flex items-center justify-between text-sm mb-2">
-                  <span>{selected.label}</span>
-                  <span className="text-muted">× {form.quantity}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm mb-2">
-                  <span>Ticket amount</span>
-                  <span>{formatNgn(subtotal)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm mb-4">
-                  <span>Processing fee (1.5% + ₦100)</span>
-                  <span>{formatNgn(processingFee)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm font-semibold border-t border-black/8 pt-3">
-                  <span>Total</span>
-                  <span>{formatNgn(total)}</span>
-                </div>
-                <ul className="space-y-2 text-sm text-ink/70 border-t border-black/8 pt-4">
-                  {selected.includes.map((inc) => (
-                    <li key={inc} className="flex items-start gap-2">
-                      <CircleCheck className="text-rose shrink-0 mt-0.5" size={15} />
-                      {inc}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
-
-          <div className="card p-6 bg-blush border-rose/20 card-hover">
-            <h4 className="font-semibold mb-2">Good to know</h4>
-            <ul className="space-y-2 text-sm text-ink/75">
-              {ev.venueNote && <li>• {ev.venueNote}</li>}
-              {ev.bring && <li>• {ev.bring}</li>}
-              {ev.timeLabel && <li>• Sessions at: {ev.timeLabel}</li>}
-            </ul>
-          </div>
-        </aside>
         </Reveal>
         </>
         )}

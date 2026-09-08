@@ -13,7 +13,8 @@ export type RealtimeEventType =
   | 'subscribers'
   | 'sponsors'
   | 'events'
-  | 'attendance';
+  | 'attendance'
+  | 'settings';
 
 export function initRealtime(server: HttpServer): void {
   wss = new WebSocketServer({ server, path: '/realtime' });

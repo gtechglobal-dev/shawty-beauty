@@ -63,7 +63,7 @@ export default function Navbar() {
       onClick={() => setOpen(false)}
       className={`sticky top-0 z-50 transition-all duration-300 ${
         scrolled || open
-          ? 'bg-cream/85 backdrop-blur-xl border-b border-pinkgold/20 shadow-[0_8px_30px_-14px_rgba(42,27,34,0.28)]'
+          ? 'bg-cream/85 backdrop-blur-xl border-b border-pinkgold/20 shadow-[0_8px_30px_-14px_rgba(122,48,69,0.28)]'
           : 'bg-transparent border-b border-transparent'
       }`}
     >
@@ -117,14 +117,14 @@ export default function Navbar() {
       </div>
 
       {open && (
-        <nav onClick={(e) => e.stopPropagation()} className="md:hidden relative z-50 px-5 pb-6 pt-2 space-y-1 border-t border-black/5 bg-cream/95 backdrop-blur-md">
+        <nav onClick={(e) => e.stopPropagation()} className="md:hidden relative z-50 px-5 pb-6 pt-2 space-y-1 border-t border-[#321d24]/10 bg-cream/95 backdrop-blur-md">
           {links.map((l) => (
             <Link
               key={l.to}
               to={l.to}
               onClick={() => setOpen(false)}
               className={`block px-4 py-3 rounded-lg text-[15px] font-medium ${
-                isActive(l.to) ? 'text-rose-deep bg-blush' : 'text-ink/75'
+                isActive(l.to) ? 'text-[#7a3045] bg-blush' : 'text-ink/75'
               }`}
             >
               {l.label}

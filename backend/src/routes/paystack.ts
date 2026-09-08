@@ -426,49 +426,51 @@ router.post('/verify', async (req: Request, res: Response) => {
     if (!reference) {
       return res.status(400).json({ error: 'Reference is required' });
     }
-    if (!PAYSTACK_SECRET) {
-      return res.status(500).json({ error: 'Paystack is not configured' });
-    }
 
-    const paystackRes = await fetch(
-      `${PAYSTACK_BASE}/transaction/verify/${reference}`,
-      { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } },
-    );
-    const data = await paystackRes.json();
-
-    if (!paystackRes.ok || !data.status) {
-      return res.status(400).json({ error: 'Unable to verify transaction', data });
+    // Ask Paystack for the current transaction state. A transient error on
+    // the very first call after checkout is common (tx still settling), so
+    // we never hard-fail here — we fall back to our own database below.
+    let status: string | undefined;
+    let transaction: any;
+    if (PAYSTACK_SECRET) {
+      try {
+        const paystackRes = await fetch(
+          `${PAYSTACK_BASE}/transaction/verify/${reference}`,
+          { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } },
+        );
+        const data = await paystackRes.json();
+        if (paystackRes.ok && data.status && data.data?.status) {
+          status = data.data.status;
+          transaction = data.data;
+        }
+      } catch (err: any) {
+        console.error(`Paystack verify fetch failed for ${reference}:`, err.message);
+      }
     }
 
     const reg = await findRegistrationByReference(reference);
 
-    if (reg) {
-      if (data.data.status === 'success' && reg.status !== 'paid') {
-        const paid = await updateRegistration(reg.id, {
-          status: 'paid',
-          paystackReference: reference,
-        });
-        // Notify the studio once that this registration is now PAID
-        if (paid) {
-          notifyPaidRegistration(paid).catch(() => {});
-          deliverTicketFor(paid).catch(() => {});
-          broadcastRealtime('registrations', { id: paid.id, status: 'paid' });
-        }
-      }
-      return res.json({
-        success: true,
-        paid: data.data.status === 'success',
-        status: data.data.status,
-        registration: reg,
-        transaction: data.data,
+    // The webhook may already have confirmed this payment — never contradict it.
+    const paid = status === 'success' || reg?.status === 'paid';
+
+    if (paid && reg && reg.status !== 'paid') {
+      const confirmed = await updateRegistration(reg.id, {
+        status: 'paid',
+        paystackReference: reference,
       });
+      if (confirmed) {
+        notifyPaidRegistration(confirmed).catch(() => {});
+        deliverTicketFor(confirmed).catch(() => {});
+        broadcastRealtime('registrations', { id: confirmed.id, status: 'paid' });
+      }
     }
 
     res.json({
       success: true,
-      paid: data.data.status === 'success',
-      status: data.data.status,
-      transaction: data.data,
+      paid,
+      status: status ?? reg?.status ?? 'unknown',
+      registration: reg ?? undefined,
+      transaction,
     });
   } catch (err: any) {
     console.error('Paystack verify failed:', err.message);

@@ -56,7 +56,7 @@ export default function PhoneInput({ value, onChange, required = true, dial: dia
           value={dial}
           onChange={(e) => changeDial(e.target.value)}
           aria-label="Country code"
-          className="appearance-none bg-white pl-2 pr-7 py-3 h-full text-[0.9rem] font-medium outline-none cursor-pointer border-r border-black/10"
+          className="appearance-none bg-white pl-2 pr-7 py-3 h-full text-[0.9rem] font-medium outline-none cursor-pointer border-r border-[#321d24]/15"
         >
           {phoneCountries.map((c) => (
             <option key={c.code} value={c.dial}>
@@ -66,7 +66,7 @@ export default function PhoneInput({ value, onChange, required = true, dial: dia
         </select>
         <ChevronDown
           size={16}
-          className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-ink/50"
+          className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[#321d24]/50"
         />
       </div>
       <input
