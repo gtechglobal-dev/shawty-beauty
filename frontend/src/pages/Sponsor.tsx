@@ -619,8 +619,8 @@ export default function Sponsor() {
           )}
 
           {showForm && (
-          <div ref={formRef} className="mt-12 scroll-mt-8">
-            <div className="max-w-2xl mx-auto">
+          <div ref={formRef} className="mt-12 scroll-mt-8 min-w-0">
+            <div className="max-w-2xl mx-auto min-w-0">
           {submitted ? (
             <div ref={successRef} className="card p-8 sm:p-10 text-center scroll-mt-24">
               <div className="w-16 h-16 mx-auto rounded-full bg-green-100 text-green-600 flex items-center justify-center mb-5">
@@ -644,7 +644,7 @@ export default function Sponsor() {
               </div>
             </div>
           ) : (
-            <form onSubmit={submit} className="card p-6 sm:p-8">
+            <form onSubmit={submit} className="card p-6 sm:p-8 min-w-0 overflow-hidden">
               <div className="text-center mb-8">
                 <span className="eyebrow mb-3">Sponsorship</span>
                 <h2 className="section-title mb-2">SUPPORT SHAWTY BEAUTY STUDIO</h2>
@@ -677,7 +677,7 @@ export default function Sponsor() {
                   <input className="input-field" value={form.fullName} required
                     onChange={(e) => update('fullName', e.target.value)} />
                 </div>
-                <div className="grid sm:grid-cols-2 gap-5">
+                <div className="grid sm:grid-cols-2 gap-5 min-w-0">
                   <div>
                     <label className="field-label">Phone Number *</label>
                     <div className="mt-2">
@@ -700,9 +700,9 @@ export default function Sponsor() {
                     <p className="text-xs text-muted mt-1 mb-3">
                       Select the platforms you're on and add your username or handle for each.
                     </p>
-                    <div className="space-y-2.5">
+                    <div className="space-y-2.5 min-w-0">
                       {socials.map((s, i) => (
-                        <div key={i} className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                        <div key={i} className="flex flex-col sm:flex-row items-start sm:items-center gap-2 min-w-0">
                           <select
                             className="input-field flex-1 min-w-0 w-full sm:w-auto"
                             value={s.platform}
