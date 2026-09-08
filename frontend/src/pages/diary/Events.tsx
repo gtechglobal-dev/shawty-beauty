@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Plus,
   Copy,
@@ -14,7 +14,6 @@ import {
   CalendarDays,
   Users,
   Ticket as TicketIcon,
-  Crown,
   TrendingUp,
   RefreshCw,
   KeyRound,
@@ -63,17 +62,6 @@ export type DiaryEvent = StudioEvent & {
   summary: DiarySummary
 }
 
-export interface DiaryUnassigned {
-  registrations: number
-  latestRegistrations: {
-    id: string
-    fullName: string
-    status: string
-    createdAt: string
-  }[]
-  sponsors: number
-}
-
 export interface DiaryTotals {
   events: number
   messages: number
@@ -108,8 +96,9 @@ interface RegistrationRow {
   emergencyContact?: string
 }
 
-interface SponsorRow {
+export interface SponsorRow {
   id: string
+  reference?: string
   brandName: string
   contactName: string
   email: string
@@ -119,6 +108,19 @@ interface SponsorRow {
   notes: string
   status: string
   featured: boolean
+  sponsorType?: string
+  supportAreas?: string[]
+  sponsorshipType?: string
+  usagePreference?: string
+  publicRecognition?: boolean
+  displayName?: string
+  logoUrl?: string
+  logoBase64?: string
+  country?: string
+  state?: string
+  address?: string
+  deactivated?: boolean
+  createdAt?: string
 }
 
 export function statusBadge(status: string) {
@@ -220,7 +222,7 @@ const [pendingEnd, setPendingEnd] = useState<DiaryEvent | null>(null)
       <div>
         <h3 className="font-semibold text-lg mb-1">Events &amp; everything connected to them</h3>
         <p className="text-sm text-muted mb-4">
-          Each event groups its own registrations, attendance and sponsors. Tap Manage event to dig into the details
+          Each event groups its own registrations and attendance. Tap Manage event to dig into the details
           and press <strong className="text-rose-deep"> Create New Event </strong> to start a happening. Making an
           event live switches the homepage banner, program page and registration forms to it automatically.
         </p>
@@ -274,7 +276,6 @@ const [pendingEnd, setPendingEnd] = useState<DiaryEvent | null>(null)
                         { icon: Users, label: 'Registered', value: s.registrations },
                         { icon: TicketIcon, label: 'Paid tickets', value: s.paid },
                         { icon: CalendarDays, label: 'Present', value: s.present },
-                        { icon: Crown, label: 'Sponsors', value: `${s.confirmedSponsors}/${s.sponsors}` },
                         { icon: TrendingUp, label: 'Revenue', value: formatNgn(s.revenue) },
                       ]}
                     />
@@ -362,8 +363,8 @@ function EndEventModal({
         <div className="mt-4 rounded-xl bg-green-50 border border-green-100 px-4 py-3 text-sm text-ink/75 flex items-start gap-2 text-left max-w-sm mx-auto">
           <CircleCheck size={16} className="text-green-600 shrink-0 mt-0.5" />
           <span>
-            You can bring it back anytime with <strong className="text-ink">Make Live</strong> — its registrations,
-            attendance and sponsors stay saved.
+            You can bring it back anytime with <strong className="text-ink">Make Live</strong> — its registrations
+            and attendance stay saved.
           </span>
         </div>
         <div className="mt-6 grid grid-cols-2 gap-3">
@@ -1010,32 +1011,31 @@ export function EventEditor({
 // Per-event manage view (groups everything connected to one event)
 // ------------------------------------------------------------------
 
-const PACKAGE_LABELS: Record<string, string> = {
+export const PACKAGE_LABELS: Record<string, string> = {
   supporter: 'Supporter', partner: 'Partner', featured: 'Featured', title: 'Title/Major',
   product: 'Product', service: 'Service', custom: 'Custom',
 }
 
 export function EventManage({
   event,
-  unassigned,
   headers,
   saving,
+  reloadKey,
   onBack,
   onEdit,
   onSetLive,
   onEnd,
 }: {
   event: DiaryEvent
-  unassigned: DiaryUnassigned | null
   headers: Record<string, string>
   saving: boolean
+  reloadKey?: number
   onBack: () => void
   onEdit: () => void
   onSetLive: () => void
   onEnd: () => void
 }) {
   const [regs, setRegs] = useState<RegistrationRow[]>([])
-  const [sponsors, setSponsors] = useState<SponsorRow[]>([])
   const [loading, setLoading] = useState(true)
   const [codes, setCodes] = useState<Record<string, { createdAt: string }>>({})
   const [generatedCode, setGeneratedCode] = useState<{ day: string; label: string; code: string } | null>(null)
@@ -1056,16 +1056,14 @@ export function EventManage({
   const s = event.summary
   const toast = useToast()
 
-  async function load() {
-    setLoading(true)
+  async function load(silent = false) {
+    if (!silent) setLoading(true)
     try {
-      const [r, sp, c] = await Promise.all([
+      const [r, c] = await Promise.all([
         getJson(`/api/admin/registrations?eventId=${encodeURIComponent(event.id)}`, headers),
-        getJson(`/api/admin/sponsors?eventId=${encodeURIComponent(event.id)}`, headers),
         getJson(`/api/admin/events/${encodeURIComponent(event.id)}/attendance-codes`, headers),
       ])
       setRegs(r.registrations || [])
-      setSponsors(sp.sponsors || [])
       const map: Record<string, { createdAt: string }> = {}
       ;(c.codes || []).forEach((cc: { day: string; createdAt: string }) => { map[cc.day] = { createdAt: cc.createdAt } })
       setCodes(map)
@@ -1076,12 +1074,16 @@ export function EventManage({
     }
   }
 
-  useEffect(() => {
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event.id])
+  const prevReloadKey = useRef(reloadKey ?? 0)
 
-  const sortedRegs = [...regs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  useEffect(() => {
+    const keyChanged = reloadKey !== undefined && reloadKey !== prevReloadKey.current
+    prevReloadKey.current = reloadKey ?? 0
+    load(reloadKey !== undefined && keyChanged)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event.id, reloadKey])
+
+  const sortedRegs = [...regs].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
   const presentCount = sortedRegs.filter(isPresent).length
 
   const filteredRegs = sortedRegs.filter((r) => {
@@ -1094,16 +1096,6 @@ export function EventManage({
   })
   const hasFilters = Boolean(filters.ticketType || filters.date)
   useEffect(() => setShowAllRegs(false), [filters.ticketType, filters.date])
-
-  async function updateSponsor(id: string, body: Record<string, any>) {
-    try {
-      await patchJson(`/api/admin/sponsors/${id}`, body, headers)
-      toast.push('Sponsor updated.')
-      load()
-    } catch (err: any) {
-      toast.push(err.message || 'Failed to update sponsor', 'err')
-    }
-  }
 
   async function generateDayCode(day: string, label: string) {
     setGenBusy(day)
@@ -1277,7 +1269,7 @@ export function EventManage({
               <button onClick={() => setFilters({})} className="btn btn-outline !py-2 flex items-center gap-1.5"><X size={14} /> Clear filters</button>
             )}
             <button onClick={() => setFilterOpen(true)} className="btn btn-outline !py-2 flex items-center gap-1.5"><Filter size={14} /> Filter</button>
-            <button onClick={load} className="btn btn-outline !py-2 flex items-center gap-1.5"><RefreshCw size={14} /> Refresh</button>
+            <button onClick={() => load()} className="btn btn-outline !py-2 flex items-center gap-1.5"><RefreshCw size={14} /> Refresh</button>
           </div>
         </div>
         {loading ? (
@@ -1375,72 +1367,6 @@ export function EventManage({
         </div>
         )}
       </div>
-
-      {/* Sponsors */}
-      <div className="card overflow-hidden">
-        <div className="p-6 border-b border-black/5">
-          <h4 className="font-semibold text-lg">Sponsors for this event ({sponsors.length})</h4>
-          <p className="text-sm text-muted">Sponsorship applications received while this event was (or is) live.</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-muted text-xs border-b border-black/8">
-                <th className="px-5 py-2">Brand</th>
-                <th className="px-5 py-2">Contact</th>
-                <th className="px-5 py-2">Package</th>
-                <th className="px-5 py-2">Amount</th>
-                <th className="px-5 py-2">Status</th>
-                <th className="px-5 py-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sponsors.map((sp) => (
-                <tr key={sp.id} className="border-b border-black/5 align-top">
-                  <td className="px-5 py-3">
-                    <div className="font-medium flex items-center gap-1.5">{sp.brandName} {sp.featured && <Crown size={12} className="text-gold" />}</div>
-                  </td>
-                  <td className="px-5 py-3">
-                    <div className="text-xs">{sp.contactName}</div>
-                    <div className="text-xs text-muted">{sp.email}</div>
-                    {sp.notes && <div className="text-xs text-muted max-w-[180px] truncate" title={sp.notes}>{sp.notes}</div>}
-                  </td>
-                  <td className="px-5 py-3">{PACKAGE_LABELS[sp.packageType] || sp.packageType}</td>
-                  <td className="px-5 py-3">{sp.amount > 0 ? formatNgn(sp.amount) : 'In-kind'}</td>
-                  <td className="px-5 py-3"><span className={statusBadge(sp.status)}>{sp.status}</span></td>
-                  <td className="px-5 py-3">
-                    <div className="flex gap-1.5 flex-wrap">
-                      {sp.status === 'pending' && <button onClick={() => updateSponsor(sp.id, { status: 'confirmed' })} className="px-2.5 py-1 rounded-lg text-xs bg-green-600 text-white hover:bg-green-700">Confirm</button>}
-                      <button onClick={() => updateSponsor(sp.id, { featured: !sp.featured })} className="px-2.5 py-1 rounded-lg text-xs bg-gold text-ink hover:opacity-90">{sp.featured ? 'Unfeature' : 'Feature'}</button>
-                      {sp.status !== 'cancelled' && <button onClick={() => updateSponsor(sp.id, { status: 'cancelled' })} className="px-2.5 py-1 rounded-lg text-xs bg-black/10 hover:bg-black/20">Cancel</button>}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {sponsors.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-muted">No sponsors linked to this event.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Unassigned records (submitted before events carried their own id) */}
-      {unassigned && unassigned.registrations + unassigned.sponsors > 0 && (
-        <div className="card p-6 border border-amber-200 bg-amber-50/50">
-          <h4 className="font-semibold mb-2 flex items-center gap-2">
-            <CircleAlert size={16} className="text-amber-600" /> Unassigned registrations &amp; sponsors
-          </h4>
-          <p className="text-sm text-ink/70 mb-3">
-            {unassigned.registrations} registrations and {unassigned.sponsors} sponsors were submitted before events
-            carried their own banner, so they aren't tied to a specific event.
-          </p>
-          {unassigned.latestRegistrations.slice(0, 10).map((r) => (
-            <div key={r.id} className="flex items-center justify-between text-sm border-b border-amber-200/70 py-1.5 last:border-0">
-              <span className="font-medium">{r.fullName}</span>
-              <span><span className={statusBadge(r.status)}>{r.status}</span> · {new Date(r.createdAt).toLocaleDateString()}</span>
-            </div>
-          ))}
-        </div>
-      )}
 
       <EndEventModal
         open={confirmEnd}

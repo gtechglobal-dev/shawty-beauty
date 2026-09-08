@@ -2,23 +2,33 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import { writeContact, addSubscriber, addUnsubscribed, type ContactMessage } from '../db.js';
 import { sendTelegramMessage, telegramConfigured, escapeHtml } from '../lib/telegram.js';
+import { isValidPhone, normalizePhone } from '../lib/phone.js';
+import { broadcastRealtime } from '../lib/realtime.js';
 
 const router = Router();
 
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { name, email, subject, message } = req.body;
+    const sanitizeText = (s: unknown, max: number): string =>
+      String(s || '')
+        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+        .trim()
+        .slice(0, max);
 
-    const cleanName = (name || '').trim().slice(0, 100);
-    const cleanEmail = (email || '').trim().toLowerCase().slice(0, 254);
-    const cleanSubject = (subject || '').trim().slice(0, 200);
-    const cleanMessage = (message || '').trim().slice(0, 2000);
+    const cleanName = sanitizeText(req.body.name, 100);
+    const cleanEmail = sanitizeText(req.body.email, 254).toLowerCase();
+    const cleanSubject = sanitizeText(req.body.subject, 200);
+    const cleanMessage = sanitizeText(req.body.message, 2000);
+    const cleanPhone = normalizePhone(sanitizeText(req.body.phone, 24));
 
     if (!cleanName || !cleanEmail || !cleanMessage) {
       return res.status(400).json({ error: 'Name, email and message are required' });
     }
     if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(cleanEmail)) {
       return res.status(400).json({ error: 'Invalid email address' });
+    }
+    if (cleanPhone && !isValidPhone(cleanPhone)) {
+      return res.status(400).json({ error: 'Please enter a valid phone number with its country code' });
     }
 
     const msg: ContactMessage = {
@@ -27,11 +37,13 @@ router.post('/', async (req: Request, res: Response) => {
       email: cleanEmail,
       subject: cleanSubject || 'General enquiry',
       message: cleanMessage,
+      phone: cleanPhone || undefined,
       read: false,
       createdAt: new Date().toISOString(),
     };
 
     await writeContact(msg);
+    broadcastRealtime('contacts', { id: msg.id });
 
     if (telegramConfigured()) {
       const tgMsg = [
@@ -39,9 +51,10 @@ router.post('/', async (req: Request, res: Response) => {
         ``,
         `<b>Name:</b> ${escapeHtml(msg.name)}`,
         `<b>Email:</b> ${escapeHtml(msg.email)}`,
+        msg.phone ? `<b>Phone:</b> ${escapeHtml(msg.phone)}` : '',
         `<b>Subject:</b> ${escapeHtml(msg.subject)}`,
         `<b>Message:</b> ${escapeHtml(msg.message)}`,
-      ].join('\n');
+      ].filter(Boolean).join('\n');
       sendTelegramMessage(tgMsg).catch(() => {});
     }
 
@@ -54,11 +67,16 @@ router.post('/', async (req: Request, res: Response) => {
 
 router.post('/subscribe', async (req: Request, res: Response) => {
   try {
-    const email = (req.body.email || '').trim().toLowerCase();
+    const email = String(req.body.email || '')
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+      .trim()
+      .toLowerCase()
+      .slice(0, 254);
     if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(email)) {
       return res.status(400).json({ error: 'Please provide a valid email address' });
     }
     const added = await addSubscriber(email);
+    broadcastRealtime('subscribers', { email });
     res.status(added ? 201 : 200).json({
       success: true,
       message: added ? 'Subscribed successfully' : 'You are already subscribed',

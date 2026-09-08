@@ -9,6 +9,7 @@ import { useToast } from '../components/Toasts'
 import PhoneInput from '../components/PhoneInput'
 import Reveal from '../components/Reveal'
 import TicketCard from '../components/TicketCard'
+import { isValidPhone, phoneErrorMessage } from '../lib/phone'
 
 interface FormState {
   fullName: string
@@ -136,7 +137,21 @@ export default function Register() {
     reader.readAsDataURL(file)
   }
 
+  function validateContactInfo(): boolean {
+    const phoneErr = phoneErrorMessage(form.phone)
+    if (phoneErr) {
+      toast.push(phoneErr, 'err')
+      return false
+    }
+    if (form.emergencyContact && !isValidPhone(form.emergencyContact)) {
+      toast.push('Please enter a valid emergency contact number with its country code', 'err')
+      return false
+    }
+    return true
+  }
+
   async function handlePayWithPaystack() {
+    if (!validateContactInfo()) return
     setLoading(true)
     if (!profilePhoto) {
       toast.push('Please upload a profile photo to complete your registration.', 'err')
@@ -207,6 +222,7 @@ export default function Register() {
 
   async function handleManualRegister(e: React.FormEvent) {
     e.preventDefault()
+    if (!validateContactInfo()) return
     setLoading(true)
     if (!profilePhoto) {
       toast.push('Please upload a profile photo to complete your registration.', 'err')

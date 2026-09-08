@@ -15,17 +15,27 @@ import Reveal from '../components/Reveal'
 import CountUp from '../components/CountUp'
 import { siteConfig, defaultEvent, eventRegisterUrl } from '../lib/constants'
 import { fetchLiveEventOrNull, type StudioEvent } from '../lib/events'
+import { useRealtime } from '../lib/useRealtime'
 
 export default function Home() {
   const [live, setLive] = useState<StudioEvent>(defaultEvent)
   const [hasLive, setHasLive] = useState(false)
 
-  useEffect(() => {
+  const refresh = () =>
     fetchLiveEventOrNull().then((ev) => {
       setLive(ev ?? defaultEvent)
       setHasLive(Boolean(ev))
     })
+
+  useEffect(() => {
+    refresh()
   }, [])
+
+  // When the owner promotes/ends an event in the Diary, the homepage switches
+  // to the new live event immediately for any visitor on this page.
+  useRealtime((type) => {
+    if (type === 'events') refresh()
+  })
 
   const registerUrl = eventRegisterUrl(live)
 

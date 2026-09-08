@@ -16,6 +16,7 @@ import {
   type TicketType,
 } from '../db.js';
 import { buildTicketPng, ticketDownloadUrl, ticketScanUrl, baseOrigin } from '../lib/tickets.js';
+import { broadcastRealtime } from '../lib/realtime.js';
 
 const router = Router();
 
@@ -132,6 +133,7 @@ router.post('/:token/attendance', async (req: Request, res: Response) => {
       present: true,
     });
     if (!updated) return res.status(500).json({ error: 'Could not save attendance' });
+    broadcastRealtime('attendance', { registrationId: reg.id, day });
 
     const dayIndex = parseInt(day.slice(1), 10) - 1;
     const dayLabel = event.attendanceLabels?.[dayIndex] || `Day ${dayIndex + 1}`;

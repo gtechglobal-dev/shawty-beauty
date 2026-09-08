@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { LoaderCircle, Mail, Phone } from 'lucide-react'
 import InstagramIcon from '../components/icons/InstagramIcon'
+import PhoneInput from '../components/PhoneInput'
 import { postJson } from '../lib/api'
 import { useToast } from '../components/Toasts'
 import { siteConfig } from '../lib/constants'
 import Reveal from '../components/Reveal'
+import { isValidPhone } from '../lib/phone'
 
 export default function Contact() {
-  const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' })
+  const [form, setForm] = useState({ name: '', email: '', phone: '', subject: '', message: '' })
   const [newsletter, setNewsletter] = useState('')
   const [loading, setLoading] = useState(false)
   const toast = useToast()
@@ -18,11 +20,15 @@ export default function Contact() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (form.phone && !isValidPhone(form.phone)) {
+      toast.push('Please enter a valid phone number with its country code', 'err')
+      return
+    }
     setLoading(true)
     try {
       await postJson('/api/contact', form)
       toast.push('Your message has been sent. We’ll get back to you soon!')
-      setForm({ name: '', email: '', subject: '', message: '' })
+      setForm({ name: '', email: '', phone: '', subject: '', message: '' })
     } catch (err: any) {
       toast.push(err.message || 'Could not send your message.', 'err')
     } finally {
@@ -71,10 +77,16 @@ export default function Contact() {
               <label className="field-label">Email *</label>
               <input type="email" className="input-field" value={form.email} required onChange={(e) => update('email', e.target.value)} />
             </div>
-          </div>
-          <div>
-            <label className="field-label">Subject</label>
-            <input className="input-field" value={form.subject} onChange={(e) => update('subject', e.target.value)} />
+            <div>
+              <label className="field-label">Phone Number</label>
+              <div className="mt-2">
+                <PhoneInput value={form.phone} onChange={(v) => update('phone', v)} required={false} />
+              </div>
+            </div>
+            <div>
+              <label className="field-label">Subject</label>
+              <input className="input-field" value={form.subject} onChange={(e) => update('subject', e.target.value)} />
+            </div>
           </div>
           <div>
             <label className="field-label">Message *</label>

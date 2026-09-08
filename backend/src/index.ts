@@ -4,7 +4,7 @@ import cors from 'cors';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, readFileSync } from 'fs';
-import { connectDB, isDbConnected, ensureSeedEvents } from './db.js';
+import { connectDB, isDbConnected, ensureSeedEvents, deleteUnassignedRegistrations } from './db.js';
 import authRouter from './routes/auth.js';
 import adminRouter from './routes/admin.js';
 import contactRouter from './routes/contact.js';
@@ -13,6 +13,7 @@ import sponsorsRouter from './routes/sponsors.js';
 import eventsRouter from './routes/events.js';
 import ticketsRouter from './routes/tickets.js';
 import { startTelegramAdminBot } from './lib/telegramAdminBot.js';
+import { initRealtime } from './lib/realtime.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -73,15 +74,19 @@ if (existsSync(frontendDist)) {
 connectDB()
   .then(async () => {
     await ensureSeedEvents();
-    app.listen(PORT, () => {
+    const purged = await deleteUnassignedRegistrations();
+    if (purged > 0) console.log(`Removed ${purged} legacy unassigned registration(s)`);
+    const server = app.listen(PORT, () => {
       console.log(`Shawty Beauty Studio API running on http://localhost:${PORT}`);
     });
+    initRealtime(server);
     startTelegramAdminBot();
   })
   .catch((err) => {
     console.error('Failed to connect to MongoDB:', err.message);
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`Shawty Beauty Studio API running on http://localhost:${PORT} (NO DB)`);
     });
+    initRealtime(server);
     startTelegramAdminBot();
   });

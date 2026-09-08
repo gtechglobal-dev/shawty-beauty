@@ -1,39 +1,119 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
-  CircleCheck,
+  HeartHandshake,
+  Home,
   LoaderCircle,
-  Sparkles,
-  Crown,
-  Package,
-  Wrench,
+  ImagePlus,
+  X,
+  ArrowRight,
 } from 'lucide-react'
-import { formatNgn, sponsorPackages, type SponsorPkg } from '../lib/constants'
-import { postJson } from '../lib/api'
+import { getJson, postJson } from '../lib/api'
 import { fetchLiveEvent } from '../lib/events'
-import { useToast } from '../components/Toasts'
+import PhoneInput from '../components/PhoneInput'
 import Reveal from '../components/Reveal'
+import { phoneErrorMessage } from '../lib/phone'
+import { nationalities, nationalityNames } from '../lib/constants'
+import { resizeImageBase64 } from '../lib/image'
 
-const tiers = ['supporter', 'partner', 'featured', 'title'] as const
+const SPONSOR_TYPE_OPTIONS = [
+  'Individual',
+  'Business/Company',
+  'Organization',
+  'NGO/Association',
+  'Other',
+]
+
+const SUPPORT_AREA_OPTIONS = [
+  'Makeup Training',
+  'Lashes Training',
+  'Student Scholarship',
+  'Training Materials',
+  'Beauty Equipment',
+  'Event/Class Sponsorship',
+  'General Support',
+  'Other',
+]
+
+const SPONSORSHIP_TYPE_OPTIONS = [
+  'Financial Contribution',
+  'Products/Materials',
+  'Equipment',
+  'Professional Services',
+  'Other',
+]
+
+const USAGE_PREFERENCE_OPTIONS = [
+  'For a specific student',
+  'For multiple students',
+  'For a specific program/class',
+  'For equipment or training materials',
+  'Where most needed',
+]
+
+type RecognitionChoice = '' | 'yes' | 'no'
+
+interface SponsorCard {
+  id: string
+  name: string
+  email: string
+  logoUrl?: string
+  logoBase64?: string
+  state?: string
+  country?: string
+}
+
+function formatAmountInput(raw: string): string {
+  const cleaned = raw.replace(/[^\d.]/g, '')
+  const [int, dec] = cleaned.split('.')
+  const intDigits = (int || '').replace(/^0+(?=\d)/, '')
+  const grouped = intDigits ? intDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : ''
+  return dec !== undefined && dec !== '' ? `${grouped}.${dec.slice(0, 2)}` : grouped
+}
 
 export default function Sponsor() {
   const [form, setForm] = useState({
-    brandName: '',
-    contactName: '',
-    email: '',
+    sponsorType: '',
+    fullName: '',
     phone: '',
-    packageType: 'supporter' as SponsorPkg['id'],
+    email: '',
+    country: '',
+    state: '',
+    address: '',
+    supportAreas: [] as string[],
+    sponsorshipType: '',
     amount: '',
-    notes: '',
+    usagePreference: '',
+    message: '',
+    publicRecognition: '' as RecognitionChoice,
+    displayName: '',
   })
-  const [logo, setLogo] = useState('')
+  const [consent, setConsent] = useState(false)
+  const [formError, setFormError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [logoInvalid, setLogoInvalid] = useState('')
+  const [submitted, setSubmitted] = useState('')
   const [eventId, setEventId] = useState('')
-  const toast = useToast()
+  const [logoBase64, setLogoBase64] = useState('')
+  const [logoError, setLogoError] = useState('')
+  const [sponsors, setSponsors] = useState<SponsorCard[]>([])
+  const [sponsorsLoading, setSponsorsLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const formRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     fetchLiveEvent().then((ev) => setEventId(ev.id)).catch(() => {})
+    getJson('/api/sponsors')
+      .then((data) => setSponsors(data.sponsors || []))
+      .catch(() => setSponsors([]))
+      .finally(() => setSponsorsLoading(false))
   }, [])
+
+  function openForm() {
+    setShowForm(true)
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -41,225 +121,473 @@ export default function Sponsor() {
 
   function handleLogo(file?: File) {
     if (!file) return
-    if (file.size > 300000) {
-      setLogoInvalid('Logo must be under 300KB. Please upload a smaller image.')
+    if (file.size > 2000000) {
+      setLogoError('Image must be under 2MB. Please choose a smaller file.')
       return
     }
-    setLogoInvalid('')
+    if (!file.type.startsWith('image/')) {
+      setLogoError('Please choose an image file (JPG, PNG, WebP).')
+      return
+    }
+    setLogoError('')
     const reader = new FileReader()
-    reader.onload = () => setLogo(reader.result as string)
+    reader.onload = () => {
+      resizeImageBase64(reader.result as string, 1600)
+        .then(setLogoBase64)
+        .catch(() => setLogoBase64(reader.result as string))
+    }
     reader.readAsDataURL(file)
+  }
+
+  function setSponsorshipType(value: string) {
+    setForm((f) => ({
+      ...f,
+      sponsorshipType: value,
+      amount: value === 'Financial Contribution' ? f.amount : '',
+    }))
+  }
+
+  function setRecognition(value: RecognitionChoice) {
+    setForm((f) => ({
+      ...f,
+      publicRecognition: value,
+      displayName: value === 'yes' ? f.displayName : '',
+    }))
+    if (value !== 'yes') {
+      setLogoBase64('')
+      setLogoError('')
+    }
+  }
+
+  function toggleArea(area: string) {
+    setForm((f) => ({
+      ...f,
+      supportAreas: f.supportAreas.includes(area)
+        ? f.supportAreas.filter((a) => a !== area)
+        : [...f.supportAreas, area],
+    }))
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
+    setFormError('')
+    const phoneErr = phoneErrorMessage(form.phone)
+    if (phoneErr) {
+      setFormError(phoneErr)
+      return
+    }
+    if (form.supportAreas.length === 0) {
+      setFormError('Please select at least one area you would like to support.')
+      return
+    }
+    if (!consent) {
+      setFormError('Please accept the confirmation statement to continue.')
+      return
+    }
     setLoading(true)
     try {
-      await postJson('/api/sponsors', {
-        ...form,
-        amount: form.amount ? Number(form.amount) : undefined,
-        logoBase64: logo || undefined,
+      const res = await postJson('/api/sponsors', {
+        fullName: form.fullName,
+        email: form.email,
+        phone: form.phone,
+        sponsorType: form.sponsorType,
+        country: form.country,
+        state: form.state,
+        address: form.address,
+        supportAreas: form.supportAreas,
+        sponsorshipType: form.sponsorshipType,
+        amount: form.sponsorshipType === 'Financial Contribution' ? Number(form.amount.replace(/[^\d.]/g, '')) : undefined,
+        usagePreference: form.usagePreference,
+        message: form.message,
+        publicRecognition: form.publicRecognition === 'yes',
+        displayName: form.publicRecognition === 'yes' ? form.displayName.trim() : '',
+        logoBase64: form.publicRecognition === 'yes' ? logoBase64 : undefined,
+        consent,
         eventId: eventId || undefined,
       })
-      toast.push('Thank you! Your sponsorship application has been received. Our team will reach out shortly.')
-      setForm({
-        brandName: '',
-        contactName: '',
-        email: '',
-        phone: '',
-        packageType: 'supporter',
-        amount: '',
-        notes: '',
-      })
-      setLogo('')
+      setSubmitted(res.reference || '')
     } catch (err: any) {
-      toast.push(err.message || 'Something went wrong. Please try again.', 'err')
+      setFormError(err.message || 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  const selectedPkg = sponsorPackages.find((p) => p.id === form.packageType)!
+  function ChoiceCard({
+    checked,
+    onSelect,
+    children,
+    name,
+    value,
+    type = 'radio',
+  }: {
+    checked: boolean
+    onSelect: () => void
+    children: React.ReactNode
+    name: string
+    value: string
+    type?: 'radio' | 'checkbox'
+  }) {
+    return (
+      <label
+        className={`cursor-pointer rounded-xl border p-4 flex items-center gap-3 text-sm transition-all duration-200 ${
+          checked
+            ? 'border-rose bg-blush shadow-sm'
+            : 'border-black/10 hover:border-rose/50'
+        }`}
+      >
+        <input
+          type={type}
+          name={name}
+          value={value}
+          checked={checked}
+          onChange={onSelect}
+          className="accent-rose mt-0.5"
+        />
+        <span className="text-ink/80">{children}</span>
+      </label>
+    )
+  }
+
+  function SectionHeading({ n, title }: { n: number; title: string }) {
+    return (
+      <h3 className="flex items-center gap-3 text-sm font-semibold uppercase tracking-wide text-rose-deep mt-8 first:mt-0">
+        <span className="w-7 h-7 rounded-full bg-rose-deep text-cream text-xs flex items-center justify-center font-bold">
+          {n}
+        </span>
+        {title}
+      </h3>
+    )
+  }
+
+  const amountVisible = form.sponsorshipType === 'Financial Contribution'
+  const nameVisible = form.publicRecognition === 'yes'
 
   return (
-    <div>
-      <section className="bg-gradient-to-br from-blush via-cream to-white border-b border-black/5">
-        <Reveal variant="up">
-        <div className="container py-12 md:py-16 text-center">
-          <span className="eyebrow mb-4">
-            <Sparkles size={14} /> Become a Sponsor
-          </span>
-          <span className="ornament mt-3 justify-center">✦</span>
-          <h1 className="section-title text-4xl md:text-5xl my-4">Support the Movement</h1>
-          <p className="text-ink/70 max-w-2xl mx-auto">
-            Position your brand in front of aspiring makeup artists and makeup lovers. Explore
-            sponsorship packages designed to deliver real visibility before, during, and after the
-            program.
-          </p>
-        </div>
-        </Reveal>
-      </section>
-
-      <div className="container section-pad">
-        {/* Packages */}
-        <div className="grid md:grid-cols-2 gap-6">
-          {tiers.map((id, i) => {
-            const p = sponsorPackages.find((x) => x.id === id)!
-            return (
-              <Reveal key={id} variant="zoom" delay={i * 100}>
-              <div className={`card p-7 card-hover ${id === 'title' ? 'ring-2 ring-gold border-glow' : ''}`}>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-blush flex items-center justify-center">
-                    {id === 'title'
-                      ? <Crown className="text-gold" size={20} />
-                      : <Package className="text-rose-dark" size={20} />}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">{p.label}</h3>
-                    <span className="text-xs text-muted">{p.slot || (p.price > 0 ? `₦${p.price.toLocaleString()}` : '')}</span>
-                  </div>
-                </div>
-                {p.price > 0 && (
-                  <div className="mb-3"><span className="font-display text-3xl font-bold">{formatNgn(p.price)}</span></div>
-                )}
-                <p className="text-sm text-muted mb-5">{p.desc}</p>
-                <ul className="space-y-2 text-sm text-ink/75">
-                  {p.benefits.map((b) => (
-                    <li key={b} className="flex items-start gap-2">
-                      <CircleCheck className="text-rose shrink-0 mt-0.5" size={16} />
-                      {b}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              </Reveal>
-            )
-          })}
-        </div>
-
-        {/* Product & Service */}
-        <div className="grid md:grid-cols-2 gap-6 mt-6">
-          {['product', 'service'].map((id, i) => {
-            const p = sponsorPackages.find((x) => x.id === id)!
-            return (
-              <Reveal key={id} variant="left" delay={i * 100}>
-              <div className="card p-7 card-hover">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-gold/15 flex items-center justify-center">
-                    {id === 'product'
-                      ? <Package className="text-gold" size={20} />
-                      : <Wrench className="text-gold" size={20} />}
-                  </div>
-                  <h3 className="font-semibold">{p.label}</h3>
-                </div>
-                <p className="text-sm text-muted mb-4">{p.desc}</p>
-                <p className="text-sm text-ink/70">Sponsors receive benefits based on their contributions and agreements.</p>
-              </div>
-              </Reveal>
-            )
-          })}
-        </div>
-
-        {/* Application form */}
+    <div className="container section-pad">
         <Reveal variant="zoom">
-        <div className="max-w-2xl mx-auto mt-14 md:mt-20">
-          <div className="text-center mb-8">
-            <h2 className="section-title mb-2">Apply to Sponsor</h2>
-            <p className="text-ink/70">Tell us a little about your brand and we’ll get back to you.</p>
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-10">
+            <span className="eyebrow mb-3">Sponsorship</span>
+            <h2 className="section-title mb-3">MEET OUR SPONSORS</h2>
+            <p className="text-ink/70 max-w-2xl mx-auto">
+              A heartfelt thank you to the individuals and organizations making Shawty Beauty Studio’s mission possible.
+            </p>
           </div>
 
-          <form onSubmit={submit} className="card p-6 sm:p-8 space-y-5">
-            <div className="grid sm:grid-cols-2 gap-5">
-              <div>
-                <label className="field-label">Brand / Business Name *</label>
-                <input className="input-field" value={form.brandName} required
-                  onChange={(e) => update('brandName', e.target.value)} />
-              </div>
-              <div>
-                <label className="field-label">Contact Person *</label>
-                <input className="input-field" value={form.contactName} required
-                  onChange={(e) => update('contactName', e.target.value)} />
-              </div>
-              <div>
-                <label className="field-label">Email *</label>
-                <input type="email" className="input-field" value={form.email} required
-                  onChange={(e) => update('email', e.target.value)} />
-              </div>
-              <div>
-                <label className="field-label">Phone *</label>
-                <input className="input-field" value={form.phone} required
-                  onChange={(e) => update('phone', e.target.value)} />
-              </div>
+          {sponsorsLoading ? (
+            <div className="flex justify-center py-16"><LoaderCircle className="animate-spin text-rose-deep" size={28} /></div>
+          ) : sponsors.length === 0 ? (
+            <div className="card p-10 text-center text-muted max-w-xl mx-auto">
+              This showcase is filling up. Be the first to partner with us and have your brand featured here!
             </div>
-
-            <div>
-              <label className="field-label">Sponsorship Package *</label>
-              <div className="grid sm:grid-cols-2 gap-3 mt-2">
-                {sponsorPackages.map((p) => {
-                  const active = form.packageType === p.id
-                  return (
-                    <label
-                      key={p.id}
-                      className={`cursor-pointer rounded-xl border p-4 flex items-start gap-3 transition-all duration-200 ${
-                        active
-                          ? 'border-rose bg-blush shadow-sm'
-                          : 'border-black/10 hover:border-rose/50'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="packageType"
-                        value={p.id}
-                        checked={active}
-                        onChange={() => update('packageType', p.id as SponsorPkg['id'])}
-                        className="mt-1 accent-rose"
+          ) : (
+            <div className="flex flex-wrap justify-center gap-3">
+              {sponsors.map((s) => (
+                <div key={s.id} className="card overflow-hidden text-center w-40">
+                  <div className="h-24 bg-blush/40 flex items-center justify-center overflow-hidden p-2">
+                    {s.logoUrl || s.logoBase64 ? (
+                      <img
+                        src={s.logoUrl || (s.logoBase64!.startsWith('data:') ? s.logoBase64! : `data:image/png;base64,${s.logoBase64!}`)}
+                        alt={s.name}
+                        className="h-full w-auto max-w-full object-contain"
                       />
-                      <span>
-                        <span className="block font-medium text-sm">{p.label}</span>
-                        <span className="block text-xs text-muted">
-                          {p.price > 0 ? formatNgn(p.price) : p.slot || 'Custom / In-kind'}
-                        </span>
-                      </span>
-                    </label>
-                  )
-                })}
-              </div>
+                    ) : (
+                      <span className="font-display text-3xl font-bold text-rose-deep">{s.name.charAt(0)}</span>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <div className="font-semibold text-xs">{s.name}</div>
+                    <div className="text-[11px] text-muted mt-0.5 break-all">{s.email}</div>
+                    {(s.state || s.country) && (
+                      <div className="text-[11px] text-muted mt-0.5">
+                        {(s.state ? s.state + (s.country ? ', ' : '') : '') + (s.country || '')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
+          )}
 
-            {(selectedPkg.id === 'product' || selectedPkg.id === 'service' || selectedPkg.id === 'title') && (
-              <div>
-                <label className="field-label">Amount / Contribution (₦)</label>
-                <input type="number" min={0} className="input-field" value={form.amount} placeholder="Enter amount (for custom / in-kind sponsorships)"
-                  onChange={(e) => update('amount', e.target.value)} />
-              </div>
-            )}
-
-            <div>
-              <label className="field-label">Notes / Details of contribution</label>
-              <textarea className="input-field" rows={3} value={form.notes}
-                onChange={(e) => update('notes', e.target.value)}
-                placeholder="e.g. supplying products, providing photography, venue support, etc." />
-            </div>
-
-            <div>
-              <label className="field-label">Brand Logo (optional, under 300KB)</label>
-              <input
-                type="file"
-                accept="image/*"
-                className="input-field"
-                onChange={(e) => handleLogo(e.target.files?.[0])}
-              />
-              {logoInvalid && <p className="text-xs text-red-600 mt-1">{logoInvalid}</p>}
-              {logo && <p className="text-xs text-green-600 mt-1">Logo attached ✓</p>}
-            </div>
-
-            <button type="submit" className="btn btn-primary w-full" disabled={loading}>
-              {loading ? <><LoaderCircle size={18} className="animate-spin" /> Submitting…</> : 'Submit Sponsorship Application'}
+          <div className="text-center mt-10">
+            <button onClick={openForm} className="btn btn-primary inline-flex items-center gap-2">
+              <HeartHandshake size={18} /> Partner with us today <ArrowRight size={16} />
             </button>
-          </form>
+          </div>
+
+          {showForm && (
+          <div ref={formRef} className="mt-12 scroll-mt-8">
+            <div className="max-w-2xl mx-auto">
+          {submitted ? (
+            <div className="card p-8 sm:p-10 text-center">
+              <div className="w-16 h-16 mx-auto rounded-full bg-green-100 text-green-600 flex items-center justify-center mb-5">
+                <HeartHandshake size={32} />
+              </div>
+              <h2 className="section-title mb-3">Thank you for supporting Shawty Beauty Studio!</h2>
+              <p className="text-ink/70 mb-6">
+                Your sponsorship has been received successfully. Our team will contact you regarding
+                the next steps.
+              </p>
+              <div className="inline-flex flex-col items-center gap-1 rounded-xl bg-blush px-6 py-4">
+                <span className="text-xs text-ink/60 uppercase tracking-wide font-semibold">
+                  Sponsorship Reference
+                </span>
+                <span className="font-mono text-xl font-bold text-rose-deep">{submitted}</span>
+              </div>
+              <div className="mt-6">
+                <Link to="/" className="btn btn-primary inline-flex items-center gap-2">
+                  <Home size={16} /> Back to Home
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={submit} className="card p-6 sm:p-8">
+              <div className="text-center mb-8">
+                <span className="eyebrow mb-3">Sponsorship</span>
+                <h2 className="section-title mb-2">SUPPORT SHAWTY BEAUTY STUDIO</h2>
+                <p className="font-display text-lg font-semibold text-rose-deep mb-2">
+                  Empower. Sponsor. Make an Impact.
+                </p>
+                <p className="text-ink/70 text-sm">
+                  Your support helps Shawty Beauty Studio train and empower aspiring makeup and lash
+                  artists. Every contribution — whether financial, material, or professional — makes
+                  a difference. Fill in the details below to get started.
+                </p>
+              </div>
+
+              <SectionHeading n={1} title="Sponsor Information" />
+              <div className="mt-4 space-y-5">
+                <div>
+                  <label className="field-label">Sponsor Type *</label>
+                  <div className="grid sm:grid-cols-2 gap-3 mt-2">
+                    {SPONSOR_TYPE_OPTIONS.map((o) => (
+                      <ChoiceCard key={o} name="sponsorType" value={o}
+                        checked={form.sponsorType === o}
+                        onSelect={() => update('sponsorType', o)}>
+                        {o}
+                      </ChoiceCard>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="field-label">Full Name / Organization / Brand Name *</label>
+                  <input className="input-field" value={form.fullName} required
+                    onChange={(e) => update('fullName', e.target.value)} />
+                </div>
+                <div className="grid sm:grid-cols-2 gap-5">
+                  <div>
+                    <label className="field-label">Phone Number *</label>
+                    <div className="mt-2">
+                      <PhoneInput value={form.phone} onChange={(v) => update('phone', v)} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="field-label">Email Address *</label>
+                    <input type="email" className="input-field" value={form.email} required
+                      onChange={(e) => update('email', e.target.value)} />
+                  </div>
+                  <div className="min-w-0">
+                    <label className="field-label">Country / Nationality *</label>
+                    {form.country && !nationalityNames.includes(form.country) ? (
+                      <input className="input-field" value={form.country === 'Other' ? '' : form.country}
+                        onChange={(e) => { update('state', ''); update('country', e.target.value) }}
+                        required placeholder="Type your country" />
+                    ) : (
+                      <select className="input-field w-full min-w-0" value={form.country}
+                        onChange={(e) => { update('state', ''); update('country', e.target.value) }} required>
+                        <option value="">Select country</option>
+                        {nationalityNames.map((n) => <option key={n} value={n}>{n}</option>)}
+                        <option value="Other">Other</option>
+                      </select>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <label className="field-label">State / Region *</label>
+                    {nationalities[form.country] ? (
+                      <select className="input-field w-full min-w-0" value={form.state}
+                        onChange={(e) => update('state', e.target.value)} required>
+                        <option value="">Select state</option>
+                        {nationalities[form.country].map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    ) : (
+                      <input className="input-field" value={form.state}
+                        onChange={(e) => update('state', e.target.value)} required placeholder="Type your state / region" />
+                    )}
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="field-label">Address *</label>
+                    <input className="input-field" value={form.address}
+                      onChange={(e) => update('address', e.target.value)} required placeholder="Street, area, city" />
+                  </div>
+                </div>
+              </div>
+
+              <SectionHeading n={2} title="Sponsorship Details" />
+              <div className="mt-4 space-y-5">
+                <div>
+                  <label className="field-label">What would you like to support? *</label>
+                  <div className="grid sm:grid-cols-2 gap-3 mt-2">
+                    {SUPPORT_AREA_OPTIONS.map((o) => (
+                      <ChoiceCard key={o} name="supportAreas" value={o} type="checkbox"
+                        checked={form.supportAreas.includes(o)}
+                        onSelect={() => toggleArea(o)}>
+                        {o}
+                      </ChoiceCard>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="field-label">Sponsorship Type *</label>
+                  <div className="grid sm:grid-cols-2 gap-3 mt-2">
+                    {SPONSORSHIP_TYPE_OPTIONS.map((o, i) => (
+                      <ChoiceCard key={o} name="sponsorshipType" value={o}
+                        checked={form.sponsorshipType === o}
+                        onSelect={() => setSponsorshipType(o)}>
+                        <span>
+                          {o}
+                          {i === 0 && <span className="block text-xs text-muted font-normal">State the amount you would like to contribute</span>}
+                        </span>
+                      </ChoiceCard>
+                    ))}
+                  </div>
+                </div>
+                {amountVisible && (
+<div>
+                      <label className="field-label">Amount (₦) *</label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-ink/60 font-medium">₦</span>
+                        <input type="text" inputMode="numeric" className="input-field"
+                          style={{ paddingLeft: '2.5rem' }}
+                          value={form.amount} placeholder="e.g. 50,000" maxLength={15} required
+                          onChange={(e) => update('amount', formatAmountInput(e.target.value))} />
+                      </div>
+                    </div>
+                )}
+              </div>
+
+              <SectionHeading n={3} title="Sponsorship Preference" />
+              <div className="mt-4 space-y-5">
+                <div>
+                  <label className="field-label">How would you like your sponsorship to be used? *</label>
+                  <div className="grid sm:grid-cols-2 gap-3 mt-2">
+                    {USAGE_PREFERENCE_OPTIONS.map((o) => (
+                      <ChoiceCard key={o} name="usagePreference" value={o}
+                        checked={form.usagePreference === o}
+                        onSelect={() => update('usagePreference', o)}>
+                        {o}
+                      </ChoiceCard>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="field-label">Additional Message / Instructions (optional)</label>
+                  <textarea className="input-field" rows={3} value={form.message}
+                    onChange={(e) => update('message', e.target.value)}
+                    placeholder="Tell us anything else we should know about your sponsorship." />
+                </div>
+              </div>
+
+              <SectionHeading n={4} title="Sponsor Recognition" />
+              <div className="mt-4 space-y-5">
+                <div>
+                  <label className="field-label">
+                    Would you like to be recognized publicly as a Shawty Beauty Studio sponsor? *
+                  </label>
+                  <div className="grid sm:grid-cols-2 gap-3 mt-2">
+                    <ChoiceCard name="publicRecognition" value="yes"
+                      checked={form.publicRecognition === 'yes'}
+                      onSelect={() => setRecognition('yes')}>
+                      Yes
+                    </ChoiceCard>
+                    <ChoiceCard name="publicRecognition" value="no"
+                      checked={form.publicRecognition === 'no'}
+                      onSelect={() => setRecognition('no')}>
+                      No, I prefer to remain anonymous
+                    </ChoiceCard>
+                  </div>
+                </div>
+                {nameVisible && (
+                  <div>
+                    <label className="field-label">Name to Display *</label>
+                    <input className="input-field" value={form.displayName} required
+                      placeholder="The name that will appear in our sponsor recognition"
+                      onChange={(e) => update('displayName', e.target.value)} />
+                  </div>
+                )}
+                {nameVisible && (
+                  <div>
+                    <label className="field-label">
+                      {form.sponsorType === 'Individual'
+                        ? 'Identification Document (optional)'
+                        : 'Organization Logo / Brand Identification (optional)'}
+                    </label>
+                    <p className="text-sm text-muted mb-2">
+                      {form.sponsorType === 'Individual'
+                        ? 'Upload a valid identification document (e.g. national ID, driver’s license, passport) or any document relating to your brand.'
+                        : 'Upload your organization’s logo or any brand identification document so we can feature it in our sponsor recognition.'}
+                    </p>
+                    {logoBase64 ? (
+                      <div className="relative inline-block">
+                        <img src={logoBase64} alt="Brand identification" className="h-32 w-auto rounded-xl border border-black/10 object-contain bg-white p-2" />
+                        <button
+                          type="button"
+                          onClick={() => { setLogoBase64(''); setLogoError('') }}
+                          aria-label="Remove image"
+                          className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-rose-deep text-white flex items-center justify-center hover:bg-rose-dark transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-black/20 hover:border-rose/60 cursor-pointer p-8 text-center transition-colors">
+                        <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                          onChange={(e) => handleLogo(e.target.files?.[0])} />
+                        <span className="w-10 h-10 rounded-full bg-blush text-rose-deep flex items-center justify-center">
+                          <ImagePlus size={18} />
+                        </span>
+                        <span className="text-sm text-ink/70 font-medium">
+                          {form.sponsorType === 'Individual' ? 'Upload identification document' : 'Upload logo'}
+                        </span>
+                        <span className="text-xs text-muted">JPG, PNG or WebP · max 2MB</span>
+                      </label>
+                    )}
+                    {logoError && <div className="mt-2 text-sm text-red-600">{logoError}</div>}
+                  </div>
+                )}
+              </div>
+
+              <SectionHeading n={5} title="Confirmation" />
+              <div className="mt-4">
+                <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-black/10 p-4 text-sm text-ink/70 hover:border-rose/50 transition-all duration-200">
+                  <input type="checkbox" checked={consent}
+                    onChange={(e) => setConsent(e.target.checked)} required
+                    className="accent-rose mt-0.5" />
+                  <span>
+                    I confirm that the information provided is accurate, and I am authorized to
+                    submit this sponsorship on behalf of the stated organization (if applicable). I
+                    understand that my sponsorship details are saved and used only for Shawty Beauty
+                    Studio sponsorship purposes. *
+                  </span>
+                </label>
+              </div>
+
+              {formError && (
+                <div className="mt-5 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3">
+                  {formError}
+                </div>
+              )}
+
+              <button type="submit" className="btn btn-primary w-full mt-6" disabled={loading}>
+                {loading ? <><LoaderCircle size={18} className="animate-spin" /> Submitting…</> : 'Submit Sponsorship'}
+              </button>
+            </form>
+          )}
+          </div>
+          </div>
+          )}
         </div>
         </Reveal>
       </div>
-    </div>
   )
 }

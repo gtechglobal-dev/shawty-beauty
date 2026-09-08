@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { eventRegisterUrl, type StudioEvent } from '../lib/constants'
 import { fetchEvents, fetchLiveEventOrNull, ticketPromoActive, ticketPrice, isEventLive } from '../lib/events'
+import { useRealtime } from '../lib/useRealtime'
 import Reveal from '../components/Reveal'
 import TicketCard from '../components/TicketCard'
 
@@ -21,15 +22,26 @@ export default function Program() {
   const [live, setLive] = useState<StudioEvent | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const refresh = async () => {
+    const [evs, l] = await Promise.all([fetchEvents(), fetchLiveEventOrNull()])
+    setEvents(evs)
+    setLive(l)
+  }
+
   useEffect(() => {
     ;(async () => {
-      const evs = await fetchEvents()
-      setEvents(evs)
-      const l = await fetchLiveEventOrNull()
-      setLive(l)
+      await refresh()
       setLoading(false)
     })()
   }, [])
+
+  // Live event changes from the Diary land here in real time too.
+  useRealtime((type) => {
+    if (type === 'events') {
+      setLoading(false)
+      refresh().catch(() => {})
+    }
+  })
 
   const featured = live && live.status === 'live' ? live : null
   const others = events.filter((e) => e.id !== live?.id)

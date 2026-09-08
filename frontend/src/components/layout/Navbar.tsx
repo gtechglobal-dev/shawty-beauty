@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Menu, X, MessageCircle } from 'lucide-react'
+import { Menu, X, BookOpenText } from 'lucide-react'
 import { siteConfig } from '../../lib/constants'
+import { isLoggedIn, subscribeAuth } from '../../lib/authState'
 
 const links = [
   { to: '/', label: 'Home' },
@@ -9,13 +10,15 @@ const links = [
   { to: '/program', label: 'Our Events' },
   { to: '/sponsor', label: 'Our Sponsors' },
   { to: '/contact', label: 'Contact' },
-  { to: '/diary', label: "Shawty's Diary" },
 ]
 
 export default function Navbar() {
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [loggedIn, setLoggedIn] = useState(isLoggedIn())
   const { pathname, hash } = useLocation()
+
+  useEffect(() => subscribeAuth(() => setLoggedIn(isLoggedIn())), [])
 
   useEffect(() => {
     setOpen(false)
@@ -94,14 +97,14 @@ export default function Navbar() {
               {l.label}
             </Link>
           ))}
-          <a
-            href={siteConfig.whatsapp}
-            target="_blank"
-            rel="noreferrer"
-            className="btn btn-primary ml-1 !py-2 !px-4 !text-[13px] shrink-0"
+          <Link
+            to="/diary"
+            className={`nav-link flex items-center gap-1.5 ml-2 ${isActive('/diary') ? 'nav-active' : ''} ${loggedIn ? 'diary-pill' : ''}`}
           >
-            <MessageCircle size={15} /> Book a Session
-          </a>
+            <BookOpenText size={14} />
+            <span>{loggedIn ? 'My Diary' : "Shawty's Diary"}</span>
+            {loggedIn && <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />}
+          </Link>
         </nav>
 
         <button
@@ -127,15 +130,23 @@ export default function Navbar() {
               {l.label}
             </Link>
           ))}
-          <a
-            href={siteConfig.whatsapp}
-            target="_blank"
-            rel="noreferrer"
+          <Link
+            to="/diary"
             onClick={() => setOpen(false)}
-            className="btn btn-primary w-full mt-3"
+            className={`mt-1 flex items-center justify-between px-4 py-3 rounded-lg text-[15px] font-semibold ${
+              isActive('/diary')
+                ? 'text-rose-deep bg-blush'
+                : loggedIn
+                  ? 'text-white bg-gradient-to-br from-rose to-rose-deep shadow-[0_10px_22px_-12px_rgba(145,78,108,0.8)]'
+                  : 'text-ink/75'
+            }`}
           >
-            <MessageCircle size={18} /> Book a Session on WhatsApp
-          </a>
+            <span className="flex items-center gap-2">
+              <BookOpenText size={17} />
+              {loggedIn ? 'My Diary' : "Shawty's Diary"}
+            </span>
+            {loggedIn && <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide opacity-90"><span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" /> Owner</span>}
+          </Link>
         </nav>
       )}
     </header>

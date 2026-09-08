@@ -37,6 +37,8 @@ import { generateTicketToken, deliverTicketEmail } from '../lib/tickets.js';
 import { sendEmail, mailConfigured, type MailAttachment } from '../lib/mailer.js';
 import { escapeHtml } from '../lib/telegram.js';
 import { uploadAndStepDown } from '../lib/cloudinary.js';
+import { isValidPhone, normalizePhone } from '../lib/phone.js';
+import { broadcastRealtime } from '../lib/realtime.js';
 
 const router = Router();
 
@@ -244,9 +246,6 @@ router.get('/events', authMiddleware, async (_req: AuthRequest, res: Response) =
     });
 
     // Records created before an event carried its own id
-    const unassignedRegs = registrations.filter((r) => !r.eventId);
-    const unassignedSps = sponsors.filter((s) => !s.eventId);
-
     const excluded = await unsubscribedEmails();
     const allEmails = aggregateEmails([
       ...registrations.map((r) => ({ email: r.email, createdAt: r.createdAt, source: 'registration' })),
@@ -257,11 +256,6 @@ router.get('/events', authMiddleware, async (_req: AuthRequest, res: Response) =
 
     res.json({
       events: grouped,
-      unassigned: {
-        registrations: unassignedRegs.length,
-        latestRegistrations: unassignedRegs.slice(0, 5),
-        sponsors: unassignedSps.length,
-      },
       totals: {
         events: events.length,
         messages: contacts.length,
@@ -302,6 +296,7 @@ router.post('/events', authMiddleware, async (req: AuthRequest, res: Response) =
       updatedAt: now,
     };
     await writeEvent(newEvent);
+    broadcastRealtime('events', { id: newEvent.id });
     res.status(201).json({ success: true, event: newEvent });
   } catch (err: any) {
     console.error('Failed to create event:', err.message);
@@ -319,6 +314,7 @@ router.put('/events/:id', authMiddleware, async (req: AuthRequest, res: Response
     clean.updatedAt = new Date().toISOString();
     const updated = await updateEvent(req.params.id, clean);
     if (!updated) return res.status(404).json({ error: 'Event not found' });
+    broadcastRealtime('events', { id: updated.id });
     res.json({ success: true, event: updated });
   } catch (err: any) {
     console.error('Failed to update event:', err.message);
@@ -338,6 +334,7 @@ router.post('/events/:id/live', authMiddleware, async (req: AuthRequest, res: Re
       await updateEvent(live.id, { status: 'scheduled', updatedAt: new Date().toISOString() });
     }
     const updated = await updateEvent(current.id, { status: 'live', updatedAt: new Date().toISOString() });
+    broadcastRealtime('events', { id: current.id });
     res.json({ success: true, event: updated, message: `${current.title} is now live on the site.` });
   } catch (err: any) {
     console.error('Failed to set live event:', err.message);
@@ -356,6 +353,7 @@ router.post('/events/:id/end', authMiddleware, async (req: AuthRequest, res: Res
       return res.json({ success: true, event: current, message: `${current.title} was already finished.` });
     }
     const updated = await updateEvent(current.id, { status: 'ended', updatedAt: new Date().toISOString() });
+    broadcastRealtime('events', { id: current.id });
     res.json({ success: true, event: updated, message: `${current.title} is now finished. It has been removed from the landing page and registration is closed.` });
   } catch (err: any) {
     console.error('Failed to end event:', err.message);
@@ -372,6 +370,7 @@ router.delete('/events/:id', authMiddleware, async (req: AuthRequest, res: Respo
     }
     const deleted = await deleteEvent(req.params.id);
     if (!deleted) return res.status(404).json({ error: 'Event not found' });
+    broadcastRealtime('events', { id: req.params.id, deleted: true });
     res.json({ success: true });
   } catch (err: any) {
     console.error('Failed to delete event:', err.message);
@@ -446,17 +445,27 @@ router.get('/registrations', authMiddleware, async (req: AuthRequest, res: Respo
 router.post('/registrations', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const b = req.body || {};
-    const fullName = String(b.fullName || '').trim();
-    const phone = String(b.phone || '').trim();
-    const email = String(b.email || '').trim();
+
+    const sanitizeText = (s: unknown, max: number): string =>
+      String(s || '')
+        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+        .trim()
+        .slice(0, max);
+
+    const fullName = sanitizeText(b.fullName, 120);
+    const phone = normalizePhone(sanitizeText(b.phone, 24));
+    const email = sanitizeText(b.email, 254).toLowerCase();
     if (!fullName || !phone || !email) {
       return res.status(400).json({ error: 'Full name, phone and email are required.' });
     }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       return res.status(400).json({ error: 'A valid email address is required.' });
     }
+    if (!isValidPhone(phone)) {
+      return res.status(400).json({ error: 'Please enter a valid phone number with its country code.' });
+    }
 
-    const ticketType = String(b.ticketType || 'student').trim() || 'student';
+    const ticketType = sanitizeText(b.ticketType, 20) || 'student';
     const quantity = Math.max(1, Math.min(20, Math.round(Number(b.quantity) || 1)));
     const amount = Math.max(0, Math.round(Number(b.amount) || 0));
     const eventId = b.eventId ? String(b.eventId) : undefined;
@@ -476,7 +485,8 @@ router.post('/registrations', authMiddleware, async (req: AuthRequest, res: Resp
       else photoBase64 = rawPhoto;
     }
 
-    let ticketLabel = typeof b.ticketLabel === 'string' && b.ticketLabel.trim() ? b.ticketLabel.trim() : undefined;
+    let ticketLabel =
+      typeof b.ticketLabel === 'string' && b.ticketLabel.trim() ? b.ticketLabel.trim().slice(0, 60) : undefined;
     if (!ticketLabel && event?.tickets?.length) {
       const match =
         event.tickets.find((t) => t.id === ticketType) ||
@@ -489,14 +499,14 @@ router.post('/registrations', authMiddleware, async (req: AuthRequest, res: Resp
       fullName,
       phone,
       email,
-      instagram: String(b.instagram || '').trim(),
-      dateOfBirth: String(b.dateOfBirth || '').trim(),
-      state: String(b.state || '').trim(),
-      nationality: String(b.nationality || '').trim(),
-      address: String(b.address || '').trim(),
-      experienceLevel: String(b.experienceLevel || '').trim(),
-      emergencyContactName: String(b.emergencyContactName || '').trim(),
-      emergencyContact: String(b.emergencyContact || '').trim(),
+      instagram: sanitizeText(b.instagram, 100),
+      dateOfBirth: sanitizeText(b.dateOfBirth, 20),
+      state: sanitizeText(b.state, 80),
+      nationality: sanitizeText(b.nationality, 50),
+      address: sanitizeText(b.address, 200),
+      experienceLevel: sanitizeText(b.experienceLevel, 40),
+      emergencyContactName: sanitizeText(b.emergencyContactName, 120),
+      emergencyContact: sanitizeText(b.emergencyContact, 24),
 ticketType: ticketType as TicketType,
       ticketLabel,
       quantity,
@@ -505,8 +515,8 @@ ticketType: ticketType as TicketType,
       subtotal: amount,
       processingFee: 0,
       status: 'paid',
-      reason: String(b.reason || '').trim(),
-      hearAbout: String(b.hearAbout || '').trim(),
+      reason: sanitizeText(b.reason, 1000),
+      hearAbout: sanitizeText(b.hearAbout, 120),
       createdAt: new Date().toISOString(),
       eventId: event?.id,
       photoBase64,
@@ -563,6 +573,7 @@ router.patch('/registrations/:id', authMiddleware, async (req: AuthRequest, res:
     }
     const updated = await updateRegistration(req.params.id, update);
     if (!updated) return res.status(404).json({ error: 'Registration not found' });
+    broadcastRealtime('registrations', { id: updated.id, status: updated.status });
     res.json({ success: true, registration: updated });
   } catch (err: any) {
     console.error('Failed to update registration:', err.message);
@@ -574,6 +585,7 @@ router.delete('/registrations/:id', authMiddleware, async (req: AuthRequest, res
   try {
     const deleted = await deleteRegistration(req.params.id);
     if (!deleted) return res.status(404).json({ error: 'Registration not found' });
+    broadcastRealtime('registrations', { id: req.params.id, deleted: true });
     res.json({ success: true });
   } catch (err: any) {
     console.error('Failed to delete registration:', err.message);
@@ -643,14 +655,16 @@ router.get('/sponsors', authMiddleware, async (req: AuthRequest, res: Response) 
 
 router.patch('/sponsors/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { status, featured } = req.body;
-    const update: { status?: SponsorStatus; featured?: boolean } = {};
+    const { status, featured, deactivated } = req.body;
+    const update: { status?: SponsorStatus; featured?: boolean; deactivated?: boolean } = {};
     if (status && ['pending', 'confirmed', 'cancelled'].includes(status as SponsorStatus)) {
       update.status = status as SponsorStatus;
     }
     if (typeof featured === 'boolean') update.featured = featured;
+    if (typeof deactivated === 'boolean') update.deactivated = deactivated;
     const updated = await updateSponsor(req.params.id, update);
     if (!updated) return res.status(404).json({ error: 'Sponsor not found' });
+    broadcastRealtime('sponsors', { id: updated.id, status: updated.status });
     res.json({ success: true, sponsor: updated });
   } catch (err: any) {
     console.error('Failed to update sponsor:', err.message);
@@ -662,6 +676,7 @@ router.delete('/sponsors/:id', authMiddleware, async (req: AuthRequest, res: Res
   try {
     const deleted = await deleteSponsor(req.params.id);
     if (!deleted) return res.status(404).json({ error: 'Sponsor not found' });
+    broadcastRealtime('sponsors', { id: req.params.id, deleted: true });
     res.json({ success: true });
   } catch (err: any) {
     console.error('Failed to delete sponsor:', err.message);
@@ -722,6 +737,7 @@ router.patch('/contacts/:id/read', authMiddleware, async (req: AuthRequest, res:
   try {
     const updated = await markContactRead(req.params.id);
     if (!updated) return res.status(404).json({ error: 'Contact not found' });
+    broadcastRealtime('contacts', { id: req.params.id, read: true });
     res.json({ success: true });
   } catch (err: any) {
     console.error('Failed to mark contact read:', err.message);
@@ -873,6 +889,13 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
       if (emailFilter && emailFilter.length > 0) {
         recipients = recipients.filter((r) => emailFilter.includes(r.email.toLowerCase()));
       }
+    } else if (req.body?.scope === 'sponsors') {
+      // Sponsors-only email — goes to every sponsor (brand-level records included).
+      const sps = await readSponsors();
+      recipients = aggregateEmails(
+        sps.map((s) => ({ email: s.email, createdAt: s.createdAt, source: 'sponsor' })),
+        excluded,
+      ).filter((r) => !r.unsubscribed);
     } else {
       const [subscribers, contacts, registrations, sponsors] = await Promise.all([
         readSubscribers(),

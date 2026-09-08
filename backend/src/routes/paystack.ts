@@ -15,7 +15,9 @@ import {
 } from '../db.js';
 import { sendTelegramMessage, sendTelegramPhoto, telegramConfigured, escapeHtml } from '../lib/telegram.js';
 import { generateTicketToken, deliverTicketEmail } from '../lib/tickets.js';
+import { broadcastRealtime } from '../lib/realtime.js';
 import { uploadAndStepDown, fetchImageBase64 } from '../lib/cloudinary.js';
+import { isValidPhone, normalizePhone } from '../lib/phone.js';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || '';
 const PAYSTACK_BASE = 'https://api.paystack.co';
@@ -254,17 +256,39 @@ router.post('/initialize', async (req: Request, res: Response) => {
   try {
     const body = req.body as InitBody;
 
-    const fullName = (body.fullName || '').trim();
-    const phone = (body.phone || '').trim();
-    const email = (body.email || '').trim().toLowerCase();
+    const sanitizeText = (s: unknown, max: number): string =>
+      String(s || '')
+        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+        .trim()
+        .slice(0, max);
+
+    const fullName = sanitizeText(body.fullName, 120);
+    const phone = normalizePhone(sanitizeText(body.phone, 24));
+    const email = sanitizeText(body.email, 254).toLowerCase();
     const ticketType = body.ticketType;
     const quantity = Math.max(1, Math.min(10, Math.round(body.quantity || 1)));
+    const instagram = sanitizeText(body.instagram, 100);
+    const dateOfBirth = sanitizeText(body.dateOfBirth, 20);
+    const state = sanitizeText(body.state, 80);
+    const nationality = sanitizeText(body.nationality, 50);
+    const address = sanitizeText(body.address, 200);
+    const experienceLevel = sanitizeText(body.experienceLevel, 40);
+    const emergencyContactName = sanitizeText(body.emergencyContactName, 120);
+    const emergencyContact = normalizePhone(sanitizeText(body.emergencyContact, 24));
+    const reason = sanitizeText(body.reason, 1000);
+    const hearAbout = sanitizeText(body.hearAbout, 120);
 
     if (!fullName || !phone || !email) {
       return res.status(400).json({ error: 'Full name, phone and email are required' });
     }
     if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(email)) {
       return res.status(400).json({ error: 'Invalid email address' });
+    }
+    if (!isValidPhone(phone)) {
+      return res.status(400).json({ error: 'Please enter a valid phone number with its country code' });
+    }
+    if (emergencyContact && !isValidPhone(emergencyContact)) {
+      return res.status(400).json({ error: 'Please enter a valid emergency contact number with its country code' });
     }
 
     // Tickets are governed by the event the form is registering for (the live
@@ -311,14 +335,14 @@ router.post('/initialize', async (req: Request, res: Response) => {
       fullName,
       phone,
       email,
-      instagram: (body.instagram || '').trim(),
-      dateOfBirth: (body.dateOfBirth || '').trim(),
-      state: (body.state || '').trim(),
-      nationality: (body.nationality || '').trim(),
-      address: (body.address || '').trim(),
-      experienceLevel: (body.experienceLevel || '').trim(),
-      emergencyContactName: (body.emergencyContactName || '').trim(),
-      emergencyContact: (body.emergencyContact || '').trim(),
+      instagram,
+      dateOfBirth,
+      state,
+      nationality,
+      address,
+      experienceLevel,
+      emergencyContactName,
+      emergencyContact: emergencyContact || '',
       ticketType,
       quantity,
       unitPrice: ticketPrice(ticket),
@@ -328,8 +352,8 @@ router.post('/initialize', async (req: Request, res: Response) => {
       status: 'pending',
       eventId: event?.id,
       ticketLabel: ticket.label,
-      reason: (body.reason || '').trim(),
-      hearAbout: (body.hearAbout || '').trim(),
+      reason,
+      hearAbout,
       photoBase64,
       photoUrl,
       createdAt: new Date().toISOString(),
@@ -337,6 +361,7 @@ router.post('/initialize', async (req: Request, res: Response) => {
 
     // Save a pending registration record first
     await writeRegistration(reg);
+    broadcastRealtime('registrations', { id: reg.id, status: reg.status });
 
     const paystackRes = await fetch(`${PAYSTACK_BASE}/transaction/initialize`, {
       method: 'POST',
@@ -425,6 +450,7 @@ router.post('/verify', async (req: Request, res: Response) => {
         if (paid) {
           notifyPaidRegistration(paid).catch(() => {});
           deliverTicketFor(paid).catch(() => {});
+          broadcastRealtime('registrations', { id: paid.id, status: 'paid' });
         }
       }
       return res.json({
@@ -482,6 +508,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
           if (paid) {
             notifyPaidRegistration(paid).catch(() => {});
             deliverTicketFor(paid).catch(() => {});
+            broadcastRealtime('registrations', { id: paid.id, status: 'paid' });
           }
         }
       }

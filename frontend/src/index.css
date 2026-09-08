@@ -609,3 +609,41 @@ h1, h2, h3, .font-display {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.15; }
 }
+
+/* ===== Diary ===== */
+
+/* Distinct pill treatment for the signed-in owner's Diary nav entry */
+.diary-pill {
+  background: linear-gradient(180deg, #b36380, #7c2f4c);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.25) inset,
+    0 6px 16px -8px rgba(145, 78, 108, 0.7);
+}
+.diary-pill.nav-link {
+  color: #fff;
+  opacity: 1;
+}
+.diary-pill.nav-link:hover {
+  color: #fff;
+  opacity: 0.94;
+  background: linear-gradient(180deg, #b36380, #7c2f4c);
+}
+
+/* Hide scrollbars on the Diary's tab rail while keeping it scrollable */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Small pop-in for transient realtime notices */
+@keyframes pop-in {
+  0% { opacity: 0; transform: translate(-50%, 120%); }
+  60% { opacity: 1; transform: translate(-50%, -4%); }
+  100% { opacity: 1; transform: translate(-50%, 0); }
+}
+.animate-pop-in {
+  animation: pop-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}

@@ -1,40 +1,22 @@
 import { useEffect, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-
-interface Country {
-  code: string
-  flag: string
-  dial: string
-  max: number
-}
-
-export const countries: Country[] = [
-  { code: 'NG', flag: '🇳🇬', dial: '234', max: 10 },
-  { code: 'GH', flag: '🇬🇭', dial: '233', max: 9 },
-  { code: 'ZA', flag: '🇿🇦', dial: '27', max: 9 },
-  { code: 'KE', flag: '🇰🇪', dial: '254', max: 9 },
-  { code: 'AE', flag: '🇦🇪', dial: '971', max: 9 },
-  { code: 'US', flag: '🇺🇸', dial: '1', max: 10 },
-  { code: 'CA', flag: '🇨🇦', dial: '1', max: 10 },
-  { code: 'GB', flag: '🇬🇧', dial: '44', max: 10 },
-  { code: 'IN', flag: '🇮🇳', dial: '91', max: 10 },
-  { code: 'FR', flag: '🇫🇷', dial: '33', max: 9 },
-  { code: 'DE', flag: '🇩🇪', dial: '49', max: 11 },
-]
+import { phoneCountries, type PhoneCountry } from '../lib/phone'
 
 interface Props {
   value: string
   onChange: (v: string) => void
+  required?: boolean
 }
 
-export default function PhoneInput({ value, onChange }: Props) {
+export default function PhoneInput({ value, onChange, required = true }: Props) {
   const [dial, setDial] = useState('234')
   const [national, setNational] = useState('')
 
   useEffect(() => {
     if (!value) return
     const digits = value.replace(/\D/g, '')
-    const c = countries.find((x) => digits.startsWith(x.dial)) ?? countries[0]
+    const sorted = [...phoneCountries].sort((a, b) => b.dial.length - a.dial.length)
+    const c = sorted.find((x) => digits.startsWith(x.dial)) ?? phoneCountries[0]
     setDial(c.dial)
     setNational(digits.slice(c.dial.length).slice(0, c.max))
   }, [value])
@@ -46,14 +28,14 @@ export default function PhoneInput({ value, onChange }: Props) {
   }
 
   function changeDial(next: string) {
-    const c = countries.find((x) => x.dial === next) ?? countries[0]
+    const c = phoneCountries.find((x) => x.dial === next) ?? phoneCountries[0]
     const trimmed = national.slice(0, c.max)
     setDial(next)
     setNational(trimmed)
     onChange(`+${next} ${trimmed}`)
   }
 
-  const country = countries.find((c) => c.dial === dial) ?? countries[0]
+  const country: PhoneCountry = phoneCountries.find((c) => c.dial === dial) ?? phoneCountries[0]
   const placeholder = country.max >= 10 ? '8012345678' : '123456789'
 
   return (
@@ -65,7 +47,7 @@ export default function PhoneInput({ value, onChange }: Props) {
           aria-label="Country code"
           className="appearance-none bg-white pl-2 pr-7 py-3 h-full text-[0.9rem] font-medium outline-none cursor-pointer border-r border-black/10"
         >
-          {countries.map((c) => (
+          {phoneCountries.map((c) => (
             <option key={c.code} value={c.dial}>
               {c.flag} +{c.dial}
             </option>
@@ -83,7 +65,7 @@ export default function PhoneInput({ value, onChange }: Props) {
         onChange={(e) => changeNational(e.target.value)}
         placeholder={placeholder}
         maxLength={country.max}
-        required
+        required={required}
         aria-label="Phone number"
         className="flex-1 min-w-0 bg-white px-3 py-3 text-[0.9rem] font-sans outline-none"
       />

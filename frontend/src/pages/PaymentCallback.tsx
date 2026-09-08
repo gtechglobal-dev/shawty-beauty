@@ -4,10 +4,28 @@ import { CircleCheck, LoaderCircle, CircleAlert, CircleX } from 'lucide-react'
 import { postJson } from '../lib/api'
 import Reveal from '../components/Reveal'
 
+const WHATSAPP_TICKET_GROUPS: Record<string, string> = {
+  student: 'https://chat.whatsapp.com/JVfcHyovmfBFQnfXyw2X89?mode=gi_t',
+  gold: 'https://chat.whatsapp.com/Ib798HDNegI7Wz6bcr6tSg?mode=gi_t',
+}
+
+const WHATSAPP_COMMUNITY_DEFAULT = 'https://chat.whatsapp.com/LsEBJJVVFAJ0rSr8bsx8Sq'
+
+function whatsappGroupFor(registration?: {
+  ticketType?: string
+  ticketLabel?: string
+}): string {
+  const key = String(registration?.ticketType || registration?.ticketLabel || '').toLowerCase()
+  if (key.includes('student')) return WHATSAPP_TICKET_GROUPS.student
+  if (key.includes('gold')) return WHATSAPP_TICKET_GROUPS.gold
+  return WHATSAPP_COMMUNITY_DEFAULT
+}
+
 export default function PaymentCallback() {
   const [params] = useSearchParams()
   const reference = params.get('reference') || ''
   const [state, setState] = useState<'loading' | 'paid' | 'failed'>('loading')
+  const [whatsappLink, setWhatsappLink] = useState<string>(WHATSAPP_COMMUNITY_DEFAULT)
 
   useEffect(() => {
     if (!reference) {
@@ -15,7 +33,12 @@ export default function PaymentCallback() {
       return
     }
     postJson('/api/paystack/verify', { reference })
-      .then((data) => setState(data.paid ? 'paid' : 'failed'))
+      .then((data) => {
+        setState(data.paid ? 'paid' : 'failed')
+        if (data.paid && data.registration) {
+          setWhatsappLink(whatsappGroupFor(data.registration))
+        }
+      })
       .catch(() => setState('failed'))
   }, [reference])
 
@@ -33,13 +56,16 @@ export default function PaymentCallback() {
       {state === 'paid' && (
         <div className="card p-12">
           <CircleCheck className="mx-auto text-green-500 mb-4" size={56} />
-          <h1 className="section-title text-2xl mb-3">Payment Successful!</h1>
-          <p className="text-ink/70 mb-6">
-            Thank you! Your registration is confirmed and your ticket (with QR code) has been sent to your
-            email — download it from there. On each day of the event, scan the QR on your ticket and enter
-            the attendance code the studio shares to check in.
+          <h1 className="section-title text-2xl mb-3">Payment Successful! Welcome Onboard!</h1>
+          <p className="text-ink/70 mb-4">
+            Your registration is confirmed and your ticket has been sent to your registered email, kindly
+            download and keep safe for the event.
           </p>
-          <a href="https://chat.whatsapp.com/LsEBJJVVFAJ0rSr8bsx8Sq" target="_blank" rel="noopener noreferrer" className="btn btn-primary mb-3">
+          <p className="text-ink/70 mb-6">
+            Also check your spam folder if you can&rsquo;t find it in your primary folder. Other information
+            will be sent to you via your registered contacts when necessary... See you in class!
+          </p>
+          <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="btn btn-primary mb-3">
             Join WhatsApp Community
           </a>
           <div className="mb-6" />

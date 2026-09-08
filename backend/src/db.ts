@@ -165,6 +165,21 @@ export async function deleteRegistration(id: string): Promise<boolean> {
   return result.deletedCount > 0;
 }
 
+// Remove legacy registrations that were created before events carried their
+// own id and so can never be grouped under any event (the "Unassigned" list).
+export async function deleteUnassignedRegistrations(): Promise<number> {
+  const col = getCollection<Registration>('registrations');
+  if (!col) return 0;
+  const result = await col.deleteMany({
+    $or: [
+      { eventId: { $exists: false } },
+      { eventId: null },
+      { eventId: '' },
+    ],
+  } as any);
+  return result.deletedCount || 0;
+}
+
 // ------------------------------------------------------------------
 // Sponsors
 // ------------------------------------------------------------------
@@ -183,6 +198,7 @@ export type SponsorStatus = 'pending' | 'confirmed' | 'cancelled';
 export interface Sponsor {
   _id?: ObjectId;
   id: string;
+  reference?: string;
   brandName: string;
   contactName: string;
   email: string;
@@ -197,6 +213,18 @@ export interface Sponsor {
   logoUrl?: string;
   eventId?: string;
   createdAt: string;
+  sponsorType?: string;
+  supportAreas?: string[];
+  sponsorshipType?: string;
+  usagePreference?: string;
+  publicRecognition?: boolean;
+  displayName?: string;
+  consent?: boolean;
+  country?: string;
+  state?: string;
+  address?: string;
+  // Hidden from the public sponsors page until reactivated in the diary.
+  deactivated?: boolean;
 }
 
 export async function readSponsors(filter?: Partial<Sponsor>): Promise<Sponsor[]> {
@@ -253,6 +281,7 @@ export interface ContactMessage {
   email: string;
   subject: string;
   message: string;
+  phone?: string;
   read: boolean;
   createdAt: string;
 }

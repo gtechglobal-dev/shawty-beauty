@@ -50,7 +50,7 @@ export function generateTicketToken(): string {
 }
 
 export function baseOrigin(baseUrl?: string): string {
-  return (baseUrl || process.env.BASE_URL || 'https://shawtybeautystudio.com').replace(/\/+$/, '');
+  return (baseUrl || process.env.BASE_URL || 'https://shawty-beauty-studio.onrender.com').replace(/\/+$/, '');
 }
 
 /** What the QR encodes: opens the daily check-in page for this registrant. */
