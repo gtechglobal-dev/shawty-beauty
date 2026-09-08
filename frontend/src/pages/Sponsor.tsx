@@ -353,7 +353,7 @@ export default function Sponsor() {
   }) {
     return (
       <label
-        className={`cursor-pointer rounded-xl border p-4 flex items-center gap-3 text-sm transition-all duration-200 ${
+        className={`cursor-pointer rounded-xl border p-4 flex items-center gap-3 text-sm transition-all duration-200 min-w-0 ${
           checked
             ? 'border-rose bg-blush shadow-sm'
             : 'border-black/10 hover:border-rose/50'
@@ -407,7 +407,7 @@ export default function Sponsor() {
           ) : (
             <div className="flex flex-wrap justify-center gap-3">
               {sponsors.map((s) => (
-                <div key={s.id} className="card overflow-hidden text-center w-40">
+                <div key={s.id} className="card overflow-hidden text-center min-w-[140px] max-w-[160px] flex-1">
                   <div className="h-24 bg-blush/40 flex items-center justify-center overflow-hidden p-2">
                     {s.logoUrl || s.logoBase64 ? (
                       <button
@@ -702,16 +702,16 @@ export default function Sponsor() {
                     </p>
                     <div className="space-y-2.5">
                       {socials.map((s, i) => (
-                        <div key={i} className="flex flex-row items-center gap-2 flex-nowrap">
+                        <div key={i} className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                           <select
-                            className="input-field flex-1 min-w-0"
+                            className="input-field flex-1 min-w-0 w-full sm:w-auto"
                             value={s.platform}
                             onChange={(e) => setSocials((arr) => arr.map((x, j) => (j === i ? { ...x, platform: e.target.value } : x)))}
                           >
                             <option value="">Platform</option>
                             {SOCIAL_PLATFORM_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
                           </select>
-                          <div className="relative flex-1 min-w-0">
+                          <div className="relative flex-1 min-w-0 w-full">
                             <AtSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
                             <input
                               className="input-field !pl-8 w-full min-w-0"
@@ -723,7 +723,7 @@ export default function Sponsor() {
                           <button
                             type="button"
                             onClick={() => setSocials((arr) => arr.filter((_, j) => j !== i))}
-                            className="shrink-0 p-2.5 rounded-lg border border-black/10 text-ink/50 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
+                            className="shrink-0 p-2.5 rounded-lg border border-black/10 text-ink/50 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors self-start sm:self-center"
                             title="Remove platform"
                           >
                             <Trash2 size={16} />
