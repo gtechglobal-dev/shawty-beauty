@@ -7,6 +7,7 @@ import { getSetting, setSetting, saveResetToken, consumeResetToken } from '../db
 import { sendPasswordResetEmail, sendSuspiciousActivityEmail, mailConfigured } from '../lib/mailer.js';
 import { sendTelegramMessage, telegramConfigured } from '../lib/telegram.js';
 import { resolveClientIp, lookupIpInfo } from '../lib/clientInfo.js';
+import { siteBaseUrl } from '../lib/baseUrl.js';
 
 const router = Router();
 
@@ -125,7 +126,7 @@ router.post('/forgot-password', forgotLimiter, async (req: Request, res: Respons
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
     await saveResetToken(token, expiresAt);
 
-    const baseUrl = (process.env.BASE_URL || req.body?.origin || 'http://localhost:5173').replace(/\/+$/, '');
+    const baseUrl = siteBaseUrl(req.body?.origin);
     const resetLink = `${baseUrl}/diary?reset=${token}`;
 
     let emailed = false;

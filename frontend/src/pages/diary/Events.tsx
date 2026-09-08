@@ -160,10 +160,6 @@ function formatDobWithAge(dob?: string): string {
   return `${formatted} | ${age}years`
 }
 
-function isPresent(r: { present?: boolean; attendance?: Record<string, boolean> }): boolean {
-  return Boolean(r.present || (r.attendance && Object.values(r.attendance).some(Boolean)))
-}
-
 // ------------------------------------------------------------------
 // Events home (grouped overview)
 // ------------------------------------------------------------------
@@ -276,8 +272,6 @@ const [pendingEnd, setPendingEnd] = useState<DiaryEvent | null>(null)
                     <StatGrid
                       items={[
                         { icon: Users, label: 'Registered', value: s.registrations },
-                        { icon: TicketIcon, label: 'Paid tickets', value: s.paid },
-                        { icon: CalendarDays, label: 'Present', value: s.present },
                         { icon: TrendingUp, label: 'Revenue', value: formatNgn(s.revenue) },
                       ]}
                     />
@@ -1048,6 +1042,7 @@ export function EventManage({
   const [ticketReg, setTicketReg] = useState<RegistrationRow | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<RegistrationRow | null>(null)
   const [delBusy, setDelBusy] = useState(false)
+  const [unmarking, setUnmarking] = useState<string | null>(null)
   const [emailOpen, setEmailOpen] = useState(false)
   const [contactsOpen, setContactsOpen] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
@@ -1086,7 +1081,6 @@ export function EventManage({
   }, [event.id, reloadKey])
 
   const sortedRegs = [...regs].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-  const presentCount = sortedRegs.filter(isPresent).length
 
   const filteredRegs = sortedRegs.filter((r) => {
     if (filters.ticketType && (r.ticketLabel || r.ticketType) !== filters.ticketType) return false
@@ -1135,6 +1129,25 @@ export function EventManage({
       toast.push(err.message || 'Failed to revoke code', 'err')
     } finally {
       setGenBusy(null)
+    }
+  }
+
+  async function unmarkAttendance(r: RegistrationRow, day: string, label: string) {
+    const key = `${r.id}:${day}`
+    setUnmarking(key)
+    try {
+      const data = await delJson(
+        `/api/admin/registrations/${encodeURIComponent(r.id)}/attendance?day=${encodeURIComponent(day)}`,
+        headers,
+      )
+      setRegs((rs) =>
+        rs.map((x) => (x.id === r.id ? { ...x, attendance: data.registration?.attendance || x.attendance } : x)),
+      )
+      toast.push(`${r.fullName}'s ${label} attendance cleared.`)
+    } catch (err: any) {
+      toast.push(err.message || 'Failed to clear attendance', 'err')
+    } finally {
+      setUnmarking(null)
     }
   }
 
@@ -1189,10 +1202,8 @@ export function EventManage({
       </div>
 
       {/* Overview stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <StatCard icon={Users} label="Registered" value={s.registrations} />
-        <StatCard icon={TicketIcon} label="Paid tickets" value={`${s.paid}`} />
-        <StatCard icon={CalendarDays} label="Present" value={`${presentCount}`} />
         <StatCard icon={TrendingUp} label="Revenue" value={formatNgn(s.revenue)} />
       </div>
 
@@ -1204,24 +1215,25 @@ export function EventManage({
             <thead>
               <tr className="text-left text-muted text-xs border-b border-black/8">
                 {labels.map((l, i) => <th key={l} className="px-3 py-2 text-center">{l}</th>)}
-                <th className="px-3 py-2">Overall</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 {keys.map((k) => (
                   <td key={k} className="px-3 py-3 text-center">
-                    <span className="font-display text-2xl font-bold text-rose-deep">{s.attendanceByDay?.[k] ?? 0}</span>
+                    <span className="font-display text-2xl font-bold text-rose-deep">
+                      {s.attendanceByDay?.[k] ?? 0} / {s.registrations}
+                    </span>
                   </td>
                 ))}
-                <td className="px-3 py-3">
-                  <span className="font-display text-2xl font-bold text-green-700">{presentCount}</span>
-                </td>
               </tr>
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-muted mt-2">Students check in by scanning their ticket QR and entering the shared code for that session.</p>
+        <p className="text-xs text-muted mt-2">
+          Shown as checked-in / registered per session (e.g. 1/3 = one student present out of three
+          registered). Students check in by scanning their ticket QR and entering the shared code for that session.
+        </p>
       </div>
 
       {/* Daily attendance codes */}
@@ -1313,7 +1325,7 @@ export function EventManage({
         <div className="p-6 flex items-center justify-between flex-wrap gap-3 border-b border-black/5">
           <div>
             <h4 className="font-semibold text-lg">Students &amp; registrations ({filteredRegs.length}{hasFilters ? ` of ${sortedRegs.length}` : ''})</h4>
-            <p className="text-sm text-muted">Forms submitted for this event — view profiles, tickets and attendance.</p>
+            <p className="text-sm text-muted">Forms submitted for this event — view profiles, tickets and attendance. Tap a green day bubble on a student’s row to unmark their check-in (admin correction only).</p>
           </div>
           <div className="flex items-center gap-2">
             {hasFilters && (
@@ -1327,10 +1339,10 @@ export function EventManage({
           <div className="p-12 flex items-center justify-center text-muted"><LoaderCircle size={20} className="animate-spin" /> Loading…</div>
         ) : (
         <div>
-        <div className="overflow-x-auto">
+<div className="overflow-auto max-h-[65vh]">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-muted text-xs border-b border-black/8">
+              <tr className="text-center text-muted text-xs border-b border-black/8 sticky top-0 z-10 bg-white shadow-[0_1px_0_0_rgba(0,0,0,0.06)]">
                 <th className="px-5 py-2 w-10">S/N</th>
                 <th className="px-5 py-2">Student</th>
                 <th className="px-5 py-2">Contact</th>
@@ -1343,10 +1355,10 @@ export function EventManage({
             </thead>
             <tbody>
               {filteredRegs.slice(0, showAllRegs ? undefined : 3).map((r, i) => (
-                <tr key={r.id} className="border-b border-black/5 align-top">
+                <tr key={r.id} className="border-b border-black/5 align-middle text-center">
                   <td className="px-5 py-3 text-muted text-xs">{i + 1}</td>
                   <td className="px-5 py-3">
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center justify-center gap-2.5">
                       {photoSrc(r) && <img src={photoSrc(r)} alt="" className="w-9 h-9 rounded-full object-cover ring-1 ring-rose/30" />}
                       <div className="flex items-center gap-2 whitespace-nowrap">
                         <span className="font-medium">{r.fullName}</span>
@@ -1361,7 +1373,7 @@ export function EventManage({
                     <div className="text-xs text-muted">{r.phone}</div>
                   </td>
                   <td className="px-5 py-3">
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center justify-center gap-3">
                       <div>{r.ticketLabel || r.ticketType} × {r.quantity}</div>
                       {r.status === 'paid' && r.ticketToken && (
                         <button onClick={() => setTicketReg(r)} className="px-2 py-1 rounded-lg text-xs bg-blush text-rose-deep hover:opacity-80 flex items-center gap-1 whitespace-nowrap">
@@ -1369,20 +1381,31 @@ export function EventManage({
                         </button>
                       )}
                     </div>
-                    {r.reason && <div className="text-xs text-muted max-w-[160px] truncate" title={r.reason}>{r.reason}</div>}
                   </td>
                   <td className="px-5 py-3">{formatNgn(r.amount)}</td>
                   <td className="px-5 py-3"><span className={statusBadge(r.status)}>{r.status}</span></td>
                   <td className="px-5 py-3">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center justify-center gap-1.5">
                       {labels.map((label, i) => {
                         const key = keys[i]
                         const on = r.attendance?.[key] === true
-                        return (
+                        const busy = unmarking === `${r.id}:${key}`
+                        return on ? (
+                          <button
+                            key={key}
+                            type="button"
+                            title={`${label} — checked in. Tap to unmark (admin correction).`}
+                            onClick={() => unmarkAttendance(r, key, label)}
+                            disabled={busy}
+                            className="w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center bg-green-500 text-white shadow-sm transition-colors hover:bg-red-500 disabled:opacity-60"
+                          >
+                            {busy ? <LoaderCircle size={12} className="animate-spin" /> : i + 1}
+                          </button>
+                        ) : (
                           <span
                             key={key}
-                            title={`${label} — ${on ? 'checked in' : 'not checked in'}`}
-                            className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center transition-colors ${on ? 'bg-green-500 text-white shadow-sm' : 'bg-black/5 text-muted'}`}
+                            title={`${label} — not checked in`}
+                            className="w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center bg-black/5 text-muted"
                           >
                             {i + 1}
                           </span>
@@ -1391,7 +1414,7 @@ export function EventManage({
                     </div>
                   </td>
                   <td className="px-5 py-3">
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col items-center gap-1.5">
                       <button onClick={() => setConfirmDelete(r)} className="px-2.5 py-1 rounded-lg text-xs bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center gap-1"><Trash2 size={11} /> Delete</button>
                     </div>
                   </td>

@@ -387,6 +387,36 @@ h1, h2, h3, .font-display {
 }
 .float-slow { animation: floatSlow 9s ease-in-out infinite; }
 
+/* Twinkle for the sponsorship showcase sparkles */
+@keyframes shine {
+  0%, 100% { opacity: 0.15; transform: scale(0.6); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+.shine { animation: shine 2.6s ease-in-out infinite; }
+
+/* Cinematic sponsorship text stage — each phrase is absolutely stacked so
+   the panel height never changes; phrases crossfade in/out on a 16s loop. */
+@keyframes spotlight {
+  0%   { opacity: 0; transform: translateY(24px) scale(0.98); filter: blur(5px); }
+  5%   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  18%  { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  23%  { opacity: 0; transform: translateY(-18px) scale(1.02); filter: blur(4px); }
+  100% { opacity: 0; transform: translateY(-18px) scale(1.02); filter: blur(4px); }
+}
+.spot { animation: spotlight 16s ease-in-out infinite; }
+
+/* Sponsor benefit chips — a repeating cascade: each chip fades in one after
+   the other, all hold together, then wipe out and loop. They keep their
+   natural row layout the whole time. */
+@keyframes chipBlink {
+  0%   { opacity: 0; transform: translateY(6px); }
+  9%   { opacity: 1; transform: translateY(0); }
+  68%  { opacity: 1; transform: translateY(0); }
+  80%  { opacity: 0; transform: translateY(-4px); }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+.chip-loop { animation: chipBlink 6s ease-in-out infinite; }
+
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }

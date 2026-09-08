@@ -8,6 +8,7 @@ import {
   findRegistration,
   updateRegistration,
   deleteRegistration,
+  unmarkAttendance,
   writeRegistration,
   findLiveEvent,
   readSponsors,
@@ -42,6 +43,7 @@ import { escapeHtml } from '../lib/telegram.js';
 import { uploadAndStepDown } from '../lib/cloudinary.js';
 import { isValidPhone, normalizePhone } from '../lib/phone.js';
 import { broadcastRealtime } from '../lib/realtime.js';
+import { siteBaseUrl } from '../lib/baseUrl.js';
 
 const router = Router();
 
@@ -571,7 +573,7 @@ ticketType: ticketType as TicketType,
       const result = await deliverTicketEmail({
         registration: reg,
         event,
-        baseUrl: b.origin || process.env.BASE_URL,
+        baseUrl: siteBaseUrl(b.origin),
       });
       if (result.emailed) {
         await updateRegistration(reg.id, { ticketEmailedAt: new Date().toISOString() });
@@ -618,6 +620,30 @@ router.patch('/registrations/:id', authMiddleware, async (req: AuthRequest, res:
   }
 });
 
+// Admin corrections only: clear one day's attendance for a registrant (e.g.
+// an accidental check-in). Marking is intentionally NOT allowed here — that
+// stays exclusively with the attendee scanning their ticket QR + session code.
+router.delete('/registrations/:id/attendance', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const day = (req.query.day as string) || '';
+    if (!/^d[1-9][0-9]*$/.test(day)) {
+      return res.status(400).json({ error: 'Invalid attendance day.' });
+    }
+    const reg = await findRegistration(req.params.id);
+    if (!reg) return res.status(404).json({ error: 'Registration not found' });
+    if (reg.attendance?.[day] !== true) {
+      return res.status(400).json({ error: `${day} isn't marked present for this student.` });
+    }
+    const updated = await unmarkAttendance(reg.id, day);
+    if (!updated) return res.status(404).json({ error: 'Registration not found' });
+    broadcastRealtime('attendance', { registrationId: reg.id, day });
+    res.json({ success: true, registration: updated });
+  } catch (err: any) {
+    console.error('Failed to unmark attendance:', err.message);
+    res.status(500).json({ error: 'Failed to unmark attendance' });
+  }
+});
+
 router.delete('/registrations/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const deleted = await deleteRegistration(req.params.id);
@@ -651,7 +677,7 @@ router.post('/registrations/:id/resend-ticket', authMiddleware, async (req: Auth
     const result = await deliverTicketEmail({
       registration: reg,
       event,
-      baseUrl: req.body?.origin || process.env.BASE_URL,
+      baseUrl: siteBaseUrl(req.body?.origin),
     });
 
     if (result.emailed) {
@@ -967,7 +993,7 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
       return res.json({ success: true, sent: 0, failed: 0, total: 0, unsubscribedExcluded: excluded.size });
     }
 
-    const origin = (req.body?.origin as string) || process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const origin = (req.body?.origin as string) || siteBaseUrl() || `${req.protocol}://${req.get('host')}`;
 
     const failedEmails = new Set<string>();
     const EMAIL_TIMEOUT_MS = 30_000;

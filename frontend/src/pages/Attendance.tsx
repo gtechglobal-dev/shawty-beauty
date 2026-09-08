@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { LoaderCircle, CircleCheck, CircleAlert, Ticket, Download, CalendarDays, QrCode } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { LoaderCircle, CircleCheck, CircleAlert, Ticket, CalendarDays, QrCode } from 'lucide-react'
 import { getJson, postJson } from '../lib/api'
 import { useToast } from '../components/Toasts'
 import Reveal from '../components/Reveal'
@@ -39,8 +39,19 @@ export default function Attendance() {
   const [code, setCode] = useState('')
   const [marking, setMarking] = useState(false)
   const [attendance, setAttendance] = useState<Record<string, boolean>>({})
+  const [closing, setClosing] = useState(false)
 
   const toast = useToast()
+
+  function closePage() {
+    setClosing(true)
+    try {
+      window.open('', '_self')
+    } catch {
+      /* no-op */
+    }
+    window.close()
+  }
 
   useEffect(() => {
     if (!token) {
@@ -83,8 +94,27 @@ export default function Attendance() {
   return (
     <div className="container py-20 max-w-lg">
       <Reveal variant="up">
-        <div className="card p-8 sm:p-10 text-center relative overflow-hidden">
+        {closing ? (
+          <div className="card p-8 sm:p-10 text-center relative overflow-hidden">
+            <span className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-blush blur-2xl" />
+            <div className="inline-flex justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-rose to-rose-deep items-center text-white mb-4">
+              <CircleCheck size={26} />
+            </div>
+            <h1 className="font-display text-2xl font-bold">All done!</h1>
+            <p className="text-muted text-sm mt-2 leading-relaxed">
+              Your check-in is saved. You can close this tab now to return to what you were doing.
+            </p>
+          </div>
+        ) : (
+          <div className="card p-8 sm:p-10 text-center relative overflow-hidden">
           <span className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-blush blur-2xl" />
+          <button
+            type="button"
+            onClick={closePage}
+            className="absolute top-3 right-3 z-10 rounded-full bg-rose-deep border border-rose-deep text-white text-sm font-medium px-3.5 py-1.5 hover:bg-rose hover:border-rose transition-colors"
+          >
+            Close
+          </button>
 
           {loading && (
             <div className="py-10 text-muted flex flex-col items-center gap-3">
@@ -98,7 +128,6 @@ export default function Attendance() {
               <CircleAlert size={48} className="mx-auto text-rose-dark mb-4" />
               <h1 className="font-display text-2xl font-bold mb-3">Check-in unavailable</h1>
               <p className="text-muted text-sm">{error}</p>
-              <Link to="/" className="btn btn-outline mt-6">Back to home</Link>
             </div>
           )}
 
@@ -161,13 +190,11 @@ export default function Attendance() {
                 <p className="text-xs text-muted mt-3 text-center">
                   Ask the studio for today’s code. Your ticket QR identifies you, so only you are marked.
                 </p>
-                <a href={info.downloadUrl} className="btn btn-outline w-full mt-4 flex items-center justify-center gap-2" download>
-                  <Download size={16} /> Download ticket (PNG)
-                </a>
               </form>
             </>
           )}
         </div>
+        )}
       </Reveal>
     </div>
   )

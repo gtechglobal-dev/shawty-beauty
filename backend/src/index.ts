@@ -16,6 +16,7 @@ import eventsRouter from './routes/events.js';
 import ticketsRouter from './routes/tickets.js';
 import { startTelegramAdminBot } from './lib/telegramAdminBot.js';
 import { initRealtime } from './lib/realtime.js';
+import { siteBaseUrl } from './lib/baseUrl.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -37,7 +38,7 @@ const apiLimiter = rateLimit({
 });
 app.use('/api', apiLimiter);
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173' }));
+app.use(cors({ origin: process.env.CORS_ORIGIN || siteBaseUrl() }));
 app.use(express.json({
   limit: '50mb',
   verify: (req: any, _res, buf) => { req.rawBody = buf; },

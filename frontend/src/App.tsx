@@ -42,6 +42,9 @@ export default function App() {
 
   const isAdmin = pathname.startsWith('/admin')
   const isDiary = pathname.startsWith('/diary')
+  // Attendance check-in is deliberately standalone: no nav/footer, no Diary
+  // shortcut, no links back to the main site — mark present, then close.
+  const isAttendance = pathname.startsWith('/attendance')
 
   const [loading, setLoading] = useState(true)
   const [fading, setFading] = useState(false)
@@ -80,6 +83,21 @@ export default function App() {
     return (
       <ToastProvider>
         <Diary />
+      </ToastProvider>
+    )
+  }
+
+  // The attendance check-in page is a standalone, single-purpose screen: the
+  // holder marks themselves present and closes the tab — no public chrome or
+  // navigation out to the main site or the Diary.
+  if (isAttendance) {
+    return (
+      <ToastProvider>
+        <div className="min-h-screen bg-cream text-ink">
+          <main className="page-enter">
+            <Attendance />
+          </main>
+        </div>
       </ToastProvider>
     )
   }

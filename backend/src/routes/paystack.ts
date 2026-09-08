@@ -18,6 +18,7 @@ import { generateTicketToken, deliverTicketEmail } from '../lib/tickets.js';
 import { broadcastRealtime } from '../lib/realtime.js';
 import { uploadAndStepDown, fetchImageBase64 } from '../lib/cloudinary.js';
 import { isValidPhone, normalizePhone } from '../lib/phone.js';
+import { siteBaseUrl } from '../lib/baseUrl.js';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || '';
 const PAYSTACK_BASE = 'https://api.paystack.co';
@@ -375,7 +376,7 @@ router.post('/initialize', async (req: Request, res: Response) => {
         amount: (totalAmount * 100).toString(),
         currency: 'NGN',
         reference: `SBS-${registrationId}`,
-        callback_url: `${body.origin || process.env.BASE_URL || 'http://localhost:5173'}/register/payment-callback`,
+        callback_url: `${siteBaseUrl(body.origin)}/register/payment-callback`,
         metadata: {
           registrationId,
           eventId: event?.id,
@@ -531,7 +532,7 @@ router.get('/config', async (_req: Request, res: Response) => {
   res.json({
     paystackEnabled: Boolean(PAYSTACK_SECRET && publicKey),
     publicKey,
-    baseUrl: process.env.BASE_URL || 'http://localhost:5173',
+    baseUrl: siteBaseUrl(),
     event: event
       ? {
           id: event.id,

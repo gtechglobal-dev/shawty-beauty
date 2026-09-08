@@ -17,6 +17,13 @@ import { siteConfig, defaultEvent, eventRegisterUrl } from '../lib/constants'
 import { fetchLiveEventOrNull, type StudioEvent } from '../lib/events'
 import { useRealtime } from '../lib/useRealtime'
 
+const sponsorLines = [
+  { grab: 'Put your brand front and center.', sub: 'Reach beauty lovers who genuinely care about their glow.' },
+  { grab: 'Boost your brand’s visibility.', sub: 'Featured content, stage branding and shout-outs.' },
+  { grab: 'Share the spotlight, grow together.', sub: 'Co-brand with a community that celebrates beauty.' },
+  { grab: 'Be the brand behind the beauty.', sub: 'From product sampling to the main stage — be unforgettable.' },
+]
+
 export default function Home() {
   const [live, setLive] = useState<StudioEvent>(defaultEvent)
   const [hasLive, setHasLive] = useState(false)
@@ -43,7 +50,7 @@ export default function Home() {
   return (
     <>
       {/* ===== HERO ===== */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-cream via-blush/70 to-cream">
+      <section className="relative overflow-hidden bg-gradient-to-b from-blush via-rose/15 to-cream">
         <div className="absolute top-0 right-0 w-[460px] h-[460px] rounded-full bg-rose/20 blur-3xl -z-10 float-slow" />
         <div className="absolute -bottom-10 -left-16 w-80 h-80 rounded-full bg-pinkgold/25 blur-3xl -z-10 float" />
         <div className="absolute top-40 left-1/4 w-64 h-64 rounded-full bg-gold/15 blur-3xl -z-10 float-slow" />
@@ -72,7 +79,7 @@ export default function Home() {
 
           {/* Live event ticket alert */}
           {hasLive ? (
-          <div className="relative mt-8 mx-auto max-w-4xl">
+          <div className="relative mt-8 mx-auto max-w-3xl">
             <div className="relative overflow-hidden rounded-3xl">
               <div className="relative flex flex-col sm:flex-row items-center justify-center gap-4 rounded-3xl px-6 py-5 text-center sm:text-left overflow-hidden">
                 <img
@@ -106,7 +113,7 @@ export default function Home() {
             </div>
           </div>
           ) : (
-          <div className="relative mt-8 mx-auto max-w-4xl">
+          <div className="relative mt-8 mx-auto max-w-3xl">
             <div className="relative overflow-hidden rounded-3xl">
               <div className="relative flex flex-col sm:flex-row items-center justify-center gap-4 rounded-3xl px-6 py-6 text-center overflow-hidden">
                 <img
@@ -131,17 +138,61 @@ export default function Home() {
 
           {/* Sponsorship CTA */}
           <Reveal variant="zoom" delay={100}>
-            <div className="mt-6 mx-auto max-w-4xl border-glow rounded-3xl">
-              <div className="rounded-3xl bg-white/80 backdrop-blur-sm px-6 py-4 shadow-lg card-silk">
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-center sm:text-left">
-                  <Handshake size={22} className="text-rose-deep shrink-0" />
-                  <p className="text-ink/80 text-sm sm:text-base leading-snug">
-                    <span className="font-bold text-ink">Interested in sponsoring?</span>{' '}
-                    Align your brand with beauty — <span className="text-rose-deep font-medium">get visibility, boost your brand and ours.</span>
-                  </p>
-                  <Link to="/sponsor" className="btn btn-outline !border-rose/40 !text-rose-deep hover:!bg-blush/60 shrink-0 w-full sm:w-auto">
-                    Partner With Us <ArrowRight size={18} />
-                  </Link>
+            <div className="mt-8 mx-auto max-w-3xl">
+              <div className="relative overflow-hidden isolate rounded-3xl silk-dark text-white p-5 sm:p-6 md:p-7 border border-white/10">
+                {/* animated aurora background */}
+                <div aria-hidden className="absolute -top-14 -right-14 w-52 h-52 rounded-full bg-rose/25 blur-2xl float-slow" />
+                <div aria-hidden className="absolute -bottom-16 -left-12 w-60 h-60 rounded-full bg-pinkgold/20 blur-2xl float" />
+                <div aria-hidden className="absolute top-10 left-1/3 w-40 h-40 rounded-full bg-gold/15 blur-3xl float-slow" />
+                {/* passing sheen */}
+                <span aria-hidden className="absolute inset-0 shimmer opacity-30 mix-blend-screen pointer-events-none" />
+                {/* twinkling sponsor sparkles */}
+                <span aria-hidden className="shine absolute top-7 left-[12%] w-1.5 h-1.5 rounded-full bg-gold shadow-[0_0_10px_2px_rgba(217,164,104,0.6)]" style={{ animationDelay: '0s' }} />
+                <span aria-hidden className="shine absolute top-11 right-[18%] w-1 h-1 rounded-full bg-pinkgold shadow-[0_0_8px_2px_rgba(217,164,104,0.55)]" style={{ animationDelay: '-0.9s' }} />
+                <span aria-hidden className="shine absolute bottom-11 left-[28%] w-1.5 h-1.5 rounded-full bg-rose shadow-[0_0_10px_2px_rgba(217,138,160,0.6)]" style={{ animationDelay: '-1.6s' }} />
+                <span aria-hidden className="shine absolute bottom-9 right-[10%] w-1 h-1 rounded-full bg-gold shadow-[0_0_8px_2px_rgba(217,164,104,0.55)]" style={{ animationDelay: '-2.2s' }} />
+                <span aria-hidden className="float-slow absolute top-4 left-[55%] text-pinkgold/70 text-sm">✦</span>
+
+                <div className="relative">
+                  <div className="text-center sm:text-left">
+                    <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-pinkgold border border-pinkgold/35 rounded-full px-3.5 py-1.5 mb-3 bg-white/5 backdrop-blur-sm">
+                      <Handshake size={13} /> Sponsorship &amp; Partnerships
+                    </span>
+
+                    <div className="relative h-[112px] sm:h-[92px] overflow-hidden">
+                      {sponsorLines.map((l, i) => (
+                        <div key={l.grab} className="spot absolute inset-0 flex items-start" style={{ animationDelay: `${-i * 4}s` }}>
+                          <div className="w-full">
+                            <p className="gradient-text gradient-text-animate font-display text-2xl sm:text-3xl font-bold leading-tight">{l.grab}</p>
+                            <p className="text-white/70 text-sm sm:text-base mt-2">{l.sub}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-0 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
+                      {['Brand Visibility', 'Community Growth', 'Featured Spot', 'Co-Branding'].map((c, i) => (
+                        <span
+                          key={c}
+                          className="chip-loop text-[11px] font-semibold uppercase tracking-wider text-white/60 border border-white/15 rounded-full px-3 py-1 bg-white/5 whitespace-nowrap"
+                          style={{ animationDelay: `${i * 0.6}s` }}
+                        >
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="shrink-0 text-center">
+                      <Link to="/sponsor" className="btn btn-light ping-soft !py-3 px-7 relative shadow-[0_18px_40px_-14px_rgba(42,27,34,0.9)] hover:scale-[1.02] transition-transform">
+                        Partner With Us <ArrowRight size={18} />
+                      </Link>
+                      <p className="text-[11px] text-white/50 mt-3 flex items-center justify-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" /> A few partner slots still open
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

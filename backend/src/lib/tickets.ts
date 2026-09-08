@@ -6,6 +6,7 @@ import QRCode from 'qrcode';
 import { Resvg } from '@resvg/resvg-js';
 import type { StudioEvent, Registration, TicketType } from '../db.js';
 import { sendEmail } from './mailer.js';
+import { siteBaseUrl } from './baseUrl.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -50,7 +51,7 @@ export function generateTicketToken(): string {
 }
 
 export function baseOrigin(baseUrl?: string): string {
-  return (baseUrl || process.env.BASE_URL || 'https://shawty-beauty-studio.onrender.com').replace(/\/+$/, '');
+  return siteBaseUrl(baseUrl);
 }
 
 /** What the QR encodes: opens the daily check-in page for this registrant. */

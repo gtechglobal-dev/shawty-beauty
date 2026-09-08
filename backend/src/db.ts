@@ -173,6 +173,21 @@ export async function updateRegistration(
   return rest;
 }
 
+// Admin-only correction: clear one day's attendance for a registrant. The
+// dotted-path $unset removes just that day key from the embedded attendance map.
+export async function unmarkAttendance(id: string, day: string): Promise<Registration | null> {
+  const col = getCollection<Registration>('registrations');
+  if (!col) return null;
+  const doc = await col.findOneAndUpdate(
+    { id },
+    { $unset: { [`attendance.${day}`]: '' } },
+    { returnDocument: 'after' },
+  );
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  return rest;
+}
+
 export async function deleteRegistration(id: string): Promise<boolean> {
   const col = getCollection<Registration>('registrations');
   if (!col) return false;

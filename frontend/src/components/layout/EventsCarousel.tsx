@@ -96,7 +96,7 @@ export default function EventsCarousel({ live }: { live?: StudioEvent | null }) 
 
   return (
     <div>
-      <div className="relative max-w-4xl mx-auto rounded-2xl md:rounded-3xl overflow-hidden shadow-xl group">
+      <div className="relative max-w-3xl mx-auto rounded-2xl md:rounded-3xl overflow-hidden shadow-xl group">
           <div
             className="flex transition-transform duration-700 ease-out"
             style={{ transform: `translateX(-${index * 100}%)`, touchAction: 'pan-y' }}
