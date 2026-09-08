@@ -48,26 +48,31 @@ export default function App() {
 
   const [loading, setLoading] = useState(true)
   const [fading, setFading] = useState(false)
+  const [initialLoad, setInitialLoad] = useState(true)
 
   // Scroll to top on navigation; if landing with a #hash, the browser scrolls to it
   useEffect(() => {
     if (!hash) window.scrollTo(0, 0)
   }, [pathname, hash])
 
-  // Loader: show on first load and on every navigation; brief but measurable
-  // to give an anticipatory feel rather than a flash. After the hold time
-  // elapses, fade the loader out before revealing the page.
+  // Loader: show on first load (longer) and on navigation (shorter);
+  // fade out smoothly before revealing the page.
   useEffect(() => {
     setLoading(true)
     setFading(false)
+    const holdMs = initialLoad ? 1200 : 650
     const t = setTimeout(() => {
       setLoading(false)
       setFading(true)
-    }, 650)
+      if (initialLoad) setInitialLoad(false)
+    }, holdMs)
     return () => clearTimeout(t)
   }, [pathname])
 
-  const handleFadeEnd = () => setFading(false)
+  const handleFadeEnd = () => {
+    setFading(false)
+    setLoading(false)
+  }
 
   if (isAdmin) {
     return (
