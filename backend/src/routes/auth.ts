@@ -64,7 +64,7 @@ router.post('/login', async (req: Request, res: Response) => {
   // Wrong password — track the attempt.
   consecutiveFailedAttempts++;
 
-  if (consecutiveFailedAttempts > MAX_FAILED_ATTEMPTS) {
+  if (consecutiveFailedAttempts >= MAX_FAILED_ATTEMPTS) {
     const attempts = consecutiveFailedAttempts;
     consecutiveFailedAttempts = 0; // reset after alerting
 
