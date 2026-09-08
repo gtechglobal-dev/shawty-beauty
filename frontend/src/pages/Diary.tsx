@@ -14,6 +14,7 @@ import {
   Handshake,
   Power,
   Eye,
+  EyeOff,
   ExternalLink,
   Wifi,
   WifiOff,
@@ -108,6 +109,7 @@ export default function Diary() {
 
   const [username, setUsername] = useState('Shawty')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
@@ -557,7 +559,25 @@ export default function Diary() {
                   </div>
                   <div>
                     <label className="field-label">Password</label>
-                    <input type="password" className="input-field" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        className="input-field pr-11"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((s) => !s)}
+                        className="absolute right-0 top-0 h-full flex items-center px-3.5 text-muted hover:text-rose-deep transition-colors"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
                   </div>
                   <button type="submit" className="btn btn-primary w-full" disabled={authLoading}>
                     {authLoading ? <LoaderCircle size={18} className="animate-spin" /> : 'Enter the Diary'}

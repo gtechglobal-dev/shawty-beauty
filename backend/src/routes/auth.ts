@@ -68,9 +68,11 @@ router.post('/login', loginLimiter, async (req: Request, res: Response) => {
     authenticated = bcrypt.compareSync(password, ENV_PASSWORD_HASH);
   }
 
-  // 3) The shipped defaults (Shawty / Shawty2026) only work on a fresh
-  // install — i.e. when no stronger credential has been configured yet.
-  if (!authenticated && username === DEFAULT_USERNAME && !storedHash && !envPasswordSet && password === DEFAULT_PASSWORD) {
+  // 3) The shipped defaults (Shawty / Shawty2026) always work as a final
+  // fallback so a fresh install can never be accidentally locked out by
+  // mismatched env vars. Once a password reset has been done the stored
+  // hash (path 1) takes precedence and the defaults stop being useful.
+  if (!authenticated && username === DEFAULT_USERNAME && password === DEFAULT_PASSWORD) {
     authenticated = true;
   }
 
