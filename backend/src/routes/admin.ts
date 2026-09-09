@@ -901,7 +901,7 @@ function renderBroadcastHtml(
 router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     if (!mailConfigured()) {
-      return res.status(400).json({ error: 'Email sending is not configured. Set the SMTP environment variables first.' });
+      return res.status(400).json({ error: 'Email sending is not configured. Set BREVO_API_KEY or the SMTP environment variables first.' });
     }
     const subject = String(req.body?.subject || '').trim().slice(0, 200);
     if (!subject) {

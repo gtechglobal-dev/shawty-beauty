@@ -1,13 +1,27 @@
 import nodemailer from "nodemailer";
 
-// Minimal Nodemailer wrapper for Shawty's Diary notifications.
-// Configure via these environment variables (see backend/.env):
-//   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM
+// Email dispatch wrapper for Shawty's Diary notifications.
+//
+// Two delivery modes are supported:
+//   1. Brevo REST API (HTTPS on port 443) — PREFFERED for cloud hosts like
+//      Render, where raw SMTP (port 587) is frequently black-holed by the
+//      relay provider. Enabled by setting BREVO_API_KEY.
+//   2. Classic SMTP relay (nodemailer) — used when BREVO_API_KEY is absent.
+//      Configure via SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM.
+//
+// If BREVO_API_KEY is present it always wins, because HTTPS egress is
+// reliable from every host.
 
 export function mailConfigured(): boolean {
-  return Boolean(
+  return Boolean(process.env.BREVO_API_KEY) || Boolean(
     process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS,
   );
+}
+
+export function mailMode(): "brevo-api" | "smtp" | "none" {
+  if (process.env.BREVO_API_KEY) return "brevo-api";
+  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) return "smtp";
+  return "none";
 }
 
 function makeTransporter() {
@@ -31,8 +45,10 @@ function makeTransporter() {
 
 // Display name shown on outbound mail. Overridable, but defaults to the brand
 // so recipients never see the personal name attached to the sending account.
-const SENDER_NAME = process.env.EMAIL_FROM_NAME || "Shawty-Beauty-Studio";
+const FALLBACK_SENDER_NAME = "Shawty-Beauty-Studio";
+const SENDER_NAME = process.env.EMAIL_FROM_NAME || FALLBACK_SENDER_NAME;
 
+// The address half of EMAIL_FROM, e.g. from "Shawty <noreply@x.com>" -> x.com
 function fromAddress(): string {
   const configured = (process.env.EMAIL_FROM || "").trim();
   // EMAIL_FROM may be "Personal Name <address>" — keep only the <address>
@@ -42,6 +58,15 @@ function fromAddress(): string {
   return address ? `${SENDER_NAME} <${address}>` : SENDER_NAME;
 }
 
+// Sender split into name + address for the Brevo REST API.
+function senderParts(): { name: string; email: string } {
+  const configured = (process.env.EMAIL_FROM || "").trim();
+  const m = configured.match(/^(.*?)\s*<([^>]+)>$/);
+  const name = (m && m[1].trim()) || SENDER_NAME;
+  const email = (m ? m[2] : configured) || process.env.SMTP_USER || "";
+  return { name: name || SENDER_NAME, email };
+}
+
 export interface MailAttachment {
   filename: string;
   content: Buffer;
@@ -49,17 +74,58 @@ export interface MailAttachment {
   cid?: string;
 }
 
-/**
- * Generic email sender (styled like Shawty's Diary mail). Throws on SMTP
- * errors so callers can decide how to fall back. Attachments are sent
- * as-is; pass `cid` to reference a file from the html <img src="cid:...">.
- */
-export async function sendEmail(
-  to: string,
-  subject: string,
-  html: string,
-  attachments?: MailAttachment[],
-): Promise<void> {
+interface SendOptions {
+  to: string;
+  subject: string;
+  html: string;
+  attachments?: MailAttachment[];
+}
+
+const API_TIMEOUT_MS = 30_000;
+
+async function sendViaBrevoApi({ to, subject, html, attachments }: SendOptions): Promise<void> {
+  const { name, email } = senderParts();
+  const payload: Record<string, unknown> = {
+    sender: { name, email },
+    to: [{ email: to }],
+    subject,
+    htmlContent: html,
+  };
+  if (attachments && attachments.length > 0) {
+    payload.attachment = attachments.map((a) => ({
+      name: a.filename,
+      content: a.content.toString("base64"),
+      ...(a.contentType ? { contentType: a.contentType } : {}),
+      ...(a.cid ? { contentId: a.cid } : {}),
+    }));
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  try {
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "api-key": process.env.BREVO_API_KEY!,
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Brevo API ${res.status}: ${text.slice(0, 300)}`);
+    }
+  } catch (err: any) {
+    if (err?.name === "AbortError") throw new Error("Brevo API request timed out");
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function sendViaSmtp({ to, subject, html, attachments }: SendOptions): Promise<void> {
   if (!mailConfigured()) {
     throw new Error("SMTP is not configured");
   }
@@ -73,21 +139,38 @@ export async function sendEmail(
   });
 }
 
+async function dispatch(opts: SendOptions): Promise<void> {
+  if (process.env.BREVO_API_KEY) {
+    await sendViaBrevoApi(opts);
+    return;
+  }
+  await sendViaSmtp(opts);
+}
+
+/**
+ * Generic email sender (styled like Shawty's Diary mail). Throws on send
+ * errors so callers can decide how to fall back. Attachments are sent
+ * as-is; pass `cid` to reference a file from the html <img src="cid:...">.
+ */
+export async function sendEmail(
+  to: string,
+  subject: string,
+  html: string,
+  attachments?: MailAttachment[],
+): Promise<void> {
+  await dispatch({ to, subject, html, attachments });
+}
+
 /**
  * Send the Shawty's Diary password-reset link to the given email.
- * Throws if SMTP is not configured or the send fails — callers should
+ * Throws if email is not configured or the send fails — callers should
  * handle the error and optionally fall back to Telegram.
  */
 export async function sendPasswordResetEmail(
   to: string,
   resetLink: string,
 ): Promise<void> {
-  if (!mailConfigured()) {
-    throw new Error("SMTP is not configured");
-  }
-  const transporter = makeTransporter();
-  await transporter.sendMail({
-    from: fromAddress(),
+  await dispatch({
     to,
     subject: "🔑 Shawty\u2019s Diary — Password Reset",
     html: `
@@ -123,7 +206,7 @@ export async function sendPasswordResetEmail(
 
 /**
  * Send a suspicious-activity alert when too many wrong passwords are attempted.
- * Throws if SMTP is not configured or the send fails.
+ * Throws if email is not configured or the send fails.
  */
 export async function sendSuspiciousActivityEmail(
   to: string,
@@ -134,12 +217,7 @@ export async function sendSuspiciousActivityEmail(
     location?: string;
   },
 ): Promise<void> {
-  if (!mailConfigured()) {
-    throw new Error("SMTP is not configured");
-  }
-  const transporter = makeTransporter();
-  await transporter.sendMail({
-    from: fromAddress(),
+  await dispatch({
     to,
     subject: "⚠️ Shawty\u2019s Diary — Suspicious Login Activity",
     html: `
