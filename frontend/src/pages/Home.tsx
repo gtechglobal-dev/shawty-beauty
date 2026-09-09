@@ -125,10 +125,10 @@ export default function Home() {
       )}
 
       {/* ===== HERO ===== */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-blush via-rose/8 to-cream">
-        <div className="absolute top-0 right-0 w-[460px] h-[460px] rounded-full bg-rose/8 blur-3xl -z-10 float-slow" />
-        <div className="absolute -bottom-10 -left-16 w-80 h-80 rounded-full bg-pinkgold/10 blur-3xl -z-10 float" />
-        <div className="absolute top-40 left-1/4 w-64 h-64 rounded-full bg-gold/6 blur-3xl -z-10 float-slow" />
+      <section className="relative overflow-hidden bg-gradient-to-b from-blush via-rose/5 to-cream">
+        <div className="absolute top-0 right-0 w-[460px] h-[460px] rounded-full bg-rose/4 blur-3xl -z-10" />
+        <div className="absolute -bottom-10 -left-16 w-80 h-80 rounded-full bg-pinkgold/5 blur-3xl -z-10" />
+        <div className="absolute top-40 left-1/4 w-64 h-64 rounded-full bg-gold/3 blur-3xl -z-10" />
         <div className="container pt-10 md:pt-16 pb-10 md:pb-16">
           {/* Page title */}
           <Reveal variant="up">
