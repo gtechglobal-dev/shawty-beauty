@@ -46,11 +46,10 @@ html {
 body {
   margin: 0;
   background:
-    radial-gradient(1100px 480px at 12% -6%, rgba(232, 169, 184, 0.12), transparent 60%),
-    radial-gradient(900px 420px at 88% -8%, rgba(232, 169, 184, 0.12), transparent 60%),
-    radial-gradient(700px 600px at 50% 110%, rgba(200, 104, 126, 0.07), transparent 55%),
+    radial-gradient(1100px 480px at 12% -6%, rgba(232, 169, 184, 0.06), transparent 60%),
+    radial-gradient(900px 420px at 88% -8%, rgba(232, 169, 184, 0.06), transparent 60%),
+    radial-gradient(700px 600px at 50% 110%, rgba(200, 104, 126, 0.03), transparent 55%),
     var(--color-pearl);
-  background-attachment: fixed;
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -876,10 +875,16 @@ img[loading="lazy"] {
   color: #ffffff;
   opacity: 1;
 }
+.diary-pill.nav-link svg {
+  color: #ffffff;
+}
 .diary-pill.nav-link:hover {
   color: #ffffff;
   opacity: 0.94;
   background: linear-gradient(180deg, #8d3a52, #6a2a3d);
+}
+.diary-pill.nav-link:hover svg {
+  color: #ffffff;
 }
 
 /* Hide scrollbars on the Diary's tab rail while keeping it scrollable */
