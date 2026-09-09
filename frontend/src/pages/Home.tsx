@@ -125,10 +125,10 @@ export default function Home() {
       )}
 
       {/* ===== HERO ===== */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-blush via-rose/15 to-cream">
-        <div className="absolute top-0 right-0 w-[460px] h-[460px] rounded-full bg-rose/20 blur-3xl -z-10 float-slow" />
-        <div className="absolute -bottom-10 -left-16 w-80 h-80 rounded-full bg-pinkgold/25 blur-3xl -z-10 float" />
-        <div className="absolute top-40 left-1/4 w-64 h-64 rounded-full bg-gold/15 blur-3xl -z-10 float-slow" />
+      <section className="relative overflow-hidden bg-gradient-to-b from-blush via-rose/8 to-cream">
+        <div className="absolute top-0 right-0 w-[460px] h-[460px] rounded-full bg-rose/8 blur-3xl -z-10 float-slow" />
+        <div className="absolute -bottom-10 -left-16 w-80 h-80 rounded-full bg-pinkgold/10 blur-3xl -z-10 float" />
+        <div className="absolute top-40 left-1/4 w-64 h-64 rounded-full bg-gold/6 blur-3xl -z-10 float-slow" />
         <div className="container pt-10 md:pt-16 pb-10 md:pb-16">
           {/* Page title */}
           <Reveal variant="up">
@@ -372,9 +372,9 @@ export default function Home() {
           decoding="async"
           width="1200"
           height="800"
-          className="absolute inset-0 w-full h-full object-cover opacity-20 mix-blend-overlay"
+          className="absolute inset-0 w-full h-full object-cover opacity-10 mix-blend-overlay"
         />
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-ink/60 via-transparent to-ink/60" />
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-ink/30 via-transparent to-ink/30" />
         <Reveal variant="up">
         <div className="container text-center relative z-10">
           <span className="ornament mb-5 justify-center"><Sparkles size={12} aria-hidden /></span>

@@ -704,22 +704,22 @@ export default function Diary() {
           </div>
           <div className="flex items-center gap-2">
             {isLoggedIn() && (
-              <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
-                <span className={`w-1.5 h-1.5 rounded-full ${isLiveEvent ? 'bg-red-400 animate-pulse' : 'bg-white/30'}`} />
+              <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-white bg-white/10 border border-white/20 px-3 py-1.5 rounded-full">
+                <span className={`w-1.5 h-1.5 rounded-full ${isLiveEvent ? 'bg-red-400 animate-pulse' : 'bg-emerald-400'}`} />
                 {isLiveEvent ? `Live · ${liveEventTitle ?? 'event'}` : 'No live event'}
               </span>
             )}
             <Link
               to="/"
-              className="flex items-center gap-1.5 text-xs font-medium text-muted hover:text-white bg-white/5 border border-white/10 px-3 py-2 rounded-full transition-colors"
+              className="flex items-center gap-1.5 text-xs font-medium text-white bg-white/10 border border-white/20 px-3 py-2 rounded-full hover:bg-white/20 transition-colors"
             >
-              <ExternalLink size={13} /> <span className="hidden sm:inline">View</span> main site
+              <ExternalLink size={13} className="text-white" /> <span className="hidden sm:inline">View</span> main site
             </Link>
-            <button onClick={() => reloadAll()} className="flex items-center gap-2 p-2 text-muted hover:text-white bg-white/5 border border-white/10 rounded-full transition-colors" title="Refresh everything now">
-              <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+            <button onClick={() => reloadAll()} className="flex items-center gap-2 p-2 text-white bg-white/10 border border-white/20 rounded-full hover:bg-white/20 transition-colors" title="Refresh everything now">
+              <RefreshCw size={15} className={`${loading ? 'animate-spin' : ''} text-white`} />
             </button>
-            <button onClick={signOut} className="flex items-center gap-2 text-sm font-medium text-muted hover:text-white bg-white/5 border border-white/10 px-3 py-2 rounded-full transition-colors" title="Log out of the Diary">
-              <LogOut size={15} /> <span className="hidden sm:inline">Logout</span>
+            <button onClick={signOut} className="flex items-center gap-2 text-sm font-medium text-white bg-white/10 border border-white/20 px-3 py-2 rounded-full hover:bg-white/20 transition-colors" title="Log out of the Diary">
+              <LogOut size={15} className="text-white" /> <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </div>
