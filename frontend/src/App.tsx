@@ -60,7 +60,7 @@ export default function App() {
   useEffect(() => {
     setLoading(true)
     setFading(false)
-    const holdMs = initialLoad ? 1800 : 800
+    const holdMs = initialLoad ? 2600 : 800
     const t = setTimeout(() => {
       setLoading(false)
       setFading(true)

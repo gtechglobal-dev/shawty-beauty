@@ -141,10 +141,10 @@ export default function Home() {
                 {siteConfig.name}
                 <span className="gradient-text gradient-text-animate block">Look stunning, feel unstoppable.</span>
               </h1>
-              <div className="mx-auto mt-6 flex items-center justify-center gap-3 text-sm sm:text-base font-medium tracking-wide text-ink/70">
-                <span>Premium Services</span>
-                <span className="text-rose/60" aria-hidden>|</span>
-                <span className="gradient-text font-semibold">Beauty that celebrates you</span>
+              <div className="mx-auto mt-6 flex flex-nowrap items-center justify-center gap-2 sm:gap-3 text-sm sm:text-base font-medium tracking-wide text-ink/70">
+                <span className="whitespace-nowrap">Premium Services</span>
+                <span className="text-rose/60 shrink-0" aria-hidden>|</span>
+                <span className="gradient-text font-semibold whitespace-nowrap">Beauty that celebrates you</span>
               </div>
             </div>
           </Reveal>
