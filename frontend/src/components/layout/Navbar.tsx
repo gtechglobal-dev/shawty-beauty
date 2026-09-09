@@ -65,7 +65,7 @@ export default function Navbar() {
         scrolled || open
           ? 'bg-cream/85 backdrop-blur-xl border-b border-pinkgold/20 shadow-[0_8px_30px_-14px_rgba(122,48,69,0.28)]'
           : 'bg-transparent border-b border-transparent'
-      }`}
+      } will-change-transform`}
     >
       <div className="container flex items-center justify-between h-16 md:h-[72px] gap-3">
         <Link to="/" className="flex items-center gap-3 shrink-0 group" onClick={() => setOpen(false)}>
@@ -133,19 +133,19 @@ export default function Navbar() {
           <Link
             to="/diary"
             onClick={() => setOpen(false)}
-            className={`mt-1 flex items-center justify-between px-4 py-3 rounded-lg text-[15px] font-semibold ${
+            className={`mt-1 flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap ${
               isActive('/diary')
                 ? 'text-rose-deep bg-blush'
                 : loggedIn
                   ? 'text-white bg-gradient-to-br from-rose to-rose-deep shadow-[0_10px_22px_-12px_rgba(145,78,108,0.8)]'
-                  : 'text-ink/75'
+                  : 'text-rose-dark font-medium'
             }`}
           >
-            <span className="flex items-center gap-2">
-              <BookOpenText size={17} />
+            <span className="flex items-center gap-2 shrink-0">
+              <BookOpenText size={15} className="shrink-0" />
               {loggedIn ? 'My Diary' : "Shawty's Diary"}
             </span>
-            {loggedIn && <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide opacity-90"><span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" /> Owner</span>}
+            {loggedIn && <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide opacity-90 shrink-0"><span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" /> Owner</span>}
           </Link>
         </nav>
       )}

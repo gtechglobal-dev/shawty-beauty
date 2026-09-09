@@ -141,9 +141,8 @@ export default function Home() {
                 {siteConfig.name}
                 <span className="gradient-text gradient-text-animate block">Look stunning, feel unstoppable.</span>
               </h1>
-              <div className="mx-auto mt-6 flex flex-nowrap items-center justify-center gap-2 sm:gap-3 text-sm sm:text-base font-medium tracking-wide text-ink/70">
+              <div className="mx-auto mt-6 flex flex-col items-center justify-center gap-1 text-sm sm:text-base font-medium tracking-wide text-ink/70">
                 <span className="whitespace-nowrap">Premium Services</span>
-                <span className="text-rose/60 shrink-0" aria-hidden>|</span>
                 <span className="gradient-text font-semibold whitespace-nowrap">Beauty that celebrates you</span>
               </div>
             </div>
@@ -160,8 +159,10 @@ export default function Home() {
                 <img
                   src="/images/carousel/event.jpg"
                   alt=""
-                  loading="lazy"
+                  loading="eager"
                   decoding="async"
+                  width="800"
+                  height="600"
                   className="absolute inset-0 w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-ink/90 via-ink/70 to-ink/40" />
@@ -194,8 +195,10 @@ export default function Home() {
                 <img
                   src="/images/carousel/event.jpg"
                   alt=""
-                  loading="lazy"
+                  loading="eager"
                   decoding="async"
+                  width="800"
+                  height="600"
                   className="absolute inset-0 w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-ink/90 via-ink/70 to-ink/40" />
@@ -360,13 +363,15 @@ export default function Home() {
       )}
 
       {/* ===== INSTAGRAM CTA ===== */}
-      <section className="section-pad silk-dark relative overflow-hidden">
+      <section className="section-pad silk-dark relative overflow-hidden content-auto">
         <img
           src="/images/studio1.png"
           alt=""
           aria-hidden
           loading="lazy"
           decoding="async"
+          width="1200"
+          height="800"
           className="absolute inset-0 w-full h-full object-cover opacity-20 mix-blend-overlay"
         />
         <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-ink/60 via-transparent to-ink/60" />

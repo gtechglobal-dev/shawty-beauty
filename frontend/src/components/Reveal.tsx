@@ -1,4 +1,4 @@
-import { useEffect, useRef, ReactNode } from 'react'
+import { useEffect, useRef, ReactNode, memo } from 'react'
 
 interface RevealProps {
   children: ReactNode
@@ -8,7 +8,7 @@ interface RevealProps {
   variant?: 'up' | 'left' | 'right' | 'zoom' | 'fade'
 }
 
-export default function Reveal({
+const Reveal = memo(function Reveal({
   children,
   className = '',
   delay = 0,
@@ -27,13 +27,15 @@ export default function Reveal({
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            el.style.transitionDelay = `${delay}ms`
+            if (delay > 0) {
+              el.style.transitionDelay = `${delay}ms`
+            }
             el.classList.add('reveal-in')
             observer.unobserve(el)
           }
         })
       },
-      { threshold: 0.12 },
+      { threshold: 0.12, rootMargin: '0px 0px -50px 0px' },
     )
     observer.observe(el)
     return () => observer.disconnect()
@@ -49,4 +51,6 @@ export default function Reveal({
       {children}
     </Tag>
   )
-}
+})
+
+export default Reveal

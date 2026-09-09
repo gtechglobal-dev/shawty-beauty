@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, memo } from 'react'
 
 interface CountUpProps {
   end: number
@@ -8,11 +8,11 @@ interface CountUpProps {
   className?: string
 }
 
-export default function CountUp({
+const CountUp = memo(function CountUp({
   end,
   suffix = '',
   prefix = '',
-  duration = 1200,
+  duration = 1400,
   className = '',
 }: CountUpProps) {
   const ref = useRef<HTMLSpanElement | null>(null)
@@ -36,7 +36,7 @@ export default function CountUp({
             const start = performance.now()
             const tick = (now: number) => {
               const progress = Math.min((now - start) / duration, 1)
-              const eased = 1 - Math.pow(1 - progress, 3)
+              const eased = 1 - Math.pow(1 - progress, 4)
               setVal(Math.round(eased * end))
               if (progress < 1) requestAnimationFrame(tick)
             }
@@ -45,7 +45,7 @@ export default function CountUp({
           }
         })
       },
-      { threshold: 0.4 },
+      { threshold: 0.3, rootMargin: '0px 0px -50px 0px' },
     )
     observer.observe(el)
     return () => observer.disconnect()
@@ -58,4 +58,6 @@ export default function CountUp({
       {suffix}
     </span>
   )
-}
+})
+
+export default CountUp
