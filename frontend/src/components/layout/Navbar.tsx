@@ -117,14 +117,14 @@ export default function Navbar() {
       </div>
 
       {open && (
-        <nav onClick={(e) => e.stopPropagation()} className="md:hidden relative z-50 px-5 pb-6 pt-2 space-y-1 border-t border-[#321d24]/10 bg-cream/95 backdrop-blur-md">
+        <nav onClick={(e) => e.stopPropagation()} className="md:hidden relative z-50 px-4 pb-5 pt-2 space-y-0.5 border-t border-[#321d24]/10 bg-cream/95 backdrop-blur-md">
           {links.map((l) => (
             <Link
               key={l.to}
               to={l.to}
               onClick={() => setOpen(false)}
-              className={`block px-4 py-3 rounded-lg text-[15px] font-medium ${
-                isActive(l.to) ? 'text-[#7a3045] bg-blush' : 'text-ink/75'
+              className={`block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
+                isActive(l.to) ? 'text-[#7a3045] bg-blush' : 'text-ink/80'
               }`}
             >
               {l.label}
@@ -133,19 +133,19 @@ export default function Navbar() {
           <Link
             to="/diary"
             onClick={() => setOpen(false)}
-            className={`mt-1 flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap ${
+            className={`mt-1 flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap ${
               isActive('/diary')
                 ? 'text-rose-deep bg-blush'
                 : loggedIn
-                  ? 'text-white bg-gradient-to-br from-rose to-rose-deep shadow-[0_10px_22px_-12px_rgba(145,78,108,0.8)]'
+                  ? 'text-white bg-gradient-to-br from-rose to-rose-deep shadow-[0_8px_20px_-10px_rgba(145,78,108,0.8)]'
                   : 'text-rose-dark font-medium'
             }`}
           >
-            <span className="flex items-center gap-2 shrink-0">
-              <BookOpenText size={15} className="shrink-0" />
+            <span className="flex items-center gap-1.5 shrink-0">
+              <BookOpenText size={14} className="shrink-0" />
               {loggedIn ? 'My Diary' : "Shawty's Diary"}
             </span>
-            {loggedIn && <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide opacity-90 shrink-0"><span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" /> Owner</span>}
+            {loggedIn && <span className="flex items-center gap-1 text-[9px] uppercase tracking-wide opacity-90 shrink-0"><span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" /> Owner</span>}
           </Link>
         </nav>
       )}

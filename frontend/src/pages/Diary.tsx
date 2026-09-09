@@ -1499,9 +1499,9 @@ function DetailField({ label, value }: { label: string; value?: string }) {
 
 function ConnectionPill({ status }: { status: RealtimeStatus }) {
   const map = {
-    open: { dot: 'bg-emerald-400', text: 'Live · synced', cls: 'text-emerald-300' },
-    connecting: { dot: 'bg-amber-400 animate-pulse', text: 'Connecting…', cls: 'text-amber-300' },
-    closed: { dot: 'bg-white/30', text: 'Offline — Refresh to update', cls: 'text-white/50' },
+    open: { dot: 'bg-emerald-400', text: 'ONLINE', cls: 'text-emerald-300' },
+    connecting: { dot: 'bg-amber-400 animate-pulse', text: 'CONNECTING', cls: 'text-amber-300' },
+    closed: { dot: 'bg-white/30', text: 'OFFLINE', cls: 'text-white/50' },
   }[status]
   const Icon = status === 'closed' ? WifiOff : Wifi
   return (
