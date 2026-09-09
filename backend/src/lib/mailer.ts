@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import nodemailer from "nodemailer";
 
 // Minimal Nodemailer wrapper for Shawty's Diary notifications.
 // Configure via these environment variables (see backend/.env):
@@ -6,9 +6,7 @@ import nodemailer from 'nodemailer';
 
 export function mailConfigured(): boolean {
   return Boolean(
-    process.env.SMTP_HOST &&
-      process.env.SMTP_USER &&
-      process.env.SMTP_PASS,
+    process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS,
   );
 }
 
@@ -21,19 +19,26 @@ function makeTransporter() {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    // Fail fast instead of hanging forever — on cloud providers (Render) the
+    // SMTP relay can silently black-hole connections, which previously only
+    // surfaced as a generic 30s timeout. These give us a real error code
+    // (ETIMEDOUT, EHOSTUNREACH, EAUTH, "IP not permitted", etc.).
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
   });
 }
 
 // Display name shown on outbound mail. Overridable, but defaults to the brand
 // so recipients never see the personal name attached to the sending account.
-const SENDER_NAME = process.env.EMAIL_FROM_NAME || 'Shawty-Beauty-Studio';
+const SENDER_NAME = process.env.EMAIL_FROM_NAME || "Shawty-Beauty-Studio";
 
 function fromAddress(): string {
-  const configured = (process.env.EMAIL_FROM || '').trim();
+  const configured = (process.env.EMAIL_FROM || "").trim();
   // EMAIL_FROM may be "Personal Name <address>" — keep only the <address>
   // so the personal name never leaks into the displayed sender.
   const m = configured.match(/<([^>]+)>/);
-  const address = (m ? m[1] : configured) || process.env.SMTP_USER || '';
+  const address = (m ? m[1] : configured) || process.env.SMTP_USER || "";
   return address ? `${SENDER_NAME} <${address}>` : SENDER_NAME;
 }
 
@@ -56,7 +61,7 @@ export async function sendEmail(
   attachments?: MailAttachment[],
 ): Promise<void> {
   if (!mailConfigured()) {
-    throw new Error('SMTP is not configured');
+    throw new Error("SMTP is not configured");
   }
   const transporter = makeTransporter();
   await transporter.sendMail({
@@ -73,15 +78,18 @@ export async function sendEmail(
  * Throws if SMTP is not configured or the send fails — callers should
  * handle the error and optionally fall back to Telegram.
  */
-export async function sendPasswordResetEmail(to: string, resetLink: string): Promise<void> {
+export async function sendPasswordResetEmail(
+  to: string,
+  resetLink: string,
+): Promise<void> {
   if (!mailConfigured()) {
-    throw new Error('SMTP is not configured');
+    throw new Error("SMTP is not configured");
   }
   const transporter = makeTransporter();
   await transporter.sendMail({
     from: fromAddress(),
     to,
-    subject: '🔑 Shawty\u2019s Diary — Password Reset',
+    subject: "🔑 Shawty\u2019s Diary — Password Reset",
     html: `
       <div style="font-family: Arial, Helvetica, sans-serif; background: #fdf9f4; padding: 32px 16px; border-radius: 16px;">
         <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #f0dbe4;">
@@ -119,16 +127,21 @@ export async function sendPasswordResetEmail(to: string, resetLink: string): Pro
  */
 export async function sendSuspiciousActivityEmail(
   to: string,
-  details: { attempts: number; timestamp: string; ip?: string; location?: string },
+  details: {
+    attempts: number;
+    timestamp: string;
+    ip?: string;
+    location?: string;
+  },
 ): Promise<void> {
   if (!mailConfigured()) {
-    throw new Error('SMTP is not configured');
+    throw new Error("SMTP is not configured");
   }
   const transporter = makeTransporter();
   await transporter.sendMail({
     from: fromAddress(),
     to,
-    subject: '⚠️ Shawty\u2019s Diary — Suspicious Login Activity',
+    subject: "⚠️ Shawty\u2019s Diary — Suspicious Login Activity",
     html: `
       <div style="font-family: Arial, Helvetica, sans-serif; background: #fdf9f4; padding: 32px 16px; border-radius: 16px;">
         <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #f0dbe4;">
@@ -146,7 +159,7 @@ export async function sendSuspiciousActivityEmail(
               </p>
               <p style="margin: 0; font-size: 13px; color: #6b3030; line-height: 1.6;">
                 Failed attempts: <strong>${details.attempts}</strong><br/>
-                Time: <strong>${details.timestamp}</strong>${details.ip ? `<br/>IP address: <strong>${details.ip}</strong>` : ''}${details.location ? `<br/>Location: <strong>${details.location}</strong>` : ''}
+                Time: <strong>${details.timestamp}</strong>${details.ip ? `<br/>IP address: <strong>${details.ip}</strong>` : ""}${details.location ? `<br/>Location: <strong>${details.location}</strong>` : ""}
               </p>
             </div>
             <p style="color: #98808c; font-size: 13px; line-height: 1.6; margin: 0 0 22px;">

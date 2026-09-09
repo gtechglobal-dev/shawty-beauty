@@ -18,9 +18,17 @@ import settingsRouter from './routes/settings.js';
 import { startTelegramAdminBot } from './lib/telegramAdminBot.js';
 import { initRealtime } from './lib/realtime.js';
 import { siteBaseUrl } from './lib/baseUrl.js';
+import { mailConfigured } from './lib/mailer.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
+
+if (mailConfigured()) {
+  const smtpPort = Number(process.env.SMTP_PORT || 587);
+  console.log(`SMTP configured: ${process.env.SMTP_HOST}:${smtpPort}`);
+} else {
+  console.warn('SMTP not configured — emails will NOT be sent.');
+}
 
 app.set('trust proxy', 1);
 

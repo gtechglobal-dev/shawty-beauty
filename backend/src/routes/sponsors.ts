@@ -372,15 +372,21 @@ router.post('/', async (req: Request, res: Response) => {
     await writeSponsor(sponsor);
     broadcastRealtime('sponsors', { id: sponsor.id });
 
-    const mail = await deliverSponsorThankYouEmail({
+    // Send the thank-you email in the background — SMTP must never hold up the
+    // sponsorship response, especially on slow/cold cloud instances. The result
+    // is logged so failures are visible in Render logs.
+    deliverSponsorThankYouEmail({
       name: sponsor.brandName || sponsor.displayName || sponsor.contactName || 'Sponsor',
       email: sponsor.email,
       reference,
       eventTitle: undefined,
-    });
-    if (!mail.emailed) {
-      console.warn('Sponsor thank-you email not sent:', mail.reason);
-    }
+    })
+      .then((mail) => {
+        if (!mail.emailed) console.warn('Sponsor thank-you email not sent:', mail.reason);
+      })
+      .catch((err: any) => {
+        console.warn('Sponsor thank-you email failed:', err?.message || err);
+      });
 
     if (telegramConfigured()) {
       const msg = [
