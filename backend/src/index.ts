@@ -6,7 +6,7 @@ import { rateLimit } from 'express-rate-limit';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, readFileSync } from 'fs';
-import { connectDB, isDbConnected, ensureSeedEvents, deleteUnassignedRegistrations } from './db.js';
+import { connectDB, isDbConnected, ensureSeedEvents, migrateEventStatuses, deleteUnassignedRegistrations } from './db.js';
 import authRouter from './routes/auth.js';
 import adminRouter from './routes/admin.js';
 import contactRouter from './routes/contact.js';
@@ -112,6 +112,7 @@ if (existsSync(frontendDist)) {
 connectDB()
   .then(async () => {
     await ensureSeedEvents();
+    await migrateEventStatuses();
     const purged = await deleteUnassignedRegistrations();
     if (purged > 0) console.log(`Removed ${purged} legacy unassigned registration(s)`);
     const server = app.listen(PORT, () => {

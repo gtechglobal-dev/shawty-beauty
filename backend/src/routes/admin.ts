@@ -307,7 +307,7 @@ router.post('/events', authMiddleware, async (req: AuthRequest, res: Response) =
         ? slugify(title || `${base.title} (Copy)`) + '-' + Date.now().toString(36)
         : slugify(title || base.title) + '-' + Date.now().toString(36),
       title: title ? String(title).trim().slice(0, 160) : fromEventId ? `${base.title} (Copy)` : base.title,
-      status: 'scheduled',
+      status: 'upcoming',
       createdAt: now,
       updatedAt: now,
     };
@@ -347,7 +347,7 @@ router.post('/events/:id/live', authMiddleware, async (req: AuthRequest, res: Re
     if (!current) return res.status(404).json({ error: 'Event not found' });
     const live = (await readEvents()).find((e) => e.status === 'live');
     if (live && live.id !== current.id) {
-      await updateEvent(live.id, { status: 'scheduled', updatedAt: new Date().toISOString() });
+      await updateEvent(live.id, { status: 'upcoming', updatedAt: new Date().toISOString() });
     }
     const updated = await updateEvent(current.id, { status: 'live', updatedAt: new Date().toISOString() });
     broadcastRealtime('events', { id: current.id });
@@ -365,10 +365,10 @@ router.post('/events/:id/end', authMiddleware, async (req: AuthRequest, res: Res
   try {
     const current = await findEvent(req.params.id);
     if (!current) return res.status(404).json({ error: 'Event not found' });
-    if (current.status === 'ended') {
+    if (current.status === 'finished') {
       return res.json({ success: true, event: current, message: `${current.title} was already finished.` });
     }
-    const updated = await updateEvent(current.id, { status: 'ended', updatedAt: new Date().toISOString() });
+    const updated = await updateEvent(current.id, { status: 'finished', updatedAt: new Date().toISOString() });
     broadcastRealtime('events', { id: current.id });
     res.json({ success: true, event: updated, message: `${current.title} is now finished. It has been removed from the landing page and registration is closed.` });
   } catch (err: any) {
@@ -1115,7 +1115,7 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
             // Guard against a hang (slow/throttled SMTP) so every recipient is
             // ultimately tallied as either sent or failed — never left in limbo.
             await Promise.race([
-              sendEmail(email, subject, html, attachments),
+              sendEmail(email, subject, html, attachments, unsubUrl),
               new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('SMTP send timed out')), EMAIL_TIMEOUT_MS),
               ),

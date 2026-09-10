@@ -19,8 +19,8 @@ export default function MobileBottomNav() {
   const active = (to: string) => (to === '/' ? pathname === '/' : pathname === to)
 
   return (
-    <nav className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-pinkgold/25 bg-cream/95 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]">
-      <div className="flex items-stretch justify-around">
+    <nav className="md:hidden fixed inset-x-0 bottom-0 z-40 backdrop-blur-xl bg-ink/95 border-t border-white/10 px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
+      <div className="flex items-stretch justify-around gap-1">
         {links.map((l) => {
           const Icon = l.icon
           const on = active(l.to)
@@ -28,27 +28,27 @@ export default function MobileBottomNav() {
             <Link
               key={l.to}
               to={l.to}
-              className={`flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 pt-1.5 pb-1 ${
-                on ? 'text-rose-deep' : 'text-faint hover:text-rose-dark'
+              className={`flex flex-col items-center justify-center gap-1 flex-1 min-w-0 py-1 rounded-xl ${
+                on ? 'text-pinkgold' : 'text-white/45 hover:text-white/80'
               }`}
             >
-              <Icon size={17} strokeWidth={on ? 2.4 : 2} />
-              <span className={`text-[8.5px] leading-none font-semibold tracking-wide ${on ? '' : 'text-ink/55'}`}>{l.label}</span>
+              <Icon size={18} strokeWidth={on ? 2.4 : 2} />
+              <span className={`text-[9px] leading-none font-semibold tracking-wide ${on ? 'text-white' : 'text-white/50'}`}>{l.label}</span>
             </Link>
           )
         })}
         <Link
           to="/diary"
-          className={`flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 pt-1.5 pb-1 ${
-            active('/diary') ? 'text-rose-deep' : 'text-faint hover:text-rose-dark'
+          className={`flex flex-col items-center justify-center gap-1 flex-1 min-w-0 py-1 rounded-xl ${
+            active('/diary') ? 'text-pinkgold' : 'text-white/45 hover:text-white/80'
           }`}
         >
           <span className="relative">
-            <BookOpenText size={17} strokeWidth={active('/diary') ? 2.4 : 2} />
+            <BookOpenText size={18} strokeWidth={active('/diary') ? 2.4 : 2} />
             {loggedIn && <span className="absolute -top-0.5 -right-1 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
           </span>
-          <span className={`text-[8.5px] leading-none font-semibold tracking-wide ${active('/diary') ? '' : 'text-ink/55'}`}>
-            {loggedIn ? 'Diary' : "Shawty's"}
+          <span className={`text-[9px] leading-none font-semibold tracking-wide ${active('/diary') ? 'text-white' : 'text-white/50'}`}>
+            Diary
           </span>
         </Link>
       </div>

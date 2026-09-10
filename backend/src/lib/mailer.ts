@@ -45,7 +45,7 @@ function makeTransporter() {
 
 // Display name shown on outbound mail. Overridable, but defaults to the brand
 // so recipients never see the personal name attached to the sending account.
-const FALLBACK_SENDER_NAME = "Shawty-Beauty-Studio";
+const FALLBACK_SENDER_NAME = "Shawty Beauty Studio";
 const SENDER_NAME = process.env.EMAIL_FROM_NAME || FALLBACK_SENDER_NAME;
 
 // The address half of EMAIL_FROM, e.g. from "Shawty <noreply@x.com>" -> x.com
@@ -78,12 +78,58 @@ interface SendOptions {
   to: string;
   subject: string;
   html: string;
+  text?: string;
   attachments?: MailAttachment[];
+  // Adds a one-click List-Unsubscribe header (Gmail bulk-sender requirement).
+  // Passed for broadcast mail; transactional mail (tickets, password reset)
+  // intentionally omits it.
+  unsubscribeUrl?: string;
+}
+
+// Gmail's bulk-sender rules want a one-click unsubscribe. The header lets
+// Gmail surface "Unsubscribe" button and rewards it in the spam filter.
+function unsubscribeHeaders(unsubscribeUrl?: string): Record<string, string> | undefined {
+  if (!unsubscribeUrl) return undefined;
+  return {
+    'list-unsubscribe': `<${unsubscribeUrl}>`,
+    'list-unsubscribe-post': 'List-Unsubscribe=One-Click',
+  };
+}
+
+// A lightweight HTML → plaintext conversion so every mail ships a text/plain
+// alternative (HTML-only mail is a classic spam-filter trigger).
+function htmlToText(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<head[\s\S]*?<\/head>/gi, '')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/h1>/gi, '\n\n')
+    .replace(/<\/h2>/gi, '\n\n')
+    .replace(/<\/h3>/gi, '\n\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/tr>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '- ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&rsquo;/gi, '\u2019')
+    .replace(/&lsquo;/gi, '\u2018')
+    .replace(/&ldquo;|&rdquo;/gi, '"')
+    .replace(/&hellip;/gi, '\u2026')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 const API_TIMEOUT_MS = 30_000;
 
-async function sendViaBrevoApi({ to, subject, html, attachments }: SendOptions): Promise<void> {
+async function sendViaBrevoApi({ to, subject, html, text, attachments, unsubscribeUrl }: SendOptions): Promise<void> {
   const { name, email } = senderParts();
   const payload: Record<string, unknown> = {
     sender: { name, email },
@@ -91,6 +137,9 @@ async function sendViaBrevoApi({ to, subject, html, attachments }: SendOptions):
     subject,
     htmlContent: html,
   };
+  if (text) payload.textContent = text;
+  const headers = unsubscribeHeaders(unsubscribeUrl);
+  if (headers) payload.headers = headers;
   if (attachments && attachments.length > 0) {
     payload.attachment = attachments.map((a) => ({
       name: a.filename,
@@ -125,16 +174,19 @@ async function sendViaBrevoApi({ to, subject, html, attachments }: SendOptions):
   }
 }
 
-async function sendViaSmtp({ to, subject, html, attachments }: SendOptions): Promise<void> {
+async function sendViaSmtp({ to, subject, html, text, attachments, unsubscribeUrl }: SendOptions): Promise<void> {
   if (!mailConfigured()) {
     throw new Error("SMTP is not configured");
   }
+  const headers = unsubscribeHeaders(unsubscribeUrl);
   const transporter = makeTransporter();
   await transporter.sendMail({
     from: fromAddress(),
     to,
     subject,
     html,
+    text: text || htmlToText(html),
+    headers: headers || undefined,
     attachments: attachments as any,
   });
 }
@@ -157,8 +209,9 @@ export async function sendEmail(
   subject: string,
   html: string,
   attachments?: MailAttachment[],
+  unsubscribeUrl?: string,
 ): Promise<void> {
-  await dispatch({ to, subject, html, attachments });
+  await dispatch({ to, subject, html, text: htmlToText(html), attachments, unsubscribeUrl });
 }
 
 /**

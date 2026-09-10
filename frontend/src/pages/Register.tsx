@@ -172,7 +172,7 @@ export default function Register() {
   const subtotal = selectedPrice * form.quantity
   const processingFee = Math.round(subtotal * PROCESSING_FEE_RATE) + PROCESSING_FEE_BASE
   const total = subtotal + processingFee
-  const ended = ev.status === 'ended'
+  const ended = ev.status === 'finished'
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }))

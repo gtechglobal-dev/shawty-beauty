@@ -155,7 +155,7 @@ export interface StudioEvent {
   id: string
   slug: string
   title: string
-  status: 'live' | 'scheduled' | 'ended'
+  status: 'live' | 'upcoming' | 'finished'
   bannerImage?: string
   theme?: string
   datesLabel?: string

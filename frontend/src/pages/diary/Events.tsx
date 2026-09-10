@@ -200,11 +200,9 @@ export function EventsHome({
   saving,
   headers,
   onNew,
-  onEdit,
   onManage,
   onDuplicate,
-  onSetLive,
-  onEnd,
+  onSetStatus,
   onDelete,
   onOpenMessages,
   onOpenSubscribers,
@@ -215,17 +213,13 @@ export function EventsHome({
   saving: boolean
   headers: Record<string, string>
   onNew: () => void
-  onEdit: (id: string) => void
   onManage: (id: string) => void
   onDuplicate: (id: string) => void
-  onSetLive: (id: string) => void
-  onEnd: (id: string) => void
+  onSetStatus: (id: string, status: 'live' | 'upcoming' | 'finished') => void
   onDelete: (id: string) => void
   onOpenMessages: () => void
   onOpenSubscribers: () => void
 }) {
-const [pendingEnd, setPendingEnd] = useState<DiaryEvent | null>(null)
-
   return (
     <div className="space-y-8">
       {/* Global pulse strip */}
@@ -282,8 +276,8 @@ const [pendingEnd, setPendingEnd] = useState<DiaryEvent | null>(null)
                             Live Now
                           </span>
                         ) : (
-                          <span className={`tag-chip !py-1 ${ev.status === 'ended' ? '!bg-black/10' : '!bg-amber-100 !text-amber-700'}`}>
-                            {ev.status === 'ended' ? 'Ended' : 'Scheduled'}
+                          <span className={`tag-chip !py-1 ${ev.status === 'finished' ? '!bg-black/10' : '!bg-amber-100 !text-amber-700'}`}>
+                            {ev.status === 'finished' ? 'Finished' : 'Upcoming'}
                           </span>
                         )}
                         {ev.datesLabel && <span className={`text-xs ${ev.status === 'live' ? 'text-white/80' : 'text-muted'}`}>{ev.datesLabel}</span>}
@@ -305,30 +299,27 @@ const [pendingEnd, setPendingEnd] = useState<DiaryEvent | null>(null)
                       ]}
                     />
 
-                    <div className="mt-4 flex items-center gap-2 flex-wrap">
-                      {ev.status !== 'live' && (
-                        <button
-                          onClick={() => onSetLive(ev.id)}
-                          className="inline-flex items-center gap-1.5 text-sm font-semibold bg-gradient-to-r from-rose-dark to-rose text-white px-4 py-2 rounded-full hover:opacity-90 shadow-[0_8px_20px_-8px_rgba(179,99,128,0.6)]"
-                        >
-                          <Radio size={14} /> Make Live
-                        </button>
-                      )}
-                      <button onClick={() => onManage(ev.id)} className="btn btn-outline !py-2">Manage event</button>
-                      {ev.status !== 'ended' && (
-                        <button
-                          onClick={() => setPendingEnd(ev)}
-                          className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-600 border border-red-200 bg-red-50 px-4 py-2 rounded-full hover:bg-red-100"
-                        >
-                          <CircleAlert size={14} /> End Event
-                        </button>
-                      )}
-                      {ev.status === 'ended' && (
-                        <span className="inline-flex items-center gap-1.5 text-sm font-semibold bg-black/10 text-ink/60 px-4 py-2 rounded-full">
-                          <CircleAlert size={14} /> Finished — past event
-                        </span>
-                      )}
-                    </div>
+                    <div className="mt-4 flex items-end gap-2">
+                        <label className="block">
+                          <span className="block text-[10px] uppercase tracking-wider font-semibold text-muted/70 mb-1">Status</span>
+                          <select
+                            value={ev.status}
+                            onChange={(e) => onSetStatus(ev.id, e.target.value as 'live' | 'upcoming' | 'finished')}
+                            className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold cursor-pointer outline-none transition-colors ${
+                              ev.status === 'live'
+                                ? 'bg-red-600 !text-white border-red-600'
+                                : ev.status === 'finished'
+                                  ? 'bg-black/5 text-ink/60 border-black/10'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}
+                          >
+                            <option value="upcoming" className="!text-amber-700 !bg-white">Upcoming</option>
+                            <option value="live" className="!text-red-600 !bg-white">Live</option>
+                            <option value="finished" className="!text-ink/60 !bg-white">Finished</option>
+                          </select>
+                        </label>
+                        <button onClick={() => onManage(ev.id)} className="btn btn-outline !py-1.5 !px-3 text-xs">Manage event</button>
+                      </div>
                   </div>
                 </div>
               )
@@ -344,18 +335,6 @@ const [pendingEnd, setPendingEnd] = useState<DiaryEvent | null>(null)
           </div>
         )}
       </div>
-
-      {pendingEnd && (
-        <EndEventModal
-          open
-          event={pendingEnd}
-          onCancel={() => setPendingEnd(null)}
-          onConfirm={() => {
-            onEnd(pendingEnd.id)
-            setPendingEnd(null)
-          }}
-        />
-      )}
     </div>
   )
 }
@@ -824,7 +803,7 @@ export function EventEditor({
   onCancel: () => void
 }) {
   const [title, setTitle] = useState(initial?.title ?? '')
-  const [status, setStatus] = useState<string>(initial?.status ?? 'scheduled')
+  const [status, setStatus] = useState<string>(initial?.status ?? 'upcoming')
   const [banner, setBanner] = useState<string>(initial?.bannerImage ?? '')
   const [theme, setTheme] = useState(initial?.theme ?? '')
   const [datesLabel, setDatesLabel] = useState(initial?.datesLabel ?? '')
@@ -922,9 +901,9 @@ export function EventEditor({
           <div>
             <label className="field-label">Status</label>
             <select className="input-field" value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="scheduled">Scheduled</option>
+              <option value="upcoming">Upcoming</option>
               <option value="live">Live (shows on site)</option>
-              <option value="ended">Ended</option>
+              <option value="finished">Finished</option>
             </select>
           </div>
           <div>
@@ -1223,7 +1202,7 @@ export function EventManage({
         <button onClick={onBack} className="btn btn-outline !border-white/20 !text-white hover:!bg-white/10 !py-2 flex items-center gap-1.5 relative z-10"><ArrowLeft size={15} /> All events</button>
         <div className="mt-4 flex flex-wrap items-center gap-3 relative z-10">
           <span className={`tag-chip ${event.status === 'live' ? '!bg-red-600 !bg-none !text-white' : '!bg-white/15 !bg-none !text-white'}`}>
-            {event.status === 'live' ? '● LIVE ON SITE' : event.status === 'ended' ? 'Ended' : 'Scheduled'}
+            {event.status === 'live' ? '● LIVE ON SITE' : event.status === 'finished' ? 'Finished' : 'Upcoming'}
           </span>
           <span className="text-white/70 text-xs">{event.datesLabel}</span>
         </div>
@@ -1235,7 +1214,7 @@ export function EventManage({
           {event.status !== 'live' && (
             <button onClick={onSetLive} className="btn btn-primary !py-2 flex items-center gap-1.5"><Radio size={14} /> Make Live now</button>
           )}
-          {event.status !== 'ended' && (
+          {event.status !== 'finished' && (
             <button
               onClick={() => setConfirmEnd(true)}
               className="btn !py-2 !bg-red-600 !text-white hover:!bg-red-700 flex items-center gap-1.5"

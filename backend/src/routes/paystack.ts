@@ -295,7 +295,7 @@ router.post('/initialize', async (req: Request, res: Response) => {
     // Tickets are governed by the event the form is registering for (the live
     // event by default). Payment plumbing stays identical.
     const { event, tickets } = await resolveTickets(body.eventId);
-    if (event && event.status === 'ended') {
+    if (event && event.status === 'finished') {
       return res.status(400).json({
         error: 'This event has ended. Registration is closed — watch out for our future events coming soon.',
       });

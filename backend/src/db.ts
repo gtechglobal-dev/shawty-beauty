@@ -475,7 +475,7 @@ export async function readHiddenEmails(): Promise<HiddenEmail[]> {
 // Events (the central "happening" — site content is driven by events)
 // ------------------------------------------------------------------
 
-export type EventStatus = 'live' | 'scheduled' | 'ended';
+export type EventStatus = 'live' | 'upcoming' | 'finished';
 
 export interface EventTicket {
   id: string;
@@ -512,7 +512,7 @@ export interface StudioEvent {
 }
 
 export function isValidEventStatus(s: string): s is EventStatus {
-  return s === 'live' || s === 'scheduled' || s === 'ended';
+  return s === 'live' || s === 'upcoming' || s === 'finished';
 }
 
 export async function readEvents(filter?: Partial<StudioEvent>): Promise<StudioEvent[]> {
@@ -714,6 +714,31 @@ export async function ensureSeedEvents(): Promise<void> {
   // That would undo an admin's "End event" (leaving no live event shows the
   // site's "coming soon" state) on the next server restart. Going live is an
   // explicit admin action via the Make Live button.
+}
+
+/**
+ * Migrate events created before the status re-labelling, where the legacy
+ * values 'scheduled' / 'ended' map to the new 'upcoming' / 'finished'.
+ * Runs idempotently on every server start.
+ */
+export async function migrateEventStatuses(): Promise<number> {
+  const col = getCollection<StudioEvent>('events');
+  if (!col) return 0;
+  let migrated = 0;
+  const legacy = await col.find({
+    $or: [{ status: 'scheduled' }, { status: 'ended' }],
+  } as any).toArray();
+  for (const doc of legacy) {
+    const rawStatus = String(doc.status || '');
+    const next = rawStatus === 'scheduled' ? 'upcoming' : 'finished';
+    await col.updateOne(
+      { _id: doc._id },
+      { $set: { status: next, updatedAt: new Date().toISOString() } },
+    );
+    migrated += 1;
+  }
+  if (migrated > 0) console.log(`Migrated ${migrated} event(s) to the new status values.`);
+  return migrated;
 }
 
 // ------------------------------------------------------------------

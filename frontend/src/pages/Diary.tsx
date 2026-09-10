@@ -27,7 +27,7 @@ import {
   ScrollText,
   Copy,
 } from 'lucide-react'
-import { getJson, patchJson, postJson, delJson } from '../lib/api'
+import { getJson, patchJson, postJson, putJson, delJson } from '../lib/api'
 import { isLoggedIn, clearAuthToken, storeAuthToken } from '../lib/authState'
 import { useRealtime, type RealtimeEventType, type RealtimeStatus } from '../lib/useRealtime'
 import { formatNgn, type StudioEvent } from '../lib/constants'
@@ -35,6 +35,7 @@ import { useToast } from '../components/Toasts'
 import Modal from '../components/Modal'
 import EmailComposer from '../components/EmailComposer'
 import DraggableFab from '../components/layout/DraggableFab'
+import MobileBottomNav from '../components/layout/MobileBottomNav'
 import { downloadImage } from '../lib/image'
 import RichText from '../lib/RichText'
 import {
@@ -141,6 +142,8 @@ export default function Diary() {
   const [confirmPassword, setConfirmPassword] = useState('')
 
   const [authLoading, setAuthLoading] = useState(false)
+  const [navVisible, setNavVisible] = useState(true)
+  const navHideTimer = useRef<number | undefined>(undefined)
 
   const [grouped, setGrouped] = useState<GroupedData>({ events: [], totals: null })
   const [contacts, setContacts] = useState<ContactMsg[]>([])
@@ -216,6 +219,26 @@ export default function Diary() {
     if (reloadTick > 0 && token) reloadAll(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloadTick])
+
+  // Bottom nav on phones: keep it visible while touching the page, then tuck
+  // it out of the way after 15s of no touch so it doesn't block the screen.
+  useEffect(() => {
+    if (!token) return
+    const hide = () => setNavVisible(false)
+    const show = () => {
+      setNavVisible(true)
+      window.clearTimeout(navHideTimer.current)
+      navHideTimer.current = window.setTimeout(hide, 15000)
+    }
+    window.addEventListener('touchstart', show, { passive: true })
+    window.addEventListener('pointerdown', show)
+    show()
+    return () => {
+      window.removeEventListener('touchstart', show)
+      window.removeEventListener('pointerdown', show)
+      window.clearTimeout(navHideTimer.current)
+    }
+  }, [token])
 
   // Keep the current page/view in the URL (e.g. /diary?sub=manage&event=...)
   // so an F5 refresh lands back on the same screen instead of resetting
@@ -402,12 +425,30 @@ export default function Diary() {
     }
   }
 
+  async function handleSetStatus(id: string, status: string) {
+    setSaving(true)
+    try {
+      const data = await putJson(`/api/admin/events/${id}`, { status }, headers)
+      await reloadEvents()
+      toast.push(data.event?.title ? `${data.event.title} → ${status}.` : `Event status set to ${status}.`)
+    } catch (err: any) {
+      if (/unauthorized|invalid token/i.test(err.message || '')) {
+        toast.push('Your session has expired. Please sign in again.', 'err')
+        signOut()
+        return
+      }
+      toast.push(err.message || 'Failed to update event status', 'err')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function handleEnd(id: string) {
     setSaving(true)
     try {
       const data = await postJson(`/api/admin/events/${id}/end`, {}, headers)
       await reloadEvents()
-      toast.push(data.message || 'Event ended.')
+      toast.push(data.message || 'Event finished.')
     } catch (err: any) {
       if (/unauthorized|invalid token/i.test(err.message || '')) {
         toast.push('Your session has expired. Please sign in again.', 'err')
@@ -533,12 +574,6 @@ export default function Diary() {
               <span className="text-[10px] tracking-[0.24em] uppercase text-white/40">Studio owner&rsquo;s area</span>
             </span>
           </button>
-          <Link
-            to="/"
-            className="flex items-center gap-1.5 text-xs font-medium text-white/50 hover:text-white bg-white/5 border border-white/10 px-3 py-2 rounded-full transition-colors"
-          >
-            <ExternalLink size={13} /> View main site
-          </Link>
         </header>
 
         <div className="relative z-10 flex-1 flex items-center justify-center px-4 pb-20">
@@ -640,6 +675,7 @@ export default function Diary() {
             )}
           </div>
         </div>
+        <MobileBottomNav />
       </div>
     )
   }
@@ -815,9 +851,11 @@ export default function Diary() {
         </div>
       </nav>
 
-      {/* Permanent phone bottom nav: each Diary section as icon + label */}
-      <nav className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-pinkgold/25 bg-cream/95 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]">
-        <div className="flex items-stretch justify-around">
+      {/* Permanent phone bottom nav: each Diary section as icon + label; hides after 15s idle */}
+      <nav className={`md:hidden fixed inset-x-0 bottom-0 z-40 backdrop-blur-xl bg-ink/95 border-t border-white/10 px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] transition-transform duration-300 ease-out ${
+        navVisible ? 'translate-y-0' : 'translate-y-full'
+      }`}>
+        <div className="flex items-stretch justify-around gap-1">
           <BottomTab active={section === 'events' && subView === 'home'} onClick={() => setSection('events')} icon={CalendarDays} label="Events" />
           <BottomTab active={section === 'sponsors'} onClick={() => goSection('sponsors')} icon={Handshake} label="Sponsors" count={sponsors.length} />
           <BottomTab active={section === 'messages'} onClick={() => goSection('messages')} icon={MessageSquare} label="Messages" badge={unreadMessages} />
@@ -825,10 +863,10 @@ export default function Diary() {
           <BottomTab active={section === 'settings'} onClick={() => goSection('settings')} icon={ScrollText} label="ScrollText" />
           <Link
             to="/"
-            className="flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 pt-1.5 pb-1 text-faint hover:text-rose-dark"
+            className="flex flex-col items-center justify-center gap-1 flex-1 min-w-0 py-1 text-white/45 hover:text-white/80"
           >
-            <ExternalLink size={17} strokeWidth={2} />
-            <span className="text-[8.5px] leading-none font-semibold tracking-wide text-ink/55">Main site</span>
+            <ExternalLink size={18} strokeWidth={2} />
+            <span className="text-[9px] leading-none font-semibold tracking-wide text-white/50">Main site</span>
           </Link>
         </div>
       </nav>
@@ -884,11 +922,9 @@ export default function Diary() {
             saving={saving}
             headers={headers}
             onNew={handleCreateBlank}
-            onEdit={handleEdit}
             onManage={handleManage}
             onDuplicate={(id) => { void handleDuplicate(id) }}
-            onSetLive={(id) => { void handleSetLive(id) }}
-            onEnd={(id) => { void handleEnd(id) }}
+            onSetStatus={(id, status) => { void handleSetStatus(id, status) }}
             onDelete={(id) => { void handleDelete(id) }}
             onOpenMessages={() => setSection('messages')}
             onOpenSubscribers={() => setSection('sentEmails')}
@@ -1789,12 +1825,12 @@ function BottomTab({ active, onClick, icon: Icon, label, count, badge }: {
   return (
     <button
       onClick={onClick}
-      className={`relative flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 pt-1.5 pb-1 ${
-        active ? 'text-rose-deep' : 'text-faint hover:text-rose-dark'
+      className={`relative flex flex-col items-center justify-center gap-1 flex-1 min-w-0 py-1 ${
+        active ? 'text-pinkgold' : 'text-white/45 hover:text-white/80'
       }`}
     >
       <span className="relative">
-        <Icon size={17} strokeWidth={active ? 2.4 : 2} />
+        <Icon size={18} strokeWidth={active ? 2.4 : 2} />
         {typeof count === 'number' && count > 0 && (
           <span className="absolute -top-1 -right-2.5 text-[8px] font-bold bg-blush text-rose-deep px-1 py-px rounded-full">{count}</span>
         )}
@@ -1802,7 +1838,7 @@ function BottomTab({ active, onClick, icon: Icon, label, count, badge }: {
           <span className="absolute -top-1 -right-2.5 text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full bg-red-500 text-white animate-pulse">{badge > 9 ? '9+' : badge}</span>
         )}
       </span>
-      <span className={`text-[8.5px] leading-none font-semibold tracking-wide ${active ? '' : 'text-ink/55'}`}>{label}</span>
+      <span className={`text-[9px] leading-none font-semibold tracking-wide ${active ? 'text-white' : 'text-white/50'}`}>{label}</span>
     </button>
   )
 }

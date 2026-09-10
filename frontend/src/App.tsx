@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Routes, Route, useLocation, Link } from 'react-router-dom'
 import { BookOpenText } from 'lucide-react'
 import Navbar from './components/layout/Navbar'
@@ -74,6 +74,18 @@ export default function App() {
     return () => clearTimeout(t)
   }, [pathname])
 
+  // Registration drafts belong to the active /register flow only. Tapping a
+  // menu item to leave the registration pages (even mid-form) discards the
+  // saved draft, so returning starts fresh instead of restoring old input.
+  const prevPath = useRef(pathname)
+  useEffect(() => {
+    const wasInRegister = prevPath.current === '/register' || prevPath.current.startsWith('/register/')
+    prevPath.current = pathname
+    if (wasInRegister && !(pathname === '/register' || pathname.startsWith('/register/'))) {
+      sessionStorage.removeItem('shawyty_register_draft_v1')
+    }
+  }, [pathname])
+
   const handleFadeEnd = () => {
     setFading(false)
     setLoading(false)
@@ -114,7 +126,7 @@ export default function App() {
 
   return (
     <ToastProvider>
-      <div className="min-h-screen bg-cream text-ink flex flex-col pb-[calc(3rem+env(safe-area-inset-bottom))] md:pb-0">
+      <div className="min-h-screen bg-cream text-ink flex flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
         <Loader show={loading} fading={fading} onFadeEnd={handleFadeEnd} />
         <Navbar />
         <DiaryFab />
