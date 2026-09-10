@@ -27,6 +27,7 @@ import {
 import { formatNgn, eventRegisterUrl, type StudioEvent, type Ticket } from '../../lib/constants'
 import { getJson, patchJson, postJson, delJson } from '../../lib/api'
 import Modal from '../../components/Modal'
+import EmailComposer from '../../components/EmailComposer'
 import { useToast } from '../../components/Toasts'
 
 // ------------------------------------------------------------------
@@ -94,6 +95,34 @@ interface RegistrationRow {
   experienceLevel?: string
   emergencyContactName?: string
   emergencyContact?: string
+}
+
+// Local log of every number already exported as a phone contact, so the next
+// "Save contacts" run can flag duplicates and ask before overwriting. Browsers
+// can't read the device address book, so "already exists" = already saved here.
+const SAVED_CONTACTS_KEY = 'sbs_saved_contacts'
+
+interface SavedContact {
+  phone: string
+  name: string
+  ts: number
+}
+
+function savedContacts(): SavedContact[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SAVED_CONTACTS_KEY) || '[]')
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function recordSavedContact(phone: string, name: string) {
+  const p = (phone || '').replace(/\D/g, '')
+  if (!p) return
+  const rest = savedContacts().filter((s) => s.phone !== p)
+  rest.push({ phone: p, name, ts: Date.now() })
+  localStorage.setItem(SAVED_CONTACTS_KEY, JSON.stringify(rest))
 }
 
 export interface SponsorRow {
@@ -443,111 +472,41 @@ function EmailApplicantsModal({
   onClose: () => void
 }) {
   const paid = regs.filter((r) => r.status !== 'cancelled')
-  const [selected, setSelected] = useState<string[]>(() => paid.map((r) => r.id))
-  const [subject, setSubject] = useState('')
-  const [message, setMessage] = useState('')
-  const [busy, setBusy] = useState(false)
-  const toast = useToast()
 
-  useEffect(() => {
-    setSelected(paid.map((r) => r.id))
-    setSubject(`Excited to have you — ${event.title}`)
-    setMessage(
-      `Hi there,\n\n` +
+  return (
+    <EmailComposer
+      title="Email to applicants"
+      subtitle={<p className="text-sm text-muted mt-1">{event.title}</p>}
+      headers={headers}
+      recipients={paid.map((r) => ({
+        id: r.id,
+        email: r.email,
+        label: r.fullName,
+        sublabel: `${r.ticketLabel || r.ticketType} × ${r.quantity}`,
+      }))}
+      initialSubject={`Excited to have you — ${event.title}`}
+      initialMessage={
+        `Hi there,\n\n` +
         `We're really looking forward to seeing you at ${event.title}!` +
         `${event.datesLabel ? ` It runs ${event.datesLabel}.` : ''}` +
         `${event.venueNote ? `\n\n${event.venueNote}` : ''}` +
-        `\n\nSee you soon!\n— Shawty Beauty Studio`,
-    )
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event.id])
-
-  async function send() {
-    const recipients = paid.filter((r) => selected.includes(r.id))
-    if (recipients.length === 0) {
-      toast.push('Select at least one applicant to email.', 'err')
-      return
-    }
-    setBusy(true)
-    try {
-      const data = await postJson(
-        `/api/admin/broadcast`,
-        {
-          eventId: event.id,
-          subject: subject.trim() || `Update — ${event.title}`,
-          blocks: [{ type: 'text', text: message.trim() }],
-          emails: recipients.map((r) => r.email),
-        },
-        headers,
-      )
-      toast.push(
-        data.total
-          ? `Email sent to ${data.sent} of ${data.total} recipients (${data.failed} failed).`
-          : 'No recipients could be emailed.',
-        data.sent && data.sent > 0 ? 'ok' : 'err',
-      )
-    } catch (err: any) {
-      toast.push(err.message || 'Failed to send email.', 'err')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const toggle = (id: string) =>
-    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
-
-  return (
-    <Modal open onClose={onClose}>
-      <h3 className="font-semibold text-lg pr-8">Email to applicants</h3>
-      <p className="text-sm text-muted mt-1">{event.title}</p>
-
-      <div className="mt-5 space-y-4">
-        <div>
-          <label className="field-label">Subject</label>
-          <input className="input-field" value={subject} onChange={(e) => setSubject(e.target.value)} />
-        </div>
-        <div>
-          <label className="field-label">Message</label>
-          <textarea className="input-field" rows={7} value={message} onChange={(e) => setMessage(e.target.value)} />
-        </div>
-      </div>
-
-      <div className="mt-5">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-sm font-semibold">Recipients ({selected.length} of {paid.length})</div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setSelected(paid.map((r) => r.id))} className="text-xs font-semibold text-rose-deep hover:underline">All</button>
-            <button onClick={() => setSelected([])} className="text-xs font-semibold text-rose-deep hover:underline">None</button>
-          </div>
-        </div>
-        <div className="max-h-52 overflow-y-auto border border-black/10 rounded-xl divide-y divide-black/5">
-          {paid.length === 0 && <div className="p-4 text-sm text-muted">No applicants for this event yet.</div>}
-          {paid.map((r) => (
-            <label key={r.id} className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-black/[0.02]">
-              <input
-                type="checkbox"
-                className="accent-rose w-4 h-4 shrink-0"
-                checked={selected.includes(r.id)}
-                onChange={() => toggle(r.id)}
-              />
-              <span className="text-sm font-medium flex-1 truncate">{r.fullName}</span>
-              <span className="text-xs text-muted shrink-0">{r.ticketLabel || r.ticketType} × {r.quantity}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-6 grid grid-cols-2 gap-3">
-        <button onClick={onClose} className="btn btn-outline !py-2.5">Cancel</button>
-        <button
-          onClick={send}
-          disabled={busy || paid.length === 0}
-          className="btn btn-primary !py-2.5 flex items-center justify-center gap-1.5 disabled:opacity-60"
-        >
-          {busy ? <LoaderCircle size={15} className="animate-spin" /> : <Send size={15} />} Send email
-        </button>
-      </div>
-    </Modal>
+        `\n\nSee you soon!\n— Shawty Beauty Studio`
+      }
+      onClose={onClose}
+      onSend={async ({ subject, blocks, emails }) => {
+        const data = await postJson(
+          `/api/admin/broadcast`,
+          {
+            eventId: event.id,
+            subject: subject || `Update — ${event.title}`,
+            blocks,
+            emails,
+          },
+          headers,
+        )
+        return data
+      }}
+    />
   )
 }
 
@@ -565,6 +524,7 @@ function SaveContactsModal({
   const [filter, setFilter] = useState('')
   const visible = paid.filter((r) => !filter || (r.ticketLabel || r.ticketType) === filter)
   const [selected, setSelected] = useState<string[]>(() => visible.map((r) => r.id))
+  const [dupPrompt, setDupPrompt] = useState<{ targets: RegistrationRow[]; dupPhones: Set<string> } | null>(null)
 
   useEffect(() => {
     setSelected(visible.map((r) => r.id))
@@ -579,28 +539,35 @@ function SaveContactsModal({
     return ''
   }
 
-  function vcardFor(r: RegistrationRow): string {
+  // The full branded name first (3BMCGOLD- / 3BMCSTU-) followed by the person's
+  // whole name, kept as a single field so phones display it exactly that way.
+  function displayName(r: RegistrationRow): string {
     const prefix = ticketPrefix(r)
     const raw = (r.fullName || 'Applicant').trim()
-    const name = `${prefix}${raw}`
-    const parts = raw.split(/\s+/)
-    const last = parts.slice(1).join(' ')
-    const first = parts[0] || ''
+    return `${prefix}${raw}`
+  }
+
+  // Escape vCard text values so commas, semicolons, backslashes or newlines in a
+  // name/note can never corrupt the file for iOS or Android parsers.
+  function vcardFor(r: RegistrationRow): string {
+    const name = displayName(r)
+    const esc = (s: string) =>
+      s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n')
     return [
       'BEGIN:VCARD',
       'VERSION:3.0',
-      `N:${prefix}${last};${first};;;`,
-      `FN:${name}`,
+      `N:;${esc(name)};;;`,
+      `FN:${esc(name)}`,
       r.phone ? `TEL;TYPE=CELL:${r.phone}` : '',
-      r.email ? `EMAIL:${r.email}` : '',
-      r.instagram ? `NOTE:Instagram @${r.instagram}` : '',
+      r.email ? `EMAIL:${esc(r.email)}` : '',
+      r.instagram ? `NOTE:Instagram @${esc(r.instagram)}` : '',
       'END:VCARD',
     ]
       .filter(Boolean)
       .join('\r\n')
   }
 
-  function saveOne(r: RegistrationRow) {
+  function downloadVcf(r: RegistrationRow) {
     const prefix = ticketPrefix(r)
     const blob = new Blob([vcardFor(r)], { type: 'text/vcard' })
     const url = URL.createObjectURL(blob)
@@ -613,13 +580,65 @@ function SaveContactsModal({
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
+  const normPhone = (p: string) => (p || '').replace(/\D/g, '')
+
+  // Numbers that were already exported, or that repeat within this selection.
+  function dupCheck(rows: RegistrationRow[]): Set<string> {
+    const saved = savedContacts()
+    const seen = new Set<string>()
+    const dups = new Set<string>()
+    for (const row of rows) {
+      const p = normPhone(row.phone)
+      if (!p) continue
+      if (saved.some((s) => s.phone === p) || seen.has(p)) dups.add(p)
+      seen.add(p)
+    }
+    return dups
+  }
+
+  function saveRows(rows: RegistrationRow[]) {
+    rows.forEach((r) => downloadVcf(r))
+    rows.forEach((r) => recordSavedContact(r.phone, displayName(r)))
+  }
+
+  function handleBatch() {
+    const targets = visible.filter((r) => selected.includes(r.id))
+    if (targets.length === 0) return
+    const dups = dupCheck(targets)
+    if (dups.size > 0) {
+      setDupPrompt({ targets, dupPhones: dups })
+    } else {
+      saveRows(targets)
+    }
+  }
+
+  function handleRowSave(r: RegistrationRow) {
+    const dups = dupCheck([r])
+    if (dups.size > 0) {
+      setDupPrompt({ targets: [r], dupPhones: dups })
+    } else {
+      saveRows([r])
+    }
+  }
+
+  function chooseDup(action: 'overwrite' | 'newonly') {
+    if (!dupPrompt) return
+    const { targets, dupPhones } = dupPrompt
+    const toSave =
+      action === 'overwrite'
+        ? targets
+        : targets.filter((r) => !dupPhones.has(normPhone(r.phone)))
+    saveRows(toSave)
+    setDupPrompt(null)
+  }
+
   const toggle = (id: string) =>
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
 
   return (
     <Modal open onClose={onClose}>
       <h3 className="font-semibold text-lg pr-8">Save contacts to phone</h3>
-      <p className="text-sm text-muted mt-1">Filter by ticket type, tick who you want, then save each as a phone contact (.vcf). Gold tickets are prefixed 3BMCGOLD-, Student tickets 3BMCSTU-.</p>
+      <p className="text-sm text-muted mt-1">Filter by ticket type, tick who you want, then save each as a phone contact (.vcf). Names start with 3BMCGOLD- or 3BMCSTU-; numbers you've already saved are flagged so you can overwrite or keep the originals.</p>
 
       <div className="mt-5">
         <label className="field-label">Ticket type</label>
@@ -648,8 +667,8 @@ function SaveContactsModal({
               checked={selected.includes(r.id)}
               onChange={() => toggle(r.id)}
             />
-            <span className="text-sm font-medium flex-1 truncate">{ticketPrefix(r)}{r.fullName}</span>
-            <button onClick={() => saveOne(r)} className="px-2.5 py-1 rounded-lg text-xs bg-blush text-rose-deep hover:opacity-80 flex items-center gap-1 shrink-0">
+            <span className="text-sm font-medium flex-1 truncate">{displayName(r)}</span>
+            <button onClick={() => handleRowSave(r)} className="px-2.5 py-1 rounded-lg text-xs bg-blush text-rose-deep hover:opacity-80 flex items-center gap-1 shrink-0">
               <Download size={11} /> Save
             </button>
           </div>
@@ -659,13 +678,41 @@ function SaveContactsModal({
       <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button onClick={onClose} className="btn btn-outline !py-2.5">Close</button>
         <button
-          onClick={() => visible.filter((r) => selected.includes(r.id)).forEach((r) => saveOne(r))}
+          onClick={handleBatch}
           disabled={selected.length === 0}
           className="btn btn-primary !py-2.5 flex items-center justify-center gap-1.5 disabled:opacity-60 whitespace-nowrap"
         >
           <Download size={15} /> Save selected ({selected.filter((id) => visible.some((v) => v.id === id)).length})
         </button>
       </div>
+
+      {dupPrompt && (
+        <Modal open onClose={() => setDupPrompt(null)}>
+          <h3 className="font-semibold text-lg pr-8">Some numbers were already saved</h3>
+          <p className="text-sm text-muted mt-1">
+            {dupPrompt.dupPhones.size} of {dupPrompt.targets.length} selected number{dupPrompt.dupPhones.size === 1 ? '' : 's'}{' '}
+            {dupPrompt.dupPhones.size === 1 ? 'was already exported as a contact.' : 'were already exported as contacts.'} Overwrite them, or save only the new ones?
+          </p>
+          <div className="mt-4 max-h-44 overflow-y-auto border border-black/10 rounded-xl divide-y divide-black/5">
+            {dupPrompt.targets
+              .filter((r) => dupPrompt.dupPhones.has(normPhone(r.phone)))
+              .map((r) => (
+                <div key={r.id} className="px-3 py-2.5 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{displayName(r)}</div>
+                    <div className="text-xs text-muted">{r.phone}</div>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-rose-deep bg-blush px-2 py-1 rounded-full shrink-0">already saved</span>
+                </div>
+              ))}
+          </div>
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <button onClick={() => setDupPrompt(null)} className="btn btn-outline !py-2.5">Cancel</button>
+            <button onClick={() => chooseDup('newonly')} className="btn btn-light !py-2.5">Save new only</button>
+            <button onClick={() => chooseDup('overwrite')} className="btn btn-primary !py-2.5">Overwrite</button>
+          </div>
+        </Modal>
+      )}
     </Modal>
   )
 }

@@ -945,8 +945,17 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
 
     const excluded = await unsubscribedEmails();
 
-    // When an `eventId` is given, the email only goes to that event's
-    // applicants (non-cancelled registrations) instead of the whole platform.
+    // An optional `emails` list narrows the broadcast to exactly those
+    // addresses (used by the applicants/sponsors pickers). Any address in the
+    // list that isn't already in the resolved pool is added as an *external*
+    // recipient the admin typed in manually.
+    const emailList = Array.isArray(req.body?.emails)
+      ? req.body.emails.map((e: any) => String(e).trim().toLowerCase()).filter(Boolean)
+      : null;
+    const emailFilter = new Set(emailList || []);
+
+    // Build the base pool depending on the scope: a specific event's
+    // applicants, all sponsors, or the whole platform.
     const { eventId } = req.body || {};
     let recipients: EmailAgg[];
     if (eventId && typeof eventId === 'string') {
@@ -957,14 +966,6 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
         evRegs.map((r) => ({ email: r.email, createdAt: r.createdAt, source: 'registration' })),
         excluded,
       ).filter((r) => !r.unsubscribed);
-      // An optional `emails` list narrows the event broadcast to just those
-      // registrations (used by the "Email to applicants" picker).
-      const emailFilter = Array.isArray(req.body?.emails)
-        ? req.body.emails.map((e: any) => String(e).trim().toLowerCase()).filter(Boolean)
-        : null;
-      if (emailFilter && emailFilter.length > 0) {
-        recipients = recipients.filter((r) => emailFilter.includes(r.email.toLowerCase()));
-      }
     } else if (req.body?.scope === 'sponsors') {
       // Sponsors-only email — goes to every sponsor (brand-level records included).
       const sps = await readSponsors();
@@ -988,6 +989,19 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
         ],
         excluded,
       ).filter((r) => !r.unsubscribed);
+    }
+
+    // Narrow to the exact list the admin picked in the composer, and fold in
+    // any external addresses they typed in manually (these are not part of the
+    // pooled recipients, so they're added as their own entries).
+    if (emailList && emailList.length > 0) {
+      recipients = recipients.filter((r) => emailFilter.has(r.email.toLowerCase()));
+      const pooled = new Set(recipients.map((r) => r.email.toLowerCase()));
+      for (const email of emailList) {
+        if (!pooled.has(email)) {
+          recipients.push({ email, createdAt: new Date().toISOString(), sources: ['external'], unsubscribed: false });
+        }
+      }
     }
 
     if (recipients.length === 0) {

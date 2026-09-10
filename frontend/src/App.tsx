@@ -3,6 +3,8 @@ import { Routes, Route, useLocation, Link } from 'react-router-dom'
 import { BookOpenText } from 'lucide-react'
 import Navbar from './components/layout/Navbar'
 import Footer from './components/layout/Footer'
+import MobileBottomNav from './components/layout/MobileBottomNav'
+import DraggableFab from './components/layout/DraggableFab'
 import Loader from './components/Loader'
 import Home from './pages/Home'
 import Services from './pages/Services'
@@ -17,8 +19,8 @@ import Attendance from './pages/Attendance'
 import { ToastProvider } from './components/Toasts'
 import { isLoggedIn, subscribeAuth } from './lib/authState'
 
-// Floating "back to the Diary" pill for the signed-in owner so they can jump
-// straight back to management from anywhere on the public site.
+// Floating "back to the Diary" button for the signed-in owner — draggable so
+// it can sit anywhere on the screen, and the position is remembered.
 function DiaryFab() {
   const [loggedIn, setLoggedIn] = useState(isLoggedIn())
 
@@ -26,14 +28,17 @@ function DiaryFab() {
 
   if (!loggedIn) return null
   return (
-    <Link
-      to="/diary"
-      className="fixed bottom-4 right-4 z-50 flex items-center gap-2 text-sm font-semibold text-white bg-gradient-to-br from-rose to-rose-deep px-4 py-3 rounded-full shadow-[0_14px_30px_-12px_rgba(145,78,108,0.7)] hover:scale-[1.03] active:scale-95 transition-transform"
-      title="Open Shawty's Diary"
-    >
-      <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
-      <BookOpenText size={15} /> Diary
-    </Link>
+    <DraggableFab storageKey="sbs-fab-diary" className="hidden md:block">
+      <Link
+        to="/diary"
+        className="flex items-center gap-2 text-sm font-semibold text-white bg-gradient-to-br from-rose to-rose-deep px-4 py-3 rounded-full shadow-[0_14px_30px_-12px_rgba(145,78,108,0.7)] hover:scale-[1.03] active:scale-95 transition-transform select-none"
+        title="Open Shawty's Diary"
+        draggable={false}
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+        <BookOpenText size={15} /> Diary
+      </Link>
+    </DraggableFab>
   )
 }
 
@@ -109,10 +114,11 @@ export default function App() {
 
   return (
     <ToastProvider>
-      <div className="min-h-screen bg-cream text-ink flex flex-col">
+      <div className="min-h-screen bg-cream text-ink flex flex-col pb-[calc(3rem+env(safe-area-inset-bottom))] md:pb-0">
         <Loader show={loading} fading={fading} onFadeEnd={handleFadeEnd} />
         <Navbar />
         <DiaryFab />
+        <MobileBottomNav />
         <main key={pathname} className="flex-1 page-enter overflow-x-clip">
           <Routes>
             <Route path="/" element={<Home />} />

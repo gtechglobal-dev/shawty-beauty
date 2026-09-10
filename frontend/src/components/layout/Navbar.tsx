@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Menu, X, BookOpenText } from 'lucide-react'
+import { BookOpenText } from 'lucide-react'
 import { siteConfig } from '../../lib/constants'
 import { isLoggedIn, subscribeAuth } from '../../lib/authState'
 
@@ -13,16 +13,11 @@ const links = [
 ]
 
 export default function Navbar() {
-  const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [loggedIn, setLoggedIn] = useState(isLoggedIn())
-  const { pathname, hash } = useLocation()
+  const { pathname } = useLocation()
 
   useEffect(() => subscribeAuth(() => setLoggedIn(isLoggedIn())), [])
-
-  useEffect(() => {
-    setOpen(false)
-  }, [pathname, hash])
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12)
@@ -31,44 +26,24 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const headerRef = useRef<HTMLElement | null>(null)
-
-  // Close mobile menu when clicking/tapping anywhere outside the header
-  useEffect(() => {
-    if (!open) return
-    const onDocClick = (e: MouseEvent | TouchEvent) => {
-      if (headerRef.current && !headerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('click', onDocClick)
-    document.addEventListener('touchstart', onDocClick)
-    return () => {
-      document.removeEventListener('click', onDocClick)
-      document.removeEventListener('touchstart', onDocClick)
-    }
-  }, [open])
-
   const isActive = (to: string) => {
     // Home: active on homepage only when no section hash is set
     if (to === '/') {
-      return pathname === '/' && hash === ''
+      return pathname === '/' 
     }
     return pathname === to
   }
 
   return (
     <header
-      ref={headerRef}
-      onClick={() => setOpen(false)}
       className={`sticky top-0 z-50 transition-all duration-300 ${
-        scrolled || open
+        scrolled
           ? 'bg-cream/85 backdrop-blur-xl border-b border-pinkgold/20 shadow-[0_8px_30px_-14px_rgba(122,48,69,0.28)]'
           : 'bg-transparent border-b border-transparent'
       } will-change-transform`}
     >
       <div className="container flex items-center justify-between h-16 md:h-[72px] gap-3">
-        <Link to="/" className="flex items-center gap-3 shrink-0 group" onClick={() => setOpen(false)}>
+        <Link to="/" className="flex items-center gap-3 shrink-0 group">
           {/* Signature double-ring monogram */}
           <span className="relative w-10 h-10 md:w-11 md:h-11">
             <span className="absolute inset-0 rounded-full bg-gradient-to-br from-rose via-pinkgold to-gold opacity-25 blur-[6px] group-hover:opacity-40 transition-opacity" />
@@ -106,49 +81,7 @@ export default function Navbar() {
             {loggedIn && <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />}
           </Link>
         </nav>
-
-        <button
-          className="md:hidden p-2 -mr-1 text-ink"
-          onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
-          aria-label="Toggle menu"
-        >
-          {open ? <X size={26} /> : <Menu size={26} />}
-        </button>
       </div>
-
-      {open && (
-        <nav onClick={(e) => e.stopPropagation()} className="md:hidden relative z-50 px-4 pb-5 pt-2 space-y-0.5 border-t border-[#321d24]/10 bg-cream/95 backdrop-blur-md">
-          {links.map((l) => (
-            <Link
-              key={l.to}
-              to={l.to}
-              onClick={() => setOpen(false)}
-              className={`block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-                isActive(l.to) ? 'text-[#7a3045] bg-blush' : 'text-ink/80'
-              }`}
-            >
-              {l.label}
-            </Link>
-          ))}
-          <Link
-            to="/diary"
-            onClick={() => setOpen(false)}
-            className={`mt-1 flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap ${
-              isActive('/diary')
-                ? 'text-rose-deep bg-blush'
-                : loggedIn
-                  ? 'text-white bg-gradient-to-br from-rose to-rose-deep shadow-[0_8px_20px_-10px_rgba(145,78,108,0.8)]'
-                  : 'text-rose-dark font-medium'
-            }`}
-          >
-            <span className="flex items-center gap-1.5 shrink-0">
-              <BookOpenText size={14} className="shrink-0" />
-              {loggedIn ? 'My Diary' : "Shawty's Diary"}
-            </span>
-            {loggedIn && <span className="flex items-center gap-1 text-[9px] uppercase tracking-wide opacity-90 shrink-0"><span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" /> Owner</span>}
-          </Link>
-        </nav>
-      )}
     </header>
   )
 }

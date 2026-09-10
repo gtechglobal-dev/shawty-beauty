@@ -9,3 +9,4 @@ build/
 Thumbs.db
 backend/data/*.json
 frontend/tsconfig.tsbuildinfo
+backend/tsconfig.tsbuildinfo

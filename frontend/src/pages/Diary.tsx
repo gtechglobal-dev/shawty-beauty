@@ -33,6 +33,8 @@ import { useRealtime, type RealtimeEventType, type RealtimeStatus } from '../lib
 import { formatNgn, type StudioEvent } from '../lib/constants'
 import { useToast } from '../components/Toasts'
 import Modal from '../components/Modal'
+import EmailComposer from '../components/EmailComposer'
+import DraggableFab from '../components/layout/DraggableFab'
 import { downloadImage } from '../lib/image'
 import RichText from '../lib/RichText'
 import {
@@ -124,8 +126,6 @@ export default function Diary() {
   const [sponsorDeleteTarget, setSponsorDeleteTarget] = useState<SponsorRow | null>(null)
   const [sponsorContactAction, setSponsorContactAction] = useState<{ kind: 'call' | 'whatsapp' | 'email'; phone: string; email: string } | null>(null)
   const [sponsorEmailOpen, setSponsorEmailOpen] = useState(false)
-  const [sponsorEmailSubject, setSponsorEmailSubject] = useState('')
-  const [sponsorEmailMessage, setSponsorEmailMessage] = useState('')
   const [sponsorLogoPreview, setSponsorLogoPreview] = useState<string>('')
   const [contactAction, setContactAction] = useState<{ kind: 'call' | 'whatsapp'; phone: string } | null>(null)
   const [contactDetails, setContactDetails] = useState<ContactMsg | null>(null)
@@ -451,33 +451,6 @@ export default function Diary() {
     }
   }
 
-  async function sendSponsorEmail() {
-    if (!sponsorEmailSubject.trim() || !sponsorEmailMessage.trim()) {
-      toast.push('Add both a subject and a message.', 'err')
-      return
-    }
-    setSaving(true)
-    try {
-      const data = await postJson('/api/admin/broadcast', {
-        subject: sponsorEmailSubject,
-        message: sponsorEmailMessage,
-        scope: 'sponsors',
-      }, headers)
-      toast.push(
-        data.total > 0
-          ? `Email sent to ${data.sent} of ${data.total} sponsor${data.total === 1 ? '' : 's'}${data.failed ? ` (${data.failed} failed)` : ''}.`
-          : 'No sponsor emails to send.',
-      )
-      setSponsorEmailOpen(false)
-      setSponsorEmailSubject('')
-      setSponsorEmailMessage('')
-    } catch (err: any) {
-      toast.push(err.message || 'Failed to send email', 'err')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   async function deleteSponsor(target: SponsorRow) {
     setSponsorDeleting(true)
     try {
@@ -688,7 +661,7 @@ export default function Diary() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-cream via-blush/40 to-cream text-ink">
+    <div className="min-h-screen bg-gradient-to-b from-cream via-blush/40 to-cream text-ink pb-[calc(3rem+env(safe-area-inset-bottom))] md:pb-0">
       {/* Sticky top bar */}
       <header className="silk-dark sticky top-0 z-40 border-b border-pinkgold/20 shadow-[0_10px_30px_-18px_rgba(0,0,0,0.5)]">
         <div className="container h-16 md:h-[72px] flex items-center justify-between gap-3">
@@ -709,24 +682,18 @@ export default function Diary() {
                 {isLiveEvent ? `Live · ${liveEventTitle ?? 'event'}` : 'No live event'}
               </span>
             )}
-            <Link
-              to="/"
-              className="flex items-center gap-1.5 text-xs font-medium text-white bg-white/10 border border-white/20 px-3 py-2 rounded-full hover:bg-white/20 transition-colors"
-            >
-              <ExternalLink size={13} className="text-white" /> <span className="hidden sm:inline">View</span> main site
-            </Link>
             <button onClick={() => reloadAll()} className="flex items-center gap-2 p-2 text-white bg-white/10 border border-white/20 rounded-full hover:bg-white/20 transition-colors" title="Refresh everything now">
               <RefreshCw size={15} className={`${loading ? 'animate-spin' : ''} text-white`} />
             </button>
-            <button onClick={signOut} className="flex items-center gap-2 text-sm font-medium text-white bg-white/10 border border-white/20 px-3 py-2 rounded-full hover:bg-white/20 transition-colors" title="Log out of the Diary">
-              <LogOut size={15} className="text-white" /> <span className="hidden sm:inline">Logout</span>
+            <button onClick={signOut} className="flex items-center gap-1.5 text-[11px] leading-none font-semibold text-white bg-white/10 border border-white/20 px-2.5 py-2 rounded-full hover:bg-white/20 transition-colors whitespace-nowrap" title="Log out of the Diary">
+              <LogOut size={13} className="text-white" /> Log Out
             </button>
           </div>
         </div>
       </header>
 
-      {/* Sticky tab rail — big, tappable, mobile-first */}
-      <nav className="sticky top-16 md:top-[72px] z-30 bg-cream/90 backdrop-blur-md border-b border-black/5">
+      {/* Sticky tab rail — hidden on phones, which get the permanent bottom nav instead */}
+      <nav className="hidden md:block sticky top-[72px] z-30 bg-cream/90 backdrop-blur-md border-b border-black/5">
         <div className="container flex gap-1.5 py-2 overflow-x-auto no-scrollbar">
           <TabPill
             active={section === 'events' && subView === 'home'}
@@ -761,6 +728,24 @@ export default function Diary() {
             icon={ScrollText}
             label="Scrolling Text"
           />
+        </div>
+      </nav>
+
+      {/* Permanent phone bottom nav: each Diary section as icon + label */}
+      <nav className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-pinkgold/25 bg-cream/95 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]">
+        <div className="flex items-stretch justify-around">
+          <BottomTab active={section === 'events' && subView === 'home'} onClick={() => setSection('events')} icon={CalendarDays} label="Events" />
+          <BottomTab active={section === 'sponsors'} onClick={() => goSection('sponsors')} icon={Handshake} label="Sponsors" count={sponsors.length} />
+          <BottomTab active={section === 'messages'} onClick={() => goSection('messages')} icon={MessageSquare} label="Messages" badge={unreadMessages} />
+          <BottomTab active={section === 'subscribers'} onClick={() => goSection('subscribers')} icon={Mail} label="Emails" count={subscribers.length} />
+          <BottomTab active={section === 'settings'} onClick={() => goSection('settings')} icon={ScrollText} label="ScrollText" />
+          <Link
+            to="/"
+            className="flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 pt-1.5 pb-1 text-faint hover:text-rose-dark"
+          >
+            <ExternalLink size={17} strokeWidth={2} />
+            <span className="text-[8.5px] leading-none font-semibold tracking-wide text-ink/55">Main site</span>
+          </Link>
         </div>
       </nav>
 
@@ -845,7 +830,7 @@ export default function Diary() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-muted text-xs bg-blush/30 border-b-2 border-pinkgold/40">
+                  <tr className="text-center text-muted text-xs bg-blush/30 border-b-2 border-pinkgold/40">
                     <th className="px-6 py-2.5">Logo / Docs</th>
                     <th className="px-6 py-2.5">Brand / Name</th>
                     <th className="px-6 py-2.5">Contact</th>
@@ -856,16 +841,16 @@ export default function Diary() {
                 </thead>
                 <tbody>
                   {orderedSponsors.map((sp) => (
-                    <tr key={sp.id} className="border-b border-pinkgold/25 align-top group hover:bg-blush/15">
+                    <tr key={sp.id} className="border-b border-pinkgold/25 align-middle group hover:bg-blush/15">
                       <td className="px-6 py-3">
                         {sp.logoUrl || sp.logoBase64 ? (
                           <img
                             src={sp.logoUrl || (sp.logoBase64!.startsWith('data:') ? sp.logoBase64! : `data:image/png;base64,${sp.logoBase64!}`)}
                             alt={`${sp.brandName} logo`}
-                            className="w-12 h-12 rounded-lg object-contain bg-white border border-pinkgold/30 p-1"
+                            className="w-12 h-12 rounded-lg object-contain bg-white border border-pinkgold/30 p-1 mx-auto"
                           />
                         ) : (
-                          <span className="w-12 h-12 rounded-lg border border-dashed border-pinkgold/50 bg-blush/30 flex items-center justify-center text-rose-deep/50">
+                          <span className="w-12 h-12 rounded-lg border border-dashed border-pinkgold/50 bg-blush/30 flex items-center justify-center text-rose-deep/50 mx-auto">
                             <Image size={18} />
                           </span>
                         )}
@@ -890,7 +875,7 @@ export default function Diary() {
                         )}
                         <button
                           onClick={() => setSponsorDetails(sp)}
-                          className="mt-2 flex items-center gap-1 text-xs font-semibold text-rose-deep hover:underline cursor-pointer"
+                          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-rose-deep hover:underline cursor-pointer"
                         >
                           <Eye size={13} /> View Details
                         </button>
@@ -898,7 +883,7 @@ export default function Diary() {
                       <td className="px-6 py-3">{PACKAGE_LABELS[sp.packageType] || sp.packageType}</td>
                       <td className="px-6 py-3">{sp.amount > 0 ? formatNgn(sp.amount) : 'In-kind'}</td>
                       <td className="px-6 py-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center gap-2">
                           <button
                             onClick={() => setSponsorToggle(sp)}
                             className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-full border transition-colors ${
@@ -1035,13 +1020,17 @@ export default function Diary() {
         </div>
       )}
 
-      {/* Floating quick access to the live site for the signed-in owner */}
-      <Link
-        to="/"
-        className="fixed bottom-4 right-4 z-50 flex items-center gap-2 text-sm font-semibold text-white bg-gradient-to-br from-rose to-rose-deep px-4 py-3 rounded-full shadow-[0_14px_30px_-12px_rgba(145,78,108,0.7)] hover:scale-[1.03] active:scale-95 transition-transform"
-      >
-        <ExternalLink size={15} /> Live site
-      </Link>
+      {/* Floating quick access to the live site — draggable anywhere on the screen */}
+      <DraggableFab storageKey="sbs-fab-live">
+        <Link
+          to="/"
+          className="flex items-center gap-2 text-sm font-semibold text-white bg-gradient-to-br from-rose to-rose-deep px-4 py-3 rounded-full shadow-[0_14px_30px_-12px_rgba(145,78,108,0.7)] hover:scale-[1.03] active:scale-95 transition-transform select-none"
+          title="Go to the live site"
+          draggable={false}
+        >
+          <ExternalLink size={15} /> Live site
+        </Link>
+      </DraggableFab>
 
       {contactAction && (
         <Modal open onClose={() => setContactAction(null)}>
@@ -1442,45 +1431,39 @@ export default function Diary() {
       )}
 
       {sponsorEmailOpen && (
-        <Modal open wide onClose={() => setSponsorEmailOpen(false)}>
-          <div className="flex items-start justify-between gap-3 mb-1">
-            <div>
-              <h3 className="text-lg font-bold">Email to Sponsors</h3>
-              <p className="text-sm text-muted mt-1">
-                Reaches every sponsor on the platform ({sponsors.length} sponsor{sponsors.length === 1 ? '' : 's'}), excluding anyone who unsubscribed.
-              </p>
-            </div>
-            <button onClick={() => setSponsorEmailOpen(false)} className="p-1.5 rounded-full hover:bg-black/5 text-ink/60" title="Close">
-              <X size={18} />
-            </button>
-          </div>
-          <div className="space-y-4 mt-4">
-            <div>
-              <label className="field-label">Subject</label>
-              <input
-                className="input-field"
-                placeholder="e.g. Thank you for supporting Shawty Beauty Studio"
-                value={sponsorEmailSubject}
-                onChange={(e) => setSponsorEmailSubject(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="field-label">Message</label>
-              <textarea
-                className="input-field min-h-32 resize-y"
-                placeholder="Write your message to the sponsors…"
-                value={sponsorEmailMessage}
-                onChange={(e) => setSponsorEmailMessage(e.target.value)}
-              />
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setSponsorEmailOpen(false)} className="btn btn-light flex-1">Cancel</button>
-              <button onClick={sendSponsorEmail} className="btn btn-primary flex-1" disabled={saving}>
-                {saving ? <LoaderCircle size={18} className="animate-spin" /> : 'Send to all sponsors'}
-              </button>
-            </div>
-          </div>
-        </Modal>
+        <EmailComposer
+          title="Email to Sponsors"
+          subtitle={
+            <p className="text-sm text-muted mt-1">
+              Reaches the selected sponsor{sponsors.length === 1 ? '' : 's'} on the platform ({sponsors.length}), excluding anyone who unsubscribed.
+            </p>
+          }
+          wide
+          headers={headers}
+          recipients={sponsors.map((s) => ({
+            id: s.id,
+            email: s.email,
+            label: s.brandName || s.contactName,
+            sublabel: s.contactName,
+          }))}
+          initialSubject=""
+          initialMessage=""
+          sendLabel="Send to sponsors"
+          onClose={() => setSponsorEmailOpen(false)}
+          onSend={async ({ subject, blocks, emails }) => {
+            const data = await postJson(
+              '/api/admin/broadcast',
+              {
+                subject,
+                blocks,
+                scope: 'sponsors',
+                emails,
+              },
+              headers,
+            )
+            return data
+          }}
+        />
       )}
     </div>
   )
@@ -1539,6 +1522,36 @@ function TabPill({ active, onClick, icon: Icon, label, count, badge }: {
           {badge}
         </span>
       )}
+    </button>
+  )
+}
+
+// Compact icon + label tab for the permanent phone bottom nav.
+function BottomTab({ active, onClick, icon: Icon, label, count, badge }: {
+  active: boolean
+  onClick: () => void
+  icon: typeof CalendarDays
+  label: string
+  count?: number
+  badge?: number
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 pt-1.5 pb-1 ${
+        active ? 'text-rose-deep' : 'text-faint hover:text-rose-dark'
+      }`}
+    >
+      <span className="relative">
+        <Icon size={17} strokeWidth={active ? 2.4 : 2} />
+        {typeof count === 'number' && count > 0 && (
+          <span className="absolute -top-1 -right-2.5 text-[8px] font-bold bg-blush text-rose-deep px-1 py-px rounded-full">{count}</span>
+        )}
+        {typeof badge === 'number' && badge > 0 && (
+          <span className="absolute -top-1 -right-2.5 text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full bg-red-500 text-white animate-pulse">{badge > 9 ? '9+' : badge}</span>
+        )}
+      </span>
+      <span className={`text-[8.5px] leading-none font-semibold tracking-wide ${active ? '' : 'text-ink/55'}`}>{label}</span>
     </button>
   )
 }
