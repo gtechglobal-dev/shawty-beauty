@@ -656,12 +656,12 @@ function SaveContactsModal({
         ))}
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-3">
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button onClick={onClose} className="btn btn-outline !py-2.5">Close</button>
         <button
           onClick={() => visible.filter((r) => selected.includes(r.id)).forEach((r) => saveOne(r))}
           disabled={selected.length === 0}
-          className="btn btn-primary !py-2.5 flex items-center justify-center gap-1.5 disabled:opacity-60"
+          className="btn btn-primary !py-2.5 flex items-center justify-center gap-1.5 disabled:opacity-60 whitespace-nowrap"
         >
           <Download size={15} /> Save selected ({selected.filter((id) => visible.some((v) => v.id === id)).length})
         </button>
@@ -1559,9 +1559,9 @@ export function EventManage({
               ({confirmDelete.ticketLabel || confirmDelete.ticketType} × {confirmDelete.quantity}) will be permanently
               removed. Their ticket download link will stop working.
             </p>
-            <div className="flex items-center justify-center gap-3 mt-6">
-              <button onClick={() => setConfirmDelete(null)} disabled={delBusy} className="btn btn-outline">Cancel</button>
-              <button onClick={deleteReg} disabled={delBusy} className="btn bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-6">
+              <button onClick={() => setConfirmDelete(null)} disabled={delBusy} className="btn btn-outline w-full sm:w-auto">Cancel</button>
+              <button onClick={deleteReg} disabled={delBusy} className="btn bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 flex items-center gap-2 w-full sm:w-auto whitespace-nowrap">
                 {delBusy ? <LoaderCircle size={16} className="animate-spin" /> : <Trash2 size={16} />} Delete registration
               </button>
             </div>

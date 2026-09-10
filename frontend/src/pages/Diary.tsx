@@ -537,7 +537,7 @@ export default function Diary() {
 
         <div className="relative z-10 flex-1 flex items-center justify-center px-4 pb-20">
           <div className="w-full max-w-md">
-            <button onClick={() => setScreen('login')} className="mx-auto flex items-center gap-2 text-white/60 hover:text-white text-xs tracking-wide uppercase mb-6">
+            <button onClick={() => setScreen('login')} className="mx-auto flex items-center gap-2 text-white/60 hover:text-white text-[10px] sm:text-xs tracking-wide uppercase mb-6 whitespace-nowrap">
               <Sparkles size={13} /> Private · sign in to manage the studio
             </button>
 

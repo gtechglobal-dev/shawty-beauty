@@ -221,90 +221,96 @@ h1, h2, h3, .font-display {
 }
 
 /* ===== Buttons ===== */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 28px;
-  border-radius: 999px;
-  font-weight: 600;
-  font-size: 0.87rem;
-  letter-spacing: 0.01em;
-  cursor: pointer;
-  border: none;
-  text-decoration: none;
-  transform: translateZ(0);
-  transition: transform 0.2s var(--ease-luxury),
-    background-color 0.2s ease, background-position 0.5s ease,
-    border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
-  will-change: transform, box-shadow;
-}
+/* Buttons are defined in @layer components so Tailwind utilities (padding,
+   font-size, white-space, etc.) can override the defaults below — keeping
+   labels on one line on small screens. */
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 28px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.87rem;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    border: none;
+    text-decoration: none;
+    white-space: nowrap;
+    transform: translateZ(0);
+    transition: transform 0.2s var(--ease-luxury),
+      background-color 0.2s ease, background-position 0.5s ease,
+      border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    will-change: transform, box-shadow;
+  }
 
-.btn:active {
-  transform: scale(0.97);
-  transition-duration: 0.05s;
-}
+  .btn:active {
+    transform: scale(0.97);
+    transition-duration: 0.05s;
+  }
 
-.btn-primary {
-  background: linear-gradient(135deg, #8d3a52 0%, #7a3045 52%, #5f2436 130%);
-  background-size: 160% 100%;
-  background-position: 0% 0%;
-  color: #ffffff;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.28) inset,
-    0 12px 26px -12px rgba(122, 48, 69, 0.55);
-}
+  .btn-primary {
+    background: linear-gradient(135deg, #8d3a52 0%, #7a3045 52%, #5f2436 130%);
+    background-size: 160% 100%;
+    background-position: 0% 0%;
+    color: #ffffff;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.28) inset,
+      0 12px 26px -12px rgba(122, 48, 69, 0.55);
+  }
 
-.btn-primary:hover {
-  transform: translateY(-3px);
-  background-position: 60% 0%;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.32) inset,
-    0 20px 40px -16px rgba(122, 48, 69, 0.7);
-}
+  .btn-primary:hover {
+    transform: translateY(-3px);
+    background-position: 60% 0%;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.32) inset,
+      0 20px 40px -16px rgba(122, 48, 69, 0.7);
+  }
 
-.btn-outline {
-  background: transparent;
-  color: #7a3045;
-  border: 1.5px solid rgba(122, 48, 69, 0.28);
-}
+  .btn-outline {
+    background: transparent;
+    color: #7a3045;
+    border: 1.5px solid rgba(122, 48, 69, 0.28);
+  }
 
-.btn-outline:hover {
-  border-color: rgba(122, 48, 69, 0.6);
-  color: #5f2436;
-  background: rgba(232, 169, 184, 0.22);
-  transform: translateY(-3px);
-}
+  .btn-outline:hover {
+    border-color: rgba(122, 48, 69, 0.6);
+    color: #5f2436;
+    background: rgba(232, 169, 184, 0.22);
+    transform: translateY(-3px);
+  }
 
-.btn-light {
-  background: linear-gradient(180deg, #ffffff, #fdf0f2);
-  color: #7a3045;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-}
+  .btn-light {
+    background: linear-gradient(180deg, #ffffff, #fdf0f2);
+    color: #7a3045;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+  }
 
-.btn-light:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.4);
-}
+  .btn-light:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.4);
+  }
 
-/* Button micro-interaction */
-.btn {
-  position: relative;
-  overflow: hidden;
-}
-.btn::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.28), transparent);
-  transition: left 0.6s var(--ease-luxury);
-}
-.btn:hover::after {
-  left: 100%;
+  /* Button micro-interaction */
+  .btn {
+    position: relative;
+    overflow: hidden;
+  }
+  .btn::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+    transition: left 0.6s var(--ease-luxury);
+  }
+  .btn:hover::after {
+    left: 100%;
+  }
 }
 
 /* ===== Forms ===== */
@@ -369,6 +375,7 @@ form textarea {
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 ::selection {

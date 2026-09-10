@@ -206,9 +206,9 @@ export default function TickerPanel({ token }: { token: string }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex flex-wrap items-center gap-3 pt-2">
             <button onClick={() => save()} disabled={saving}
-              className="btn btn-primary disabled:opacity-60 flex items-center gap-2">
+              className="btn btn-primary disabled:opacity-60 flex items-center gap-2 whitespace-nowrap">
               {saving ? <LoaderCircle size={16} className="animate-spin" /> : <Save size={16} />} {saving ? 'Saving…' : 'Save Scrolling Text'}
             </button>
             <span className="text-xs text-muted">The toggle saves instantly — no "Save" needed for on/off.</span>
