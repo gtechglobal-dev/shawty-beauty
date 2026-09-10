@@ -863,19 +863,9 @@ export default function Diary() {
                         <div className="text-xs font-medium">{sp.contactName}</div>
                         <div className="text-xs text-muted">{sp.email}</div>
                         {sp.phone && <div className="text-xs text-muted">{sp.phone}</div>}
-                        {sp.website && (
-                          <a
-                            href={sp.website}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-rose-deep hover:underline break-all"
-                          >
-                            <ExternalLink size={10} /> {sp.website.replace(/^https?:\/\//, '')}
-                          </a>
-                        )}
                         <button
                           onClick={() => setSponsorDetails(sp)}
-                          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-rose-deep hover:underline cursor-pointer"
+                          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
                         >
                           <Eye size={13} /> View Details
                         </button>

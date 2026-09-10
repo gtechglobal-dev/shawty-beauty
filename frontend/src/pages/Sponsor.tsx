@@ -439,7 +439,7 @@ export default function Sponsor() {
                     )}
                     <button
                       onClick={() => setViewSponsor(s)}
-                      className="mt-2 text-[11px] font-semibold text-rose-dark hover:text-rose transition-colors inline-flex items-center gap-1"
+                      className="mt-2 text-[11px] font-semibold text-blue-600 hover:text-blue-700 transition-colors inline-flex items-center gap-1"
                     >
                       View Details <ArrowRight size={11} />
                     </button>
