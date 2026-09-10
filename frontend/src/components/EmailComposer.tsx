@@ -9,6 +9,7 @@ import {
   ChevronDown,
   X,
   AlignLeft,
+  AtSign,
 } from 'lucide-react'
 import Modal from './Modal'
 import { useToast } from './Toasts'
@@ -35,9 +36,15 @@ interface PendingSend {
   subject: string
   blocks: CleanBlock[]
   emails: string[]
+  names: Record<string, string>
 }
 
 const IMG_PCT: Record<string, string> = { full: '100%', medium: '74%', small: '50%' }
+
+// Replace the {name} personalization tag; sampleName is only used for preview.
+function fillNames(text: string, name?: string): string {
+  return text.replace(/\{name\}/gi, name || 'friend')
+}
 
 const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/
 
@@ -55,6 +62,7 @@ interface EmailComposerProps {
     subject: string
     blocks: ({ type: 'text'; text: string } | { type: 'image'; dataUrl: string; width: string })[]
     emails: string[]
+    names: Record<string, string>
   }) => Promise<{ total?: number; sent?: number; failed?: number } | undefined>
 }
 const widthOptions: { key: 'full' | 'medium' | 'small'; label: string }[] = [
@@ -126,6 +134,10 @@ export default function EmailComposer({
     setBlocks((bs) => bs.filter((b) => b.id !== id))
   }
 
+  function insertName(id: string) {
+    setBlocks((bs) => bs.map((b) => (b.id === id ? { ...b, text: `${b.text || ''} {name} ` } : b)))
+  }
+
   async function onFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -178,7 +190,12 @@ export default function EmailComposer({
       toast.push('Select at least one recipient or add an external email.', 'err')
       return null
     }
-    return { subject: subject.trim(), blocks: cleanBlocks, emails }
+    // Registered names per recipient, so the backend can fill the {name} tag.
+    const names: Record<string, string> = {}
+    for (const r of recipients) {
+      if (selected.has(r.id) && r.label) names[r.email.toLowerCase()] = r.label
+    }
+    return { subject: subject.trim(), blocks: cleanBlocks, emails, names }
   }
 
   // First tap on "Send" shows a preview of the finished email so the admin can
@@ -216,6 +233,8 @@ export default function EmailComposer({
           subject={pending.subject}
           blocks={pending.blocks}
           emails={pending.emails}
+          sampleName={recipients.find((r) => selected.has(r.id))?.label || 'Shawty'}
+          hasNames={Object.keys(pending.names).length > 0}
           sendLabel={sendLabel}
           busy={busy}
           onBack={() => setPending(null)}
@@ -239,6 +258,12 @@ export default function EmailComposer({
 
         <div>
           <label className="field-label">Message</label>
+          <div className="rounded-lg border border-pinkgold/25 bg-blush/40 px-3 py-2 text-xs text-ink/70 mb-3">
+            <AtSign size={12} className="inline mb-0.5 mr-1 text-rose-deep" />
+            Add <span className="font-semibold text-rose-deep">{'{name}'}</span> anywhere (or tap the <AtSign size={12} className="inline -mb-0.5 text-rose-deep" /> button on a
+            paragraph) and each recipient sees <span className="italic">their own registered name</span> in that spot —
+            e.g. &ldquo;Hi {`{name}`},&hellip;&rdquo; Recipients without a registered name see &ldquo;friend&rdquo;.
+          </div>
           <div className="space-y-3">
             {blocks.length === 0 && (
               <p className="text-sm text-muted">Add paragraphs and images below — reorder them however you like.</p>
@@ -251,6 +276,12 @@ export default function EmailComposer({
                     {b.type === 'text' ? 'Paragraph' : 'Image'}
                   </span>
                   <div className="flex items-center gap-1">
+                    {b.type === 'text' && (
+                      <button type="button" onClick={() => insertName(b.id)}
+                        className="p-1 rounded-md text-rose-deep/70 hover:bg-rose/10" title="Insert {name} tag">
+                        <AtSign size={14} />
+                      </button>
+                    )}
                     <button type="button" onClick={() => moveBlock(b.id, -1)} disabled={i === 0}
                       className="p-1 rounded-md text-ink/50 hover:bg-black/5 disabled:opacity-30" title="Move up">
                       <ChevronUp size={15} />
@@ -401,6 +432,8 @@ function EmailPreview({
   subject,
   blocks,
   emails,
+  sampleName,
+  hasNames,
   sendLabel,
   busy,
   onBack,
@@ -409,6 +442,8 @@ function EmailPreview({
   subject: string
   blocks: CleanBlock[]
   emails: string[]
+  sampleName: string
+  hasNames: boolean
   sendLabel: string
   busy: boolean
   onBack: () => void
@@ -422,6 +457,11 @@ function EmailPreview({
           <p className="text-sm text-muted mt-1">
             Exactly how it will look to recipients. Confirm below to send to {emails.length} recipient{emails.length === 1 ? '' : 's'}.
           </p>
+          {hasNames && (
+            <p className="text-[11px] text-rose-deep mt-1 flex items-center gap-1">
+              <AtSign size={11} /> Each recipient sees their own registered name — shown here as &ldquo;{sampleName}&rdquo;.
+            </p>
+          )}
         </div>
       </div>
 
@@ -437,7 +477,9 @@ function EmailPreview({
               b.type === 'text' ? (
                 <div key={i}>
                   {b.text.split(/\n{2,}/).map((p, j) => (
-                    <p key={j} className="text-sm leading-relaxed text-[#2a1b22] mb-4 whitespace-pre-wrap">{p}</p>
+                    <p key={j} className="text-sm leading-relaxed text-[#2a1b22] mb-4 whitespace-pre-wrap">
+                      {fillNames(p, sampleName)}
+                    </p>
                   ))}
                 </div>
               ) : (

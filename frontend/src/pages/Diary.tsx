@@ -1450,7 +1450,7 @@ export default function Diary() {
           initialMessage=""
           sendLabel="Send to sponsors"
           onClose={() => setSponsorEmailOpen(false)}
-          onSend={async ({ subject, blocks, emails }) => {
+          onSend={async ({ subject, blocks, emails, names }) => {
             const data = await postJson(
               '/api/admin/broadcast',
               {
@@ -1458,6 +1458,7 @@ export default function Diary() {
                 blocks,
                 scope: 'sponsors',
                 emails,
+                names,
               },
               headers,
             )

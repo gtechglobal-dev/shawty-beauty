@@ -493,7 +493,7 @@ function EmailApplicantsModal({
         `\n\nSee you soon!\n— Shawty Beauty Studio`
       }
       onClose={onClose}
-      onSend={async ({ subject, blocks, emails }) => {
+      onSend={async ({ subject, blocks, emails, names }) => {
         const data = await postJson(
           `/api/admin/broadcast`,
           {
@@ -501,6 +501,7 @@ function EmailApplicantsModal({
             subject: subject || `Update — ${event.title}`,
             blocks,
             emails,
+            names,
           },
           headers,
         )

@@ -856,6 +856,7 @@ function renderBroadcastHtml(
   subject: string,
   blocks: { type: string; text?: string; cid?: string; width?: string }[],
   unsubUrl: string,
+  personalName?: string,
 ): string {
   const inner = blocks
     .map((b) => {
@@ -876,7 +877,11 @@ function renderBroadcastHtml(
               '<br/>',
             )}</p>`,
         )
-        .join('');
+        .join('')
+        // "Hi {name}" → each recipient's own registered name. Only substituted
+        // when the sender provides the per-recipient names map; otherwise the
+        // tag is left untouched so plain broadcasts never get mangled.
+        .replace(/\{name\}/gi, personalName === undefined ? '{name}' : escapeHtml(personalName));
     })
     .join('');
 
@@ -1012,6 +1017,11 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
 
     const failedEmails = new Set<string>();
     const EMAIL_TIMEOUT_MS = 30_000;
+    // Optional per-recipient name map ({name} tag). Keyed by lowercase email;
+    // recipients missing from it fall back to a friendly greeting, and when no
+    // map is sent at all the {name} tag is left untouched.
+    const names = (req.body?.names && typeof req.body.names === 'object' ? req.body.names : {}) as Record<string, string>;
+    const hasNames = Object.keys(names).length > 0;
     // Send in small batches so SMTP (Gmail) doesn't throttle us.
     for (let i = 0; i < recipients.length; i += 5) {
       const batch = recipients.slice(i, i + 5);
@@ -1019,7 +1029,8 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
         batch.map(async ({ email }) => {
           try {
             const unsubUrl = `${origin}/api/contact/unsubscribe?email=${encodeURIComponent(email)}`;
-            const html = renderBroadcastHtml(subject, blocks, unsubUrl);
+            const personalName = hasNames ? names[email.toLowerCase()] || 'friend' : undefined;
+            const html = renderBroadcastHtml(subject, blocks, unsubUrl, personalName);
             // Guard against a hang (slow/throttled SMTP) so every recipient is
             // ultimately tallied as either sent or failed — never left in limbo.
             await Promise.race([
