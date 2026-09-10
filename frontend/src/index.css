@@ -56,13 +56,13 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   overflow-x: clip;
-  contain: layout style;
+  contain: style;
 }
 
 #root {
   min-height: 100dvh;
   overflow-x: clip;
-  contain: layout style;
+  contain: style;
 }
 
 * {
