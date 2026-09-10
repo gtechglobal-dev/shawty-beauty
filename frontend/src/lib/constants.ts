@@ -378,20 +378,7 @@ export function whatsappLink(phone: string, text?: string): string {
   return text ? `${base}?text=${encodeURIComponent(text)}` : base
 }
 
-// Open a WhatsApp chat with a programmatic anchor click instead of
-// window.open: anchor clicks are the browser-native path mobile Safari/Chrome
-// hand off to installed apps most reliably (no intermediate "open app" tab),
-// so the app opens straight into the conversation rather than dragging to a
-// WhatsApp home / chat-list screen.
-export function openWhatsApp(phone: string, text?: string): void {
-  const a = document.createElement('a')
-  a.href = whatsappLink(phone, text)
-  a.target = '_blank'
-  a.rel = 'noopener noreferrer'
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-}
+
 
 export const galleryImages = [
   '/images/makeup1.jpg',

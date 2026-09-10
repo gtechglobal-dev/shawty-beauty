@@ -30,7 +30,7 @@ import {
 import { getJson, patchJson, postJson, putJson, delJson } from '../lib/api'
 import { isLoggedIn, clearAuthToken, storeAuthToken } from '../lib/authState'
 import { useRealtime, type RealtimeEventType, type RealtimeStatus } from '../lib/useRealtime'
-import { formatNgn, type StudioEvent, openWhatsApp } from '../lib/constants'
+import { formatNgn, type StudioEvent, whatsappLink } from '../lib/constants'
 import { useToast } from '../components/Toasts'
 import Modal from '../components/Modal'
 import EmailComposer from '../components/EmailComposer'
@@ -1214,19 +1214,25 @@ export default function Diary() {
           </p>
           <div className="flex gap-3 mt-6">
             <button onClick={() => setContactAction(null)} className="btn btn-light flex-1">Cancel</button>
-            <button
-              onClick={() => {
-                if (contactAction.kind === 'whatsapp') {
-                  openWhatsApp(contactAction.phone)
-                } else {
-                  window.location.href = `tel:${contactAction.phone.replace(/\s+/g, '')}`
-                }
-                setContactAction(null)
-              }}
-              className={`btn flex-1 ${contactAction.kind === 'whatsapp' ? 'bg-green-500 text-white hover:bg-green-600' : 'btn-primary'}`}
-            >
-              Proceed
-            </button>
+            {contactAction.kind === 'whatsapp' ? (
+              <a
+                href={whatsappLink(contactAction.phone)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn bg-green-500 text-white hover:bg-green-600 flex-1 text-center"
+                onClick={() => setContactAction(null)}
+              >
+                Proceed
+              </a>
+            ) : (
+              <a
+                href={`tel:${contactAction.phone.replace(/\s+/g, '')}`}
+                className="btn btn-primary flex-1 text-center"
+                onClick={() => setContactAction(null)}
+              >
+                Proceed
+              </a>
+            )}
           </div>
         </Modal>
       )}
@@ -1256,22 +1262,33 @@ export default function Diary() {
           </p>
           <div className="flex gap-3 mt-6">
             <button onClick={() => setSponsorContactAction(null)} className="btn btn-light flex-1">Cancel</button>
-            <button
-              onClick={() => {
-                const a = sponsorContactAction
-                if (a.kind === 'whatsapp') {
-                  openWhatsApp(a.phone)
-                } else if (a.kind === 'email') {
-                  window.location.href = `mailto:${a.email}`
-                } else {
-                  window.location.href = `tel:${a.phone.replace(/\s+/g, '')}`
-                }
-                setSponsorContactAction(null)
-              }}
-              className={`btn flex-1 ${sponsorContactAction.kind === 'whatsapp' ? 'bg-green-500 text-white hover:bg-green-600' : 'btn-primary'}`}
-            >
-              Proceed
-            </button>
+            {sponsorContactAction.kind === 'whatsapp' ? (
+              <a
+                href={whatsappLink(sponsorContactAction.phone)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn bg-green-500 text-white hover:bg-green-600 flex-1 text-center"
+                onClick={() => setSponsorContactAction(null)}
+              >
+                Proceed
+              </a>
+            ) : sponsorContactAction.kind === 'email' ? (
+              <a
+                href={`mailto:${sponsorContactAction.email}`}
+                className="btn btn-primary flex-1 text-center"
+                onClick={() => setSponsorContactAction(null)}
+              >
+                Proceed
+              </a>
+            ) : (
+              <a
+                href={`tel:${sponsorContactAction.phone.replace(/\s+/g, '')}`}
+                className="btn btn-primary flex-1 text-center"
+                onClick={() => setSponsorContactAction(null)}
+              >
+                Proceed
+              </a>
+            )}
           </div>
         </Modal>
       )}

@@ -5,7 +5,7 @@ import {
   ScrollText,
 } from 'lucide-react'
 import { getJson, patchJson } from '../lib/api'
-import { formatNgn, tickets, openWhatsApp } from '../lib/constants'
+import { formatNgn, tickets, whatsappLink } from '../lib/constants'
 import { useToast } from '../components/Toasts'
 import Modal from '../components/Modal'
 import RichText from '../lib/RichText'
@@ -551,19 +551,25 @@ export default function Admin() {
             </div>
             <div className="flex gap-3">
               <button onClick={() => setContactAction(null)} className="btn btn-light flex-1">Cancel</button>
-              <button
-                onClick={() => {
-                  if (contactAction.kind === 'whatsapp') {
-                    openWhatsApp(contactAction.phone)
-                  } else {
-                    window.location.href = `tel:${contactAction.phone.replace(/\s+/g, '')}`
-                  }
-                  setContactAction(null)
-                }}
-                className={`btn flex-1 ${contactAction.kind === 'whatsapp' ? 'bg-green-500 text-white hover:bg-green-600' : 'btn-primary'}`}
-              >
-                Proceed
-              </button>
+              {contactAction.kind === 'whatsapp' ? (
+                <a
+                  href={whatsappLink(contactAction.phone)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn bg-green-500 text-white hover:bg-green-600 flex-1 text-center"
+                  onClick={() => setContactAction(null)}
+                >
+                  Proceed
+                </a>
+              ) : (
+                <a
+                  href={`tel:${contactAction.phone.replace(/\s+/g, '')}`}
+                  className="btn btn-primary flex-1 text-center"
+                  onClick={() => setContactAction(null)}
+                >
+                  Proceed
+                </a>
+              )}
             </div>
           </Modal>
         )}
