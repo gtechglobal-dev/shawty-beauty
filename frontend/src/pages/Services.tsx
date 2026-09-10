@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight, Brush, Eye, MessageCircle } from 'lucide-react'
-import { lashServices, makeupServices, siteConfig } from '../lib/constants'
+import { lashServices, makeupServices, siteConfig, whatsappLink } from '../lib/constants'
 import ServiceGallery from '../components/ServiceGallery'
 import Reveal from '../components/Reveal'
 
@@ -62,7 +62,7 @@ export default function Services() {
             Book a session on WhatsApp or chat with us about your dream look — we can't wait to glam you up.
           </p>
           <div className="flex flex-wrap gap-3 justify-center">
-            <a href={siteConfig.whatsapp} target="_blank" rel="noreferrer" className="btn btn-primary">
+            <a href={whatsappLink(siteConfig.phoneRaw, "Hi! I'd like to book a makeup session at Shawty Beauty Studio.")} target="_blank" rel="noreferrer" className="btn btn-primary">
               <MessageCircle size={18} /> Book Now
             </a>
             <Link to="/contact" className="btn btn-outline">

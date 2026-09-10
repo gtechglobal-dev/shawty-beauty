@@ -13,7 +13,7 @@ import InstagramIcon from '../components/icons/InstagramIcon'
 import EventsCarousel from '../components/layout/EventsCarousel'
 import Reveal from '../components/Reveal'
 import CountUp from '../components/CountUp'
-import { siteConfig, defaultEvent, eventRegisterUrl } from '../lib/constants'
+import { siteConfig, defaultEvent, eventRegisterUrl, whatsappLink } from '../lib/constants'
 import { fetchLiveEventOrNull, type StudioEvent } from '../lib/events'
 import { getJson } from '../lib/api'
 import { useRealtime } from '../lib/useRealtime'
@@ -282,7 +282,7 @@ export default function Home() {
                   Explore Services <ArrowRight size={18} />
                 </Link>
                 <a
-                  href={siteConfig.whatsapp}
+                  href={whatsappLink(siteConfig.phoneRaw, "Hi! I'd like to book a session at Shawty Beauty Studio.")}
                   target="_blank"
                   rel="noreferrer"
                   className="btn btn-outline"

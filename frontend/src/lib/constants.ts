@@ -366,6 +366,33 @@ export function formatNgn(n: number): string {
 
 export const apiUrl = '/api'
 
+// --- WhatsApp deep links ---------------------------------------------------
+// wa.me only reliably jumps straight into a chat when the number is in full
+// international format (no leading zero). A number stored as a local Nigerian
+// "0803…" is normalized to "234803…" here; a stored "+234…" already strips down
+// to the digits WhatsApp needs. Always pass pre-filled text too — a wa.me link
+// with no ?text= can land on the chat list instead of the composer on mobile.
+export function whatsappLink(phone: string, text?: string): string {
+  const digits = phone.replace(/[^\d]/g, '').replace(/^0/, '234')
+  const base = `https://wa.me/${digits}`
+  return text ? `${base}?text=${encodeURIComponent(text)}` : base
+}
+
+// Open a WhatsApp chat with a programmatic anchor click instead of
+// window.open: anchor clicks are the browser-native path mobile Safari/Chrome
+// hand off to installed apps most reliably (no intermediate "open app" tab),
+// so the app opens straight into the conversation rather than dragging to a
+// WhatsApp home / chat-list screen.
+export function openWhatsApp(phone: string, text?: string): void {
+  const a = document.createElement('a')
+  a.href = whatsappLink(phone, text)
+  a.target = '_blank'
+  a.rel = 'noopener noreferrer'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
+
 export const galleryImages = [
   '/images/makeup1.jpg',
   '/images/makeup2.jpg',

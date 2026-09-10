@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { MessageCircle } from 'lucide-react'
-import { type Service, siteConfig } from '../lib/constants'
+import { type Service, siteConfig, whatsappLink } from '../lib/constants'
 import Modal from './Modal'
 
 export default function ServiceGallery({ services }: { services: Service[] }) {
@@ -50,7 +50,7 @@ export default function ServiceGallery({ services }: { services: Service[] }) {
               <p className="flex-1 text-ink/70 leading-relaxed">{selected.long}</p>
             </div>
             <a
-              href={`${siteConfig.whatsapp}?text=${encodeURIComponent(`Hi! I'd like to book ${selected.title} at Shawty Beauty Studio.`)}`}
+              href={whatsappLink(siteConfig.phoneRaw, `Hi! I'd like to book ${selected.title} at Shawty Beauty Studio.`)}
               target="_blank"
               rel="noreferrer"
               className="btn btn-primary w-full mt-6"

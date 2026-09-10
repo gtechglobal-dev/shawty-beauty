@@ -30,7 +30,7 @@ import {
 import { getJson, patchJson, postJson, putJson, delJson } from '../lib/api'
 import { isLoggedIn, clearAuthToken, storeAuthToken } from '../lib/authState'
 import { useRealtime, type RealtimeEventType, type RealtimeStatus } from '../lib/useRealtime'
-import { formatNgn, type StudioEvent } from '../lib/constants'
+import { formatNgn, type StudioEvent, openWhatsApp } from '../lib/constants'
 import { useToast } from '../components/Toasts'
 import Modal from '../components/Modal'
 import EmailComposer from '../components/EmailComposer'
@@ -1217,7 +1217,7 @@ export default function Diary() {
             <button
               onClick={() => {
                 if (contactAction.kind === 'whatsapp') {
-                  window.open(`https://wa.me/${contactAction.phone.replace(/\D/g, '')}`, '_blank', 'noopener')
+                  openWhatsApp(contactAction.phone)
                 } else {
                   window.location.href = `tel:${contactAction.phone.replace(/\s+/g, '')}`
                 }
@@ -1260,7 +1260,7 @@ export default function Diary() {
               onClick={() => {
                 const a = sponsorContactAction
                 if (a.kind === 'whatsapp') {
-                  window.open(`https://wa.me/${a.phone.replace(/\D/g, '')}`, '_blank', 'noopener')
+                  openWhatsApp(a.phone)
                 } else if (a.kind === 'email') {
                   window.location.href = `mailto:${a.email}`
                 } else {

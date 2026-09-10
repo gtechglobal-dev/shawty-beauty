@@ -249,12 +249,12 @@ function renderEventCard(ev: StudioEvent, i: number) {
           <span className={`tag-chip ${ev.status === 'live' ? '!bg-red-600 !bg-none !text-white' : ev.status === 'finished' ? '!bg-black/10' : ''}`}>
             {ev.status === 'live' ? '● Live' : ev.status === 'finished' ? 'Past event' : 'Upcoming'}
           </span>
-          {ev.datesLabel && <span className="text-xs text-muted">{ev.datesLabel}</span>}
+          {ev.status !== 'upcoming' && ev.datesLabel && <span className="text-xs text-muted">{ev.datesLabel}</span>}
         </div>
         <h3 className="font-display text-lg font-bold leading-snug mb-2">{ev.title}</h3>
         {ev.theme && <p className="text-sm text-ink/65 line-clamp-2 mb-4">“{ev.theme}”</p>}
         <div className="flex items-baseline gap-2 mb-4 mt-auto">
-          {ev.tickets[0] && ev.status !== 'finished' && (
+          {ev.status === 'live' && ev.tickets[0] && (
             <>
               {ticketPromoActive(ev.tickets[0]) && (
                 <span className="text-sm text-muted line-through">₦{ev.tickets[0].originalPrice?.toLocaleString()}</span>
@@ -264,13 +264,18 @@ function renderEventCard(ev: StudioEvent, i: number) {
               </span>
             </>
           )}
+          {ev.status === 'upcoming' && (
+            <span className="text-sm text-ink/60 font-medium">Ticket sales begin soon</span>
+          )}
           {ev.status === 'finished' && (
             <span className="font-display text-xl font-bold text-muted">Completed</span>
           )}
         </div>
-        <Link to={eventRegisterUrl(ev)} className={`btn ${ev.status === 'finished' ? 'btn-outline' : 'btn-outline'} !py-2.5 w-full`}>
-          {ev.status === 'finished' ? 'View event' : 'Register'} <ArrowRight size={16} />
-        </Link>
+        {ev.status !== 'upcoming' && (
+          <Link to={eventRegisterUrl(ev)} className="btn btn-outline !py-2.5 w-full">
+            {ev.status === 'finished' ? 'View event' : 'Register'} <ArrowRight size={16} />
+          </Link>
+        )}
       </div>
     </Reveal>
   )

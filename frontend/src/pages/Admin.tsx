@@ -5,7 +5,7 @@ import {
   ScrollText,
 } from 'lucide-react'
 import { getJson, patchJson } from '../lib/api'
-import { formatNgn, tickets } from '../lib/constants'
+import { formatNgn, tickets, openWhatsApp } from '../lib/constants'
 import { useToast } from '../components/Toasts'
 import Modal from '../components/Modal'
 import RichText from '../lib/RichText'
@@ -554,7 +554,7 @@ export default function Admin() {
               <button
                 onClick={() => {
                   if (contactAction.kind === 'whatsapp') {
-                    window.open(`https://wa.me/${contactAction.phone.replace(/\D/g, '')}`, '_blank', 'noopener')
+                    openWhatsApp(contactAction.phone)
                   } else {
                     window.location.href = `tel:${contactAction.phone.replace(/\s+/g, '')}`
                   }

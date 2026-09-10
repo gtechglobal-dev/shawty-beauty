@@ -19,7 +19,7 @@ import PhoneInput from '../components/PhoneInput'
 import Reveal from '../components/Reveal'
 import Modal from '../components/Modal'
 import { phoneErrorMessage, dialForNationality } from '../lib/phone'
-import { nationalities, nationalityNames } from '../lib/constants'
+import { nationalities, nationalityNames, whatsappLink } from '../lib/constants'
 import { optimizeLogoBase64 } from '../lib/image'
 import RichText from '../lib/RichText'
 import { useRealtime } from '../lib/useRealtime'
@@ -572,7 +572,7 @@ export default function Sponsor() {
                     <Phone size={16} /> Call
                   </a>
                   <a
-                    href={`https://wa.me/${contactAction.phone.replace(/[^\d]/g, '').replace(/^0/, '234')}`}
+                    href={whatsappLink(contactAction.phone)}
                     target="_blank"
                     rel="noreferrer"
                     onClick={() => setContactAction(null)}
