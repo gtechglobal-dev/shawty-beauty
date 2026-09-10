@@ -226,7 +226,8 @@ export default function Program() {
         </section>
         )}
 
-        {/* CTA */}
+        {/* CTA — only for live events */}
+        {featured.status === 'live' && (
         <Reveal variant="zoom">
         <div className="text-center">
           <Sparkles className="mx-auto text-rose mb-4" size={30} />
@@ -236,6 +237,7 @@ export default function Program() {
           </Link>
         </div>
         </Reveal>
+        )}
       </div>
     </div>
   )
@@ -271,9 +273,9 @@ function renderEventCard(ev: StudioEvent, i: number) {
             <span className="font-display text-xl font-bold text-muted">Completed</span>
           )}
         </div>
-        {ev.status !== 'upcoming' && (
+        {ev.status === 'live' && (
           <Link to={eventRegisterUrl(ev)} className="btn btn-outline !py-2.5 w-full">
-            {ev.status === 'finished' ? 'View event' : 'Register'} <ArrowRight size={16} />
+            Register <ArrowRight size={16} />
           </Link>
         )}
       </div>

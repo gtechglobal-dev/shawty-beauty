@@ -367,15 +367,12 @@ export function formatNgn(n: number): string {
 export const apiUrl = '/api'
 
 // --- WhatsApp deep links ---------------------------------------------------
-// wa.me only reliably jumps straight into a chat when the number is in full
-// international format (no leading zero). A number stored as a local Nigerian
-// "0803…" is normalized to "234803…" here; a stored "+234…" already strips down
-// to the digits WhatsApp needs. Always pass pre-filled text too — a wa.me link
-// with no ?text= can land on the chat list instead of the composer on mobile.
+// Using api.whatsapp.com/send instead of wa.me — it's more reliable on mobile
+// and consistently opens the chat composer with pre-filled text.
 export function whatsappLink(phone: string, text?: string): string {
   const digits = phone.replace(/[^\d]/g, '').replace(/^0/, '234')
-  const base = `https://wa.me/${digits}`
-  return text ? `${base}?text=${encodeURIComponent(text)}` : base
+  const base = `https://api.whatsapp.com/send?phone=${digits}`
+  return text ? `${base}&text=${encodeURIComponent(text)}` : base
 }
 
 

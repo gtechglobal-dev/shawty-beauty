@@ -174,6 +174,14 @@ export default function Register() {
   const total = subtotal + processingFee
   const ended = ev.status === 'finished'
 
+  // Redirect away from finished events — registration is closed
+  if (ended) {
+    useEffect(() => {
+      navigate('/program')
+    }, [navigate])
+    return null
+  }
+
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }))
   }
