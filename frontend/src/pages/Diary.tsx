@@ -21,11 +21,11 @@ import {
   Sparkles,
   Image,
   Send,
-  Copy,
   Trash2,
   X,
   Download,
   ScrollText,
+  Copy,
 } from 'lucide-react'
 import { getJson, patchJson, postJson, delJson } from '../lib/api'
 import { isLoggedIn, clearAuthToken, storeAuthToken } from '../lib/authState'
@@ -61,14 +61,39 @@ interface ContactMsg {
   createdAt: string
 }
 
-interface Subscriber {
-  email: string
+interface SentEmailSummary {
+  id: string
+  subject: string
+  scope: 'event' | 'sponsors' | 'global'
+  eventId?: string
+  eventTitle?: string
   createdAt: string
-  sources: string[]
-  unsubscribed?: boolean
+  total: number
+  sent: number
+  failed: number
+  preview: string
+  recipientEmails: string[]
 }
 
-type Section = 'events' | 'sponsors' | 'messages' | 'subscribers' | 'settings'
+interface SentEmailRecipient {
+  email: string
+  name?: string
+  status: 'sent' | 'failed'
+  error?: string
+}
+
+interface SentEmailDetail {
+  id: string
+  subject: string
+  scope: string
+  eventId?: string
+  eventTitle?: string
+  createdAt: string
+  blocks: { type: 'text' | 'image'; text?: string; width?: string }[]
+  recipients: SentEmailRecipient[]
+}
+
+type Section = 'events' | 'sponsors' | 'messages' | 'sentEmails' | 'settings'
 type SubView = 'home' | 'manage' | 'editor'
 
 interface GroupedData {
@@ -100,7 +125,7 @@ export default function Diary() {
   const [screen, setScreen] = useState<'login' | 'forgot' | 'reset'>(resetToken ? 'reset' : 'login')
   const [section, setSection] = useState<Section>(() => {
     const s = searchParams.get('section')
-    return s === 'sponsors' || s === 'messages' || s === 'subscribers' || s === 'settings' ? s : 'events'
+    return s === 'sponsors' || s === 'messages' || s === 'sentEmails' || s === 'settings' ? s : 'events'
   })
   const [subView, setSubView] = useState<SubView>(() => {
     const s = searchParams.get('sub')
@@ -119,7 +144,13 @@ export default function Diary() {
 
   const [grouped, setGrouped] = useState<GroupedData>({ events: [], totals: null })
   const [contacts, setContacts] = useState<ContactMsg[]>([])
-  const [subscribers, setSubscribers] = useState<Subscriber[]>([])
+  const [sentEmails, setSentEmails] = useState<SentEmailSummary[]>([])
+  const [sentEmailDetails, setSentEmailDetails] = useState<SentEmailDetail | null>(null)
+  const [allSubscribers, setAllSubscribers] = useState<{ email: string; createdAt: string; sources: string[]; unsubscribed?: boolean }[]>([])
+  const [emailDeleteTarget, setEmailDeleteTarget] = useState<string | null>(null)
+  const [emailDeleting, setEmailDeleting] = useState(false)
+  const [sentEmailDeleteTarget, setSentEmailDeleteTarget] = useState<string | null>(null)
+  const [sentEmailDeleting, setSentEmailDeleting] = useState(false)
   const [sponsors, setSponsors] = useState<SponsorRow[]>([])
   const [sponsorDetails, setSponsorDetails] = useState<SponsorRow | null>(null)
   const [sponsorToggle, setSponsorToggle] = useState<SponsorRow | null>(null)
@@ -253,9 +284,11 @@ export default function Diary() {
         const c = await getJson('/api/admin/contacts', headers)
         setContacts(c.contacts || [])
       }
-      if (section === 'subscribers') {
-        const s = await getJson('/api/admin/subscribers', headers)
-        setSubscribers(s.subscribers || [])
+      if (section === 'sentEmails') {
+        const s = await getJson('/api/admin/sent-emails', headers)
+        setSentEmails(s.sentEmails || [])
+        const subs = await getJson('/api/admin/subscribers', headers)
+        setAllSubscribers(subs.subscribers || [])
       }
       if (section === 'sponsors') {
         const sp = await getJson('/api/admin/sponsors', headers)
@@ -623,40 +656,91 @@ export default function Diary() {
   const orderedEvents = [...grouped.events].reverse()
   const orderedContacts = [...contacts].reverse()
   const orderedSponsors = [...sponsors].reverse()
-  const orderedSubscribers = [...subscribers].reverse()
 
   const goSection = (s: Section) => {
     setSection(s)
     if (s === 'messages') { getJson('/api/admin/contacts', headers).then((d) => setContacts(d.contacts || [])).catch(() => {}) }
-    if (s === 'subscribers') { getJson('/api/admin/subscribers', headers).then((d) => setSubscribers(d.subscribers || [])).catch(() => {}) }
+    if (s === 'sentEmails') {
+      refreshSentEmails(true)
+      getJson('/api/admin/subscribers', headers).then((d) => setAllSubscribers(d.subscribers || [])).catch(() => {})
+    }
     if (s === 'sponsors') { getJson('/api/admin/sponsors', headers).then((d) => setSponsors(d.sponsors || [])).catch(() => {}) }
   }
 
+  async function refreshSentEmails(silent = false) {
+    if (!silent) setLoading(true)
+    try {
+      const s = await getJson('/api/admin/sent-emails', headers)
+      setSentEmails(s.sentEmails || [])
+    } catch (err: any) {
+      toast.push(err.message || 'Failed to load sent emails', 'err')
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }
+
+  async function openSentEmail(id: string) {
+    try {
+      const d = await getJson(`/api/admin/sent-emails/${id}`, headers)
+      setSentEmailDetails(d.email || null)
+    } catch (err: any) {
+      toast.push(err.message || 'Failed to load email details', 'err')
+    }
+  }
+
   async function copyAllEmails() {
-    const list = subscribers.map((s) => s.email).filter(Boolean)
-    if (list.length === 0) {
-      toast.push('No emails to copy.', 'err')
+    const emails = allSubscribers.map((s) => s.email)
+    if (emails.length === 0) {
+      toast.push('No registered emails to copy.', 'err')
       return
     }
     try {
-      await navigator.clipboard.writeText(list.join(', '))
-      toast.push(`Copied ${list.length} email${list.length === 1 ? '' : 's'}.`)
+      await navigator.clipboard.writeText(emails.join(', '))
+      toast.push(`Copied ${emails.length} email${emails.length === 1 ? '' : 's'}.`)
     } catch {
-      // Clipboard API may be unavailable (non-secure context) — fall back to
-      // a temporary textarea + execCommand for maximum compatibility.
       const ta = document.createElement('textarea')
-      ta.value = list.join(', ')
+      ta.value = emails.join(', ')
       ta.style.position = 'fixed'
       ta.style.opacity = '0'
       document.body.appendChild(ta)
       ta.select()
       try {
         document.execCommand('copy')
-        toast.push(`Copied ${list.length} email${list.length === 1 ? '' : 's'}.`)
+        toast.push(`Copied ${emails.length} email${emails.length === 1 ? '' : 's'}.`)
       } catch {
         toast.push('Could not copy emails.', 'err')
       }
       document.body.removeChild(ta)
+    }
+  }
+
+  async function deleteRegisteredEmail(email: string) {
+    setEmailDeleting(true)
+    try {
+      await delJson(`/api/admin/subscribers/email?email=${encodeURIComponent(email)}`, headers)
+      setEmailDeleteTarget(null)
+      toast.push(`Removed ${email}`)
+      const subs = await getJson('/api/admin/subscribers', headers)
+      setAllSubscribers(subs.subscribers || [])
+    } catch (err: any) {
+      toast.push(err.message || 'Failed to remove email', 'err')
+    } finally {
+      setEmailDeleting(false)
+    }
+  }
+
+  async function deleteSentEmail(id: string) {
+    setSentEmailDeleting(true)
+    try {
+      await delJson(`/api/admin/sent-emails/${id}`, headers)
+      setSentEmailDeleteTarget(null)
+      toast.push('Sent email deleted.')
+      const s = await getJson('/api/admin/sent-emails', headers)
+      setSentEmails(s.sentEmails || [])
+    } catch (err: any) {
+      toast.push(err.message || 'Failed to delete', 'err')
+    } finally {
+      setSentEmailDeleting(false)
     }
   }
 
@@ -716,11 +800,11 @@ export default function Diary() {
             badge={unreadMessages}
           />
           <TabPill
-            active={section === 'subscribers'}
-            onClick={() => goSection('subscribers')}
+            active={section === 'sentEmails'}
+            onClick={() => goSection('sentEmails')}
             icon={Mail}
-            label="Emails"
-            count={subscribers.length}
+            label="Sent Emails"
+            count={sentEmails.length}
           />
           <TabPill
             active={section === 'settings'}
@@ -737,7 +821,7 @@ export default function Diary() {
           <BottomTab active={section === 'events' && subView === 'home'} onClick={() => setSection('events')} icon={CalendarDays} label="Events" />
           <BottomTab active={section === 'sponsors'} onClick={() => goSection('sponsors')} icon={Handshake} label="Sponsors" count={sponsors.length} />
           <BottomTab active={section === 'messages'} onClick={() => goSection('messages')} icon={MessageSquare} label="Messages" badge={unreadMessages} />
-          <BottomTab active={section === 'subscribers'} onClick={() => goSection('subscribers')} icon={Mail} label="Emails" count={subscribers.length} />
+          <BottomTab active={section === 'sentEmails'} onClick={() => goSection('sentEmails')} icon={Mail} label="Sent Emails" count={sentEmails.length} />
           <BottomTab active={section === 'settings'} onClick={() => goSection('settings')} icon={ScrollText} label="ScrollText" />
           <Link
             to="/"
@@ -807,7 +891,7 @@ export default function Diary() {
             onEnd={(id) => { void handleEnd(id) }}
             onDelete={(id) => { void handleDelete(id) }}
             onOpenMessages={() => setSection('messages')}
-            onOpenSubscribers={() => setSection('subscribers')}
+            onOpenSubscribers={() => setSection('sentEmails')}
           />
         )}
 
@@ -949,51 +1033,110 @@ export default function Diary() {
           </div>
         )}
 
-        {/* ---------- SUBSCRIBERS ---------- */}
-        {section === 'subscribers' && (
-          <div className="card overflow-hidden">
-            <div className="p-6 flex items-center justify-between flex-wrap gap-3 border-b border-black/5">
+        {/* ---------- SENT EMAILS ---------- */}
+        {section === 'sentEmails' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-semibold text-lg">All registered emails ({subscribers.length})</h3>
-                <p className="text-sm text-muted">Every email on the platform — newsletter, registration, sponsor &amp; contact messages — deduplicated.</p>
+                <h3 className="font-semibold text-lg">Sent emails ({sentEmails.length})</h3>
+                <p className="text-sm text-muted">Every broadcast sent from the Diary, with delivery stats. Click one to view full details.</p>
               </div>
-              <div className="flex items-center gap-2">
-                <button onClick={copyAllEmails} className="btn btn-outline !py-2" title="Copy all emails to the clipboard, comma-separated"><Copy size={14} /> Copy all emails</button>
-                <button onClick={() => reloadAll()} className="btn btn-outline !py-2">Refresh</button>
-              </div>
+              <button onClick={() => refreshSentEmails()} className="btn btn-outline !py-2">Refresh</button>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-muted text-xs border-b border-black/8">
-                    <th className="px-6 py-2">Email</th>
-                    <th className="px-6 py-2">Source</th>
-                    <th className="px-6 py-2">First seen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orderedSubscribers.map((s, i) => (
-                    <tr key={`${s.email}-${i}`} className="border-b border-black/5">
-                      <td className="px-6 py-3 font-medium">
-                        {s.email}
-                        {s.unsubscribed && (
-                          <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 align-middle">unsubscribed</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-3">
-                        <div className="flex flex-wrap gap-1.5">
-                          {(s.sources || ['newsletter']).map((src) => (
-                            <span key={src} className="text-xs px-2 py-0.5 rounded-full bg-blush text-rose-deep capitalize">{src}</span>
-                          ))}
+            <div className="card overflow-hidden">
+              <div className="p-4 flex items-center justify-between gap-4 flex-wrap">
+                <div className="min-w-0">
+                  <div className="font-medium">
+                    Registered emails ({allSubscribers.length})
+                  </div>
+                  <p className="text-sm text-muted">Newsletter, registration, sponsor &amp; contact emails, deduplicated. Expand to view or remove addresses.</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={() => copyAllEmails()} className="btn btn-outline !py-2" title="Copy all registered emails to the clipboard, comma-separated">
+                    <Copy size={14} /> Copy all emails
+                  </button>
+                </div>
+              </div>
+              <details className="group border-t border-black/5">
+                <summary className="flex items-center justify-between px-4 py-2.5 text-sm font-medium cursor-pointer select-none hover:bg-black/2 transition-colors">
+                  <span>{allSubscribers.length > 0 ? 'Show all emails' : 'No emails yet'}</span>
+                  <span className="text-muted group-open:rotate-180 transition-transform">▾</span>
+                </summary>
+                {allSubscribers.length > 0 && (
+                  <div className="max-h-72 overflow-y-auto border-t border-black/5">
+                    {allSubscribers.map((s) => (
+                      <div key={s.email} className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-black/5 text-sm last:border-b-0 hover:bg-black/2">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-medium">{s.email}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            {(s.sources || []).map((src) => (
+                              <span key={src} className="text-[10px] px-1.5 py-0.5 rounded-full bg-blush text-rose-deep capitalize">{src}</span>
+                            ))}
+                            <span className="text-[10px] text-muted">{new Date(s.createdAt).toLocaleString()}</span>
+                            {s.unsubscribed && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">unsubscribed</span>}
+                          </div>
                         </div>
-                      </td>
-                      <td className="px-6 py-3 text-muted">{new Date(s.createdAt).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                  {subscribers.length === 0 && <tr><td colSpan={3} className="px-6 py-12 text-center text-muted">No emails registered yet.</td></tr>}
-                </tbody>
-              </table>
+                        <button
+                          onClick={() => setEmailDeleteTarget(s.email)}
+                          title="Remove from registered list"
+                          className="shrink-0 w-8 h-8 rounded-full bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </details>
             </div>
+
+            {sentEmails.length === 0 && (
+              <div className="card p-10 text-center text-muted">
+                <Mail size={22} className="mx-auto mb-2 opacity-40" />
+                No emails sent yet.
+              </div>
+            )}
+            {sentEmails.map((e) => (
+              <div
+                key={e.id}
+                onClick={() => openSentEmail(e.id)}
+                className="card p-5 cursor-pointer hover:border-rose/40 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-muted flex items-center gap-1.5 mb-1 flex-wrap">
+                      <Mail size={11} className="text-rose-deep" />
+                      Sent {new Date(e.createdAt).toLocaleString()}
+                      {e.eventTitle && <span className="tag-chip !py-0.5">{e.eventTitle}</span>}
+                    </div>
+                    <h4 className="font-semibold leading-snug">{e.subject}</h4>
+                    {e.preview && <p className="text-sm text-ink/70 mt-1 line-clamp-2">{e.preview}</p>}
+                    <div className="flex flex-wrap gap-1.5 mt-2.5">
+                      {e.recipientEmails.slice(0, 3).map((em) => (
+                        <span key={em} className="text-[11px] px-2 py-0.5 rounded-full bg-ink/5 text-ink/70">{em}</span>
+                      ))}
+                      {e.total > 3 && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-blush text-rose-deep font-medium">+{e.total - 3} more</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <button
+                      onClick={(ev) => { ev.stopPropagation(); setSentEmailDeleteTarget(e.id) }}
+                      title="Delete this email"
+                      className="w-8 h-8 rounded-full bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                    <div className="text-xs text-muted mt-1">{e.total} recipient{e.total === 1 ? '' : 's'}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-green-600">✓ {e.sent} delivered</span>
+                      {e.failed > 0 && <span className="text-xs font-semibold text-red-600">✗ {e.failed} failed</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -1420,6 +1563,122 @@ export default function Diary() {
         </Modal>
       )}
 
+      {sentEmailDetails && (
+        <Modal open wide onClose={() => setSentEmailDetails(null)}>
+          <div className="text-center mb-6">
+            <div className="w-14 h-14 mx-auto rounded-full bg-blush flex items-center justify-center">
+              <Mail className="text-rose-deep" size={22} />
+            </div>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-muted mt-3 flex items-center justify-center gap-1.5 flex-wrap">
+              Sent {new Date(sentEmailDetails.createdAt).toLocaleString()}
+              {sentEmailDetails.eventTitle && <span className="tag-chip !py-0.5">{sentEmailDetails.eventTitle}</span>}
+              <span className="tag-chip !py-0.5 capitalize">{sentEmailDetails.scope}</span>
+            </div>
+            <h3 className="font-display text-xl font-bold mt-2">{sentEmailDetails.subject}</h3>
+            <div className="flex items-center justify-center gap-3 mt-3 flex-wrap">
+              <span className="text-xs font-semibold text-ink/70">{sentEmailDetails.recipients.length} recipient{sentEmailDetails.recipients.length === 1 ? '' : 's'}</span>
+              <span className="text-xs font-semibold text-green-600">✓ {sentEmailDetails.recipients.filter((r) => r.status === 'sent').length} delivered</span>
+              {sentEmailDetails.recipients.some((r) => r.status === 'failed') && (
+                <span className="text-xs font-semibold text-red-600">
+                  ✗ {sentEmailDetails.recipients.filter((r) => r.status === 'failed').length} failed
+                </span>
+              )}
+            </div>
+          </div>
+
+          {sentEmailDetails.blocks.length > 0 && (
+            <div className="rounded-2xl border border-rose/10 bg-blush/30 p-5 mb-6 max-h-72 overflow-y-auto">
+              {sentEmailDetails.blocks.map((b, i) => {
+                if (b.type === 'image') {
+                  return (
+                    <div key={i} className="flex items-center gap-2 text-xs text-muted mb-3">
+                      <Image size={14} /> Image attached ({b.width || 'full'})
+                    </div>
+                  )
+                }
+                return (
+                  <p key={i} className="text-sm text-ink/80 whitespace-pre-line mb-3 last:mb-0">
+                    {b.text}
+                  </p>
+                )
+              })}
+            </div>
+          )}
+
+          <div className="mb-5">
+            <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-2">Recipients ({sentEmailDetails.recipients.length})</h4>
+            <div className="rounded-xl border border-black/5 overflow-hidden">
+              <div className="max-h-72 overflow-y-auto">
+                {sentEmailDetails.recipients.map((r) => (
+                  <div key={r.email} className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-black/5 text-sm last:border-b-0">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{r.email}</div>
+                      {r.name && <div className="text-xs text-muted truncate">Name: {r.name}</div>}
+                      {r.status === 'failed' && r.error && (
+                        <div className="text-xs text-red-600 truncate">{r.error}</div>
+                      )}
+                    </div>
+                    <span className={`shrink-0 text-xs font-semibold ${r.status === 'sent' ? 'text-green-600' : 'text-red-600'}`}>
+                      {r.status === 'sent' ? '✓ delivered' : '✗ failed'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <button onClick={() => setSentEmailDetails(null)} className="btn btn-light w-full">Close</button>
+        </Modal>
+      )}
+
+      {emailDeleteTarget && (
+        <Modal open onClose={() => !emailDeleting && setEmailDeleteTarget(null)}>
+          <div className="text-center mb-5">
+            <div className="w-16 h-16 mx-auto rounded-full bg-red-50 border border-red-100 flex items-center justify-center mb-4">
+              <Trash2 className="text-red-600" size={28} />
+            </div>
+            <h3 className="text-lg font-bold">Remove this email?</h3>
+            <p className="text-sm text-muted mt-2 max-w-sm mx-auto">
+              <span className="font-medium text-ink break-all">{emailDeleteTarget}</span> will be removed from the registered-emails list and won&apos;t receive future broadcasts.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => !emailDeleting && setEmailDeleteTarget(null)} className="btn btn-light flex-1" disabled={emailDeleting}>Cancel</button>
+            <button
+              onClick={() => deleteRegisteredEmail(emailDeleteTarget)}
+              className="btn flex-1 bg-red-500 text-white hover:bg-red-600"
+              disabled={emailDeleting}
+            >
+              {emailDeleting ? <><LoaderCircle size={18} className="animate-spin" /> Removing…</> : 'Remove email'}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {sentEmailDeleteTarget && (
+        <Modal open onClose={() => !sentEmailDeleting && setSentEmailDeleteTarget(null)}>
+          <div className="text-center mb-5">
+            <div className="w-16 h-16 mx-auto rounded-full bg-red-50 border border-red-100 flex items-center justify-center mb-4">
+              <Trash2 className="text-red-600" size={28} />
+            </div>
+            <h3 className="text-lg font-bold">Delete this email?</h3>
+            <p className="text-sm text-muted mt-2 max-w-sm mx-auto">
+              This will permanently remove this email from the sent-emails list. The recipients will still have the message in their inboxes.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => !sentEmailDeleting && setSentEmailDeleteTarget(null)} className="btn btn-light flex-1" disabled={sentEmailDeleting}>Cancel</button>
+            <button
+              onClick={() => deleteSentEmail(sentEmailDeleteTarget)}
+              className="btn flex-1 bg-red-500 text-white hover:bg-red-600"
+              disabled={sentEmailDeleting}
+            >
+              {sentEmailDeleting ? <><LoaderCircle size={18} className="animate-spin" /> Deleting…</> : 'Delete'}
+            </button>
+          </div>
+        </Modal>
+      )}
+
       {sponsorEmailOpen && (
         <EmailComposer
           title="Email to Sponsors"
@@ -1452,6 +1711,7 @@ export default function Diary() {
               },
               headers,
             )
+            refreshSentEmails(true)
             return data
           }}
         />

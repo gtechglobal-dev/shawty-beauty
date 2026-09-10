@@ -400,6 +400,78 @@ export async function readUnsubscribed(): Promise<Unsubscribed[]> {
 }
 
 // ------------------------------------------------------------------
+// Sent emails (log of every broadcast sent from the Diary)
+// ------------------------------------------------------------------
+
+export interface SentEmailRecipient {
+  email: string;
+  name?: string;
+  status: 'sent' | 'failed';
+  error?: string;
+}
+
+export interface SentEmail {
+  _id?: ObjectId;
+  id: string;
+  subject: string;
+  scope: 'event' | 'sponsors' | 'global';
+  eventId?: string;
+  eventTitle?: string;
+  blocks: { type: 'text' | 'image'; text?: string; width?: string }[];
+  recipients: SentEmailRecipient[];
+  createdAt: string;
+}
+
+export async function saveSentEmail(entry: SentEmail): Promise<void> {
+  const col = getCollection<SentEmail>('sentEmails');
+  if (!col) throw new Error('Database not connected');
+  await col.insertOne(entry as any);
+}
+
+export async function readSentEmails(): Promise<SentEmail[]> {
+  const col = getCollection<SentEmail>('sentEmails');
+  if (!col) return [];
+  const docs = await col.find().sort({ createdAt: -1 }).toArray();
+  return docs.map(({ _id, ...rest }) => rest);
+}
+
+export async function deleteSentEmail(id: string): Promise<boolean> {
+  const col = getCollection<SentEmail>('sentEmails');
+  if (!col) return false;
+  const res = await col.deleteOne({ id });
+  return (res.deletedCount ?? 0) > 0;
+}
+
+// ------------------------------------------------------------------
+// Hidden emails (admin removed an address from the registered-email registry)
+// ------------------------------------------------------------------
+
+export interface HiddenEmail {
+  _id?: ObjectId;
+  email: string;
+  createdAt: string;
+}
+
+export async function addHiddenEmail(email: string): Promise<boolean> {
+  const col = getCollection<HiddenEmail>('hiddenEmails');
+  if (!col) throw new Error('Database not connected');
+  try {
+    await col.insertOne({ email, createdAt: new Date().toISOString() } as any);
+  } catch (e: any) {
+    if (e?.code === 11000) return false;
+    throw e;
+  }
+  return true;
+}
+
+export async function readHiddenEmails(): Promise<HiddenEmail[]> {
+  const col = getCollection<HiddenEmail>('hiddenEmails');
+  if (!col) return [];
+  const docs = await col.find().toArray();
+  return docs.map(({ _id, ...rest }) => rest);
+}
+
+// ------------------------------------------------------------------
 // Events (the central "happening" — site content is driven by events)
 // ------------------------------------------------------------------
 

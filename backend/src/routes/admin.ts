@@ -28,6 +28,11 @@ import {
   revokeAttendanceCode,
   listAttendanceCodeViews,
   readUnsubscribed,
+  saveSentEmail,
+  readSentEmails,
+  deleteSentEmail,
+  addHiddenEmail,
+  readHiddenEmails,
   DEFAULT_EVENT,
   isValidEventStatus,
   type RegistrationStatus,
@@ -36,6 +41,7 @@ import {
   type SponsorStatus,
   type StudioEvent,
   type EventTicket,
+  type SentEmail,
 } from '../db.js';
 import { generateTicketToken, deliverTicketEmail } from '../lib/tickets.js';
 import { sendEmail, mailConfigured, type MailAttachment } from '../lib/mailer.js';
@@ -186,12 +192,13 @@ router.get('/stats', authMiddleware, async (_req: AuthRequest, res: Response) =>
         .reduce((sum, s) => sum + (s.amount || 0), 0);
 
     const excluded = await unsubscribedEmails();
+    const hidden = await hiddenEmails();
     const totalSubscribers = aggregateEmails([
       ...registrations.map((r) => ({ email: r.email, createdAt: r.createdAt, source: 'registration' })),
       ...sponsors.map((s) => ({ email: s.email, createdAt: s.createdAt, source: 'sponsor' })),
       ...contacts.map((c) => ({ email: c.email, createdAt: c.createdAt, source: 'contact' })),
       ...subscribers.map((s) => ({ email: s.email, createdAt: s.createdAt, source: 'newsletter' })),
-    ], excluded).length;
+    ], excluded).filter((s) => !hidden.has(s.email)).length;
 
     res.json({
       totalRegistrations: registrations.length,
@@ -255,12 +262,13 @@ router.get('/events', authMiddleware, async (_req: AuthRequest, res: Response) =
 
     // Records created before an event carried its own id
     const excluded = await unsubscribedEmails();
+    const hidden = await hiddenEmails();
     const allEmails = aggregateEmails([
       ...registrations.map((r) => ({ email: r.email, createdAt: r.createdAt, source: 'registration' })),
       ...sponsors.map((s) => ({ email: s.email, createdAt: s.createdAt, source: 'sponsor' })),
       ...contacts.map((c) => ({ email: c.email, createdAt: c.createdAt, source: 'contact' })),
       ...subscribers.map((s) => ({ email: s.email, createdAt: s.createdAt, source: 'newsletter' })),
-    ], excluded);
+    ], excluded).filter((s) => !hidden.has(s.email));
 
     res.json({
       events: grouped,
@@ -787,6 +795,13 @@ async function unsubscribedEmails(): Promise<Set<string>> {
   return new Set(list.map((u) => u.email.toLowerCase()));
 }
 
+// Emails the admin deleted from the registered-email registry — they
+// disappear from the admin list and are never included in a broadcast.
+async function hiddenEmails(): Promise<Set<string>> {
+  const list = await readHiddenEmails();
+  return new Set(list.map((h) => h.email.toLowerCase()));
+}
+
 router.get('/contacts', authMiddleware, async (_req: AuthRequest, res: Response) => {
   try {
     const contacts = await readContacts();
@@ -830,16 +845,79 @@ router.get('/subscribers', authMiddleware, async (_req: AuthRequest, res: Respon
       readSponsors(),
     ]);
     const excluded = await unsubscribedEmails();
+    const hidden = await hiddenEmails();
     const all = aggregateEmails([
       ...subscribers.map((s) => ({ email: s.email, createdAt: s.createdAt, source: 'newsletter' })),
       ...contacts.map((c) => ({ email: c.email, createdAt: c.createdAt, source: 'contact' })),
       ...registrations.map((r) => ({ email: r.email, createdAt: r.createdAt, source: 'registration' })),
       ...sponsors.map((s) => ({ email: s.email, createdAt: s.createdAt, source: 'sponsor' })),
-    ], excluded);
+    ], excluded).filter((s) => !hidden.has(s.email));
     res.json({ subscribers: all, total: all.length });
   } catch (err: any) {
     console.error('Failed to fetch subscribers:', err.message);
     res.status(500).json({ error: 'Failed to fetch subscribers' });
+  }
+});
+
+router.delete('/subscribers/email', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const email = String(req.query?.email || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+    await addHiddenEmail(email);
+    res.json({ success: true } as any);
+  } catch (err: any) {
+    console.error('Failed to hide email:', err.message);
+    res.status(500).json({ error: 'Failed to hide email' });
+  }
+});
+
+// ------------------------------------------------------------------
+// Sent emails (log of every broadcast sent from the Diary)
+// ------------------------------------------------------------------
+
+router.get('/sent-emails', authMiddleware, async (_req: AuthRequest, res: Response) => {
+  try {
+    const list = await readSentEmails();
+    const sentEmails = list.map((e) => ({
+      id: e.id,
+      subject: e.subject,
+      scope: e.scope,
+      eventId: e.eventId,
+      eventTitle: e.eventTitle,
+      createdAt: e.createdAt,
+      total: e.recipients.length,
+      sent: e.recipients.filter((r) => r.status === 'sent').length,
+      failed: e.recipients.filter((r) => r.status === 'failed').length,
+      recipientEmails: e.recipients.slice(0, 3).map((r) => r.email),
+      preview: (e.blocks.find((b) => b.text)?.text || '').slice(0, 140),
+    }));
+    res.json({ sentEmails, total: sentEmails.length });
+  } catch (err: any) {
+    console.error('Failed to fetch sent emails:', err.message);
+    res.status(500).json({ error: 'Failed to fetch sent emails' });
+  }
+});
+
+router.get('/sent-emails/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const list = await readSentEmails();
+    const email = list.find((e) => e.id === req.params.id);
+    if (!email) return res.status(404).json({ error: 'Email not found' });
+    res.json({ email });
+  } catch (err: any) {
+    console.error('Failed to fetch sent email:', err.message);
+    res.status(500).json({ error: 'Failed to fetch sent email' });
+  }
+});
+
+router.delete('/sent-emails/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const deleted = await deleteSentEmail(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Email not found' });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('Failed to delete sent email:', err.message);
+    res.status(500).json({ error: 'Failed to delete sent email' });
   }
 });
 
@@ -949,6 +1027,7 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
     }
 
     const excluded = await unsubscribedEmails();
+    const hidden = await hiddenEmails();
 
     // An optional `emails` list narrows the broadcast to exactly those
     // addresses (used by the applicants/sponsors pickers). Any address in the
@@ -963,21 +1042,23 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
     // applicants, all sponsors, or the whole platform.
     const { eventId } = req.body || {};
     let recipients: EmailAgg[];
+    let eventTitle: string | undefined;
     if (eventId && typeof eventId === 'string') {
       const ev = await findEvent(eventId);
       if (!ev) return res.status(404).json({ error: 'Event not found' });
+      eventTitle = ev.title;
       const evRegs = (await readRegistrations({ eventId })).filter((r) => r.status !== 'cancelled');
       recipients = aggregateEmails(
         evRegs.map((r) => ({ email: r.email, createdAt: r.createdAt, source: 'registration' })),
         excluded,
-      ).filter((r) => !r.unsubscribed);
+      ).filter((r) => !r.unsubscribed && !hidden.has(r.email));
     } else if (req.body?.scope === 'sponsors') {
       // Sponsors-only email — goes to every sponsor (brand-level records included).
       const sps = await readSponsors();
       recipients = aggregateEmails(
         sps.map((s) => ({ email: s.email, createdAt: s.createdAt, source: 'sponsor' })),
         excluded,
-      ).filter((r) => !r.unsubscribed);
+      ).filter((r) => !r.unsubscribed && !hidden.has(r.email));
     } else {
       const [subscribers, contacts, registrations, sponsors] = await Promise.all([
         readSubscribers(),
@@ -993,7 +1074,7 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
           ...sponsors.map((s) => ({ email: s.email, createdAt: s.createdAt, source: 'sponsor' })),
         ],
         excluded,
-      ).filter((r) => !r.unsubscribed);
+      ).filter((r) => !r.unsubscribed && !hidden.has(r.email));
     }
 
     // Narrow to the exact list the admin picked in the composer, and fold in
@@ -1015,7 +1096,7 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
 
     const origin = (req.body?.origin as string) || siteBaseUrl() || `${req.protocol}://${req.get('host')}`;
 
-    const failedEmails = new Set<string>();
+    const failedEmails = new Map<string, string>();
     const EMAIL_TIMEOUT_MS = 30_000;
     // Optional per-recipient name map ({name} tag). Keyed by lowercase email;
     // recipients missing from it fall back to a friendly greeting, and when no
@@ -1040,7 +1121,7 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
               ),
             ]);
           } catch (err: any) {
-            failedEmails.add(email);
+            failedEmails.set(email, err.message);
             console.error(`Broadcast failed for ${email}:`, err.message);
           }
         }),
@@ -1054,6 +1135,33 @@ router.post('/broadcast', authMiddleware, async (req: AuthRequest, res: Response
       total: recipients.length,
       unsubscribedExcluded: excluded.size,
     });
+
+    // Persist a record of this broadcast (subject, content and per-recipient
+    // outcome) so the Diary "Sent emails" tab can show everything that went out.
+    try {
+      await saveSentEmail({
+        id: `se_${uuid()}`,
+        subject,
+        createdAt: new Date().toISOString(),
+        scope: eventId && typeof eventId === 'string' ? 'event' : req.body?.scope === 'sponsors' ? 'sponsors' : 'global',
+        eventId: eventId && typeof eventId === 'string' ? eventId : undefined,
+        eventTitle,
+        blocks: blocks.map((b) => ({
+          type: b.type,
+          text: b.type === 'text' ? b.text : undefined,
+          width: b.type === 'image' ? (b as any).width : undefined,
+        })) as SentEmail['blocks'],
+        recipients: recipients.map((r) => ({
+          email: r.email,
+          name: hasNames ? names[r.email.toLowerCase()] : undefined,
+          status: failedEmails.has(r.email) ? 'failed' : 'sent',
+          error: failedEmails.get(r.email),
+        })),
+      });
+      console.log(`Broadcast "${subject}" logged (${recipients.length} recipients)`);
+    } catch (logErr: any) {
+      console.error('Failed to log broadcast:', logErr.message);
+    }
   } catch (err: any) {
     console.error('Broadcast failed:', err.message);
     res.status(500).json({ error: 'Failed to send broadcasts' });
