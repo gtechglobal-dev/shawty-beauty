@@ -58,6 +58,22 @@ function fromAddress(): string {
   return address ? `${SENDER_NAME} <${address}>` : SENDER_NAME;
 }
 
+/** Just the bare email of EMAIL_FROM, without any display name wrapper. */
+function bareFromEmail(): string {
+  const configured = (process.env.EMAIL_FROM || "").trim();
+  const m = configured.match(/<([^>]+)>/);
+  return (m ? m[1] : configured).trim();
+}
+
+// Reply-To for outbound mail. Defaults to the sender address so replies land
+// in a mailbox someone actually reads — a mailbox that (unlike the sender)
+// is usually a real, warm inbox, which inbox filters reward.
+const REPLY_TO = (process.env.EMAIL_REPLY_TO || "").trim();
+
+function replyToValue(): string {
+  return REPLY_TO || bareFromEmail();
+}
+
 // Sender split into name + address for the Brevo REST API.
 function senderParts(): { name: string; email: string } {
   const configured = (process.env.EMAIL_FROM || "").trim();
@@ -79,6 +95,7 @@ interface SendOptions {
   subject: string;
   html: string;
   text?: string;
+  replyTo?: string;
   attachments?: MailAttachment[];
   // Adds a one-click List-Unsubscribe header (Gmail bulk-sender requirement).
   // Passed for broadcast mail; transactional mail (tickets, password reset)
@@ -129,7 +146,7 @@ function htmlToText(html: string): string {
 
 const API_TIMEOUT_MS = 30_000;
 
-async function sendViaBrevoApi({ to, subject, html, text, attachments, unsubscribeUrl }: SendOptions): Promise<void> {
+async function sendViaBrevoApi({ to, subject, html, text, replyTo, attachments, unsubscribeUrl }: SendOptions): Promise<void> {
   const { name, email } = senderParts();
   const payload: Record<string, unknown> = {
     sender: { name, email },
@@ -137,6 +154,8 @@ async function sendViaBrevoApi({ to, subject, html, text, attachments, unsubscri
     subject,
     htmlContent: html,
   };
+  const reply = (replyTo || replyToValue()).trim();
+  if (reply) payload.replyTo = { email: reply };
   if (text) payload.textContent = text;
   const headers = unsubscribeHeaders(unsubscribeUrl);
   if (headers) payload.headers = headers;
@@ -174,11 +193,12 @@ async function sendViaBrevoApi({ to, subject, html, text, attachments, unsubscri
   }
 }
 
-async function sendViaSmtp({ to, subject, html, text, attachments, unsubscribeUrl }: SendOptions): Promise<void> {
+async function sendViaSmtp({ to, subject, html, text, replyTo, attachments, unsubscribeUrl }: SendOptions): Promise<void> {
   if (!mailConfigured()) {
     throw new Error("SMTP is not configured");
   }
   const headers = unsubscribeHeaders(unsubscribeUrl);
+  const reply = (replyTo || replyToValue()).trim() || undefined;
   const transporter = makeTransporter();
   await transporter.sendMail({
     from: fromAddress(),
@@ -186,6 +206,7 @@ async function sendViaSmtp({ to, subject, html, text, attachments, unsubscribeUr
     subject,
     html,
     text: text || htmlToText(html),
+    replyTo: reply,
     headers: headers || undefined,
     attachments: attachments as any,
   });
@@ -272,7 +293,7 @@ export async function sendSuspiciousActivityEmail(
 ): Promise<void> {
   await dispatch({
     to,
-    subject: "⚠️ Shawty\u2019s Diary — Suspicious Login Activity",
+    subject: "\u26a0\ufe0f Shawty\u2019s Diary \u2014 Suspicious Login Activity",
     html: `
       <div style="font-family: Arial, Helvetica, sans-serif; background: #fdf9f4; padding: 32px 16px; border-radius: 16px;">
         <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #f0dbe4;">
@@ -306,4 +327,47 @@ export async function sendSuspiciousActivityEmail(
       </div>
     `,
   });
+}
+
+/**
+ * Startup diagnostics for mail deliverability. Returns warnings the operator
+ * should act on — especially sender-domain authentication, the #1 reason
+ * legit mail (ticket confirmations, password resets) lands in Gmail spam:
+ *  - Sending FROM a personal provider (@gmail.com/@yahoo.com/…) that Brevo
+ *    cannot DKIM-sign on your behalf.
+ *  - No EMAIL_FROM at all (falling back to the Brevo SMTP login, which is
+ *    never authenticated as a sender).
+ */
+export function mailConfigWarnings(): string[] {
+  const warnings: string[] = [];
+  if (!mailConfigured()) {
+    warnings.push("Email is not configured — no mail will be sent.");
+    return warnings;
+  }
+
+  const from = bareFromEmail();
+  if (!from) {
+    warnings.push(
+      "EMAIL_FROM is not set — mail falls back to the SMTP login address, " +
+      "which is not authenticated as a sender and will likely land in spam. " +
+      "Set EMAIL_FROM to an address on a domain verified in Brevo.",
+    );
+    return warnings;
+  }
+
+  const domain = from.split("@")[1]?.toLowerCase() || "";
+  const personalProviders = [
+    "gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.uk", "outlook.com",
+    "hotmail.com", "live.com", "msn.com", "aol.com", "icloud.com", "gmx.com",
+    "yandex.com", "protonmail.com", "zoho.com",
+  ];
+  if (personalProviders.includes(domain)) {
+    warnings.push(
+      `From address "${from}" uses a personal provider (${domain}). Brevo cannot ` +
+      "DKIM-sign mail from it, so it will frequently land in spam. Use a sender " +
+      "on a domain you own, verified in Brevo (SPF/DKIM/DMARC DNS records live).",
+    );
+  }
+
+  return warnings;
 }

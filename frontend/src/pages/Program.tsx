@@ -205,7 +205,7 @@ export default function Program() {
           <div className="grid sm:grid-cols-2 gap-6 max-w-3xl">
             {featured.tickets.map((t, i) => (
               <Reveal key={t.id} variant="zoom" delay={i * 100} className="h-full">
-                <Link to={`/register?event=${encodeURIComponent(featured.slug || featured.id)}&ticket=${t.id}`} className="block h-full">
+                <Link to={`/register/${encodeURIComponent(featured.slug || featured.id)}?ticket=${t.id}`} className="block h-full">
                   <TicketCard t={t} className="h-full" />
                 </Link>
               </Reveal>

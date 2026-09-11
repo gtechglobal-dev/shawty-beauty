@@ -53,18 +53,21 @@ export async function fetchEventByKey(key: string): Promise<StudioEvent | null> 
 }
 
 // Returns the event relevant to the register page: the one requested via the
-// `?event=` param (id or slug) if given, otherwise the live event.
-export async function resolveRegisterEvent(eventKey?: string | null): Promise<StudioEvent> {
+// `:eventKey` route param or `?event=` query param (id or slug) if given,
+// otherwise the live event. Null means nothing to register for right now:
+// calling code decides how to surface that (not found / no live event).
+export async function resolveRegisterEvent(eventKey?: string | null): Promise<StudioEvent | null> {
   if (eventKey) {
     const found = await fetchEventByKey(eventKey)
     if (found) return found
+    return null
   }
-  return fetchLiveEvent()
+  return fetchLiveEventOrNull()
 }
 
 export function eventRegisterUrl(event: { slug?: string; id: string }): string {
   const key = event.slug || event.id
-  return `/register?event=${encodeURIComponent(key)}`
+  return `/register/${encodeURIComponent(key)}`
 }
 
 export function ticketPrice(t: { price: number; originalPrice?: number; promoDeadline?: number }, now = Date.now()): number {

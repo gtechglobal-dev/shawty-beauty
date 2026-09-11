@@ -137,6 +137,7 @@ export default function App() {
             <Route path="/services" element={<Services />} />
             <Route path="/program" element={<Program />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/register/:eventKey" element={<Register />} />
             <Route path="/register/payment-callback" element={<PaymentCallback />} />
             <Route path="/sponsor" element={<Sponsor />} />
             <Route path="/contact" element={<Contact />} />

@@ -18,7 +18,7 @@ import settingsRouter from './routes/settings.js';
 import { startTelegramAdminBot } from './lib/telegramAdminBot.js';
 import { initRealtime } from './lib/realtime.js';
 import { siteBaseUrl } from './lib/baseUrl.js';
-import { mailConfigured, mailMode } from './lib/mailer.js';
+import { mailConfigured, mailMode, mailConfigWarnings } from './lib/mailer.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -32,6 +32,12 @@ if (mailConfigured()) {
   console.log(`Email configured via ${detail}`);
 } else {
   console.warn('Email not configured — messages will NOT be sent.');
+}
+
+// Surfacing deliverability hazards (e.g. unauthenticated sender domain) loudly,
+// since silent "goes to spam" failures are the hardest to chase later.
+for (const warning of mailConfigWarnings()) {
+  console.warn(`[mail] ${warning}`);
 }
 
 app.set('trust proxy', 1);

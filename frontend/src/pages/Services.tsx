@@ -22,34 +22,34 @@ export default function Services() {
         </Reveal>
       </section>
 
-      {/* Lash services */}
-      <section className="section-pad bg-[#fdf6f7]">
-        <div className="container">
-          <Reveal variant="left">
-            <div className="max-w-2xl mb-10 md:mb-12 text-center md:text-left mx-auto md:mx-0">
-              <span className="eyebrow mb-3"><Eye size={14} /> Lash Tech</span>
-              <h2 className="section-title mt-2">Lash extensions that flatter your eyes</h2>
-              <p className="text-ink/70 mt-3">Handcrafted, comfortable lash sets tailored to your natural eye shape and everyday style.</p>
-            </div>
-          </Reveal>
-          <Reveal variant="zoom">
-            <ServiceGallery services={lashServices} />
-          </Reveal>
-        </div>
-      </section>
-
       {/* Makeup services */}
       <section className="section-pad bg-blush border-y border-rose/15">
         <div className="container">
-          <Reveal variant="right">
+          <Reveal variant="left">
             <div className="max-w-2xl mb-10 md:mb-12 text-center md:text-left mx-auto md:mx-0">
               <span className="eyebrow mb-3"><Brush size={14} /> Makeup Services</span>
               <h2 className="section-title mt-2">Makeup for every moment</h2>
               <p className="text-ink/70 mt-3">From everyday soft glam to unforgettable bridal glam — and 1-on-1 training to build your own skills.</p>
             </div>
           </Reveal>
-          <Reveal variant="zoom" delay={100}>
+          <Reveal variant="zoom">
             <ServiceGallery services={makeupServices} />
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Lash services */}
+      <section className="section-pad bg-[#fdf6f7]">
+        <div className="container">
+          <Reveal variant="right">
+            <div className="max-w-2xl mb-10 md:mb-12 text-center md:text-left mx-auto md:mx-0">
+              <span className="eyebrow mb-3"><Eye size={14} /> Lash Tech</span>
+              <h2 className="section-title mt-2">Lash extensions that flatter your eyes</h2>
+              <p className="text-ink/70 mt-3">Handcrafted, comfortable lash sets tailored to your natural eye shape and everyday style.</p>
+            </div>
+          </Reveal>
+          <Reveal variant="zoom" delay={100}>
+            <ServiceGallery services={lashServices} />
           </Reveal>
         </div>
       </section>

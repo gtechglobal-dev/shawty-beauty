@@ -196,7 +196,7 @@ export const defaultEvent: StudioEvent = {
 
 export function eventRegisterUrl(event: { slug?: string; id: string }): string {
   const key = event.slug || event.id
-  return `/register?event=${encodeURIComponent(key)}`
+  return `/register/${encodeURIComponent(key)}`
 }
 
 export interface SponsorPkg {

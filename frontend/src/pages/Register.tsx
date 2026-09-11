@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useNavigate, useSearchParams, useParams, Link } from 'react-router-dom'
 import { CircleCheck, LoaderCircle, CreditCard, Image as ImageIcon, ArrowRight, ArrowLeft } from 'lucide-react'
 import { formatNgn, nationalities, nationalityNames, defaultEvent, type StudioEvent } from '../lib/constants'
 import { resolveRegisterEvent, ticketPrice } from '../lib/events'
@@ -91,8 +91,11 @@ export default function Register() {
   const [searchParams] = useSearchParams()
   const ticketParam = searchParams.get('ticket')
   const eventParam = searchParams.get('event')
+  const { eventKey: routeEventKey } = useParams()
+  const requestedKey = routeEventKey ?? eventParam
 
   const [ev, setEv] = useState<StudioEvent>(defaultEvent)
+  const [resolution, setResolution] = useState<'loading' | 'ready' | 'notfound' | 'closed'>('loading')
   const draft = useMemo(() => loadDraft(), [])
   const [form, setForm] = useState<FormState>(() => {
     const base = draft?.form ? { ...initial, ...draft.form } : { ...initial }
@@ -119,28 +122,43 @@ export default function Register() {
   const toast = useToast()
   const navigate = useNavigate()
 
-  // Resolve the event: honor ?event=, otherwise the live event
+  // Resolve the event strictly: honor a requested :eventKey/?event= (id or
+  // slug) — if it doesn't exist the page shows "event not found" rather than
+  // silently opening the live event. With no key we use the live event; if
+  // there is no live event open right now we show a closed state instead of
+  // falling back to the ship-with event (whose form must never reopen).
   useEffect(() => {
     let active = true
+    setResolution('loading')
     ;(async () => {
-      const resolved = await resolveRegisterEvent(eventParam)
+      const resolved = await resolveRegisterEvent(requestedKey)
       if (!active) return
-      setEv(resolved)
+      if (requestedKey && !resolved) {
+        setResolution('notfound')
+        return
+      }
+      if (!requestedKey && !resolved) {
+        setResolution('closed')
+        return
+      }
+      const target = resolved ?? defaultEvent
+      setEv(target)
       setForm((f) => {
         const fresh = { ...f }
-        if (ticketParam && resolved.tickets.some((t) => t.id === ticketParam)) {
+        if (ticketParam && target.tickets.some((t) => t.id === ticketParam)) {
           fresh.ticketType = ticketParam
         }
-        if (!resolved.tickets.some((t) => t.id === fresh.ticketType)) {
-          fresh.ticketType = resolved.tickets[0]?.id || initial.ticketType
+        if (!target.tickets.some((t) => t.id === fresh.ticketType)) {
+          fresh.ticketType = target.tickets[0]?.id || initial.ticketType
         }
         return fresh
       })
+      setResolution('ready')
     })()
     return () => {
       active = false
     }
-  }, [eventParam, ticketParam])
+  }, [requestedKey, ticketParam])
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
@@ -173,14 +191,8 @@ export default function Register() {
   const processingFee = Math.round(subtotal * PROCESSING_FEE_RATE) + PROCESSING_FEE_BASE
   const total = subtotal + processingFee
   const ended = ev.status === 'finished'
-
-  // Redirect away from finished events — registration is closed
-  if (ended) {
-    useEffect(() => {
-      navigate('/program')
-    }, [navigate])
-    return null
-  }
+  const opensSoon = ev.status === 'upcoming'
+  const formOpen = resolution === 'ready' && !ended && !opensSoon
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -452,15 +464,20 @@ export default function Register() {
         <div className="container py-8 md:py-10 text-center relative">
           <Reveal variant="up">
             <h1 className="font-display text-3xl md:text-5xl font-bold text-white leading-tight mb-2">
-              {ev.title}
+              {resolution === 'loading' ? 'Registration' : resolution === 'notfound' ? 'Event Not Found' : resolution === 'closed' ? 'Registrations' : ev.title}
             </h1>
-            <p className="text-pinkgold text-base md:text-lg font-semibold mb-3">{ev.datesLabel}</p>
-            <p className="inline-block text-white text-sm md:text-base font-semibold tracking-[0.15em] uppercase">
-              {ended ? 'Past Event · This Event Has Ended' : 'Registration / Ticket Purchase'}
-            </p>
-            <p className="mt-2 text-white/85 text-sm md:text-base">Hosted by Shawty</p>
+            {resolution === 'ready' && (
+              <>
+                <p className="text-pinkgold text-base md:text-lg font-semibold mb-3">{ev.datesLabel}</p>
+                <p className="inline-block text-white text-sm md:text-base font-semibold tracking-[0.15em] uppercase">
+                  {ev.status === 'finished' ? 'Past Event · Registration Closed' : ev.status === 'upcoming' ? 'Upcoming Event · Registration Opens Soon' : ev.status === 'live' ? 'Registration / Ticket Purchase' : ''}
+                </p>
+                <p className="mt-2 text-white/85 text-sm md:text-base">Hosted by Shawty</p>
+              </>
+            )}
           </Reveal>
         </div>
+        {formOpen && (
         <div className="relative border-t border-white/10 bg-black/45 py-3 overflow-hidden">
           <div className="marquee">
             <div className="marquee-track items-center text-white/90">
@@ -473,10 +490,57 @@ export default function Register() {
             </div>
           </div>
         </div>
+        )}
       </section>
 
-      <div className={`container section-pad ${ended ? 'max-w-3xl' : 'max-w-4xl'} items-start`}>
-        {ended ? (
+      <div className={`container section-pad ${formOpen ? 'max-w-4xl' : 'max-w-3xl'} items-start`}>
+        {resolution === 'loading' ? (
+          <Reveal variant="up">
+            <div className="card p-16 text-center min-w-0 flex flex-col items-center justify-center gap-5" aria-live="polite">
+              <span className="relative w-16 h-16">
+                <span className="absolute inset-0 rounded-full border-4 border-rose/15 border-t-rose animate-spin" />
+                <span className="absolute inset-1 rounded-full bg-gradient-to-br from-rose to-rose-deep flex items-center justify-center text-white font-display text-2xl font-bold">
+                  S
+                </span>
+              </span>
+              <p className="text-ink/80 font-medium">Checking availability…</p>
+              <p className="text-xs text-muted">Just a moment while we confirm the current registration status.</p>
+            </div>
+          </Reveal>
+        ) : resolution === 'notfound' ? (
+          <Reveal variant="up">
+            <div className="card p-8 sm:p-12 text-center overflow-hidden relative">
+              <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] bg-[#7a3045]/8 text-[#7a3045] px-4 py-1.5 rounded-full mb-6">
+                Registration Unavailable
+              </span>
+              <h2 className="font-display text-3xl md:text-4xl font-bold leading-tight">We couldn't find this event</h2>
+              <p className="text-ink/70 text-base md:text-lg mt-4 max-w-xl mx-auto leading-relaxed">
+                The link you used doesn't match any of our events — it may be out of date. Head to our
+                events page to see what's currently open for registration.
+              </p>
+              <div className="mt-8 flex items-center justify-center gap-3 flex-wrap">
+                <Link to="/program" className="btn btn-primary">See our events <ArrowRight size={16} /></Link>
+              </div>
+            </div>
+          </Reveal>
+        ) : resolution === 'closed' ? (
+          <Reveal variant="up">
+            <div className="card p-8 sm:p-12 text-center overflow-hidden relative">
+              <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] bg-[#7a3045]/8 text-[#7a3045] px-4 py-1.5 rounded-full mb-6">
+                Registrations Currently Closed
+              </span>
+              <h2 className="font-display text-3xl md:text-4xl font-bold leading-tight">We're not taking registrations right now</h2>
+              <p className="text-ink/70 text-base md:text-lg mt-4 max-w-xl mx-auto leading-relaxed">
+                There's no event open for registration just yet. Head to our events page to see what's
+                coming up — we can't wait to have you in the studio.
+              </p>
+              <div className="mt-8 flex items-center justify-center gap-3 flex-wrap">
+                <Link to="/program" className="btn btn-primary">See our events <ArrowRight size={16} /></Link>
+                <Link to="/services" className="btn btn-outline">Explore services <ArrowRight size={16} /></Link>
+              </div>
+            </div>
+          </Reveal>
+        ) : ended ? (
           <>
             <Reveal variant="up">
               <div className="card p-8 sm:p-12 text-center overflow-hidden relative">
@@ -499,6 +563,25 @@ export default function Register() {
               </div>
             </Reveal>
           </>
+        ) : opensSoon ? (
+          <Reveal variant="up">
+            <div className="card p-8 sm:p-12 text-center overflow-hidden relative">
+              <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] bg-[#7a3045]/8 text-[#7a3045] px-4 py-1.5 rounded-full mb-6">
+                Upcoming Event · Not Open Yet
+              </span>
+              <h2 className="font-display text-3xl md:text-4xl font-bold leading-tight">Registrations open soon</h2>
+              <p className="text-ink/70 text-base md:text-lg mt-4 max-w-xl mx-auto leading-relaxed">
+                {ev.title} is coming up, but ticket sales haven't opened yet. Check back closer to the
+                start date — we can't wait to have you on board.
+              </p>
+              <p className="text-muted text-sm mt-3">
+                {ev.datesLabel ? <><span className="font-semibold text-rose-deep">{ev.datesLabel}.</span> Dates and ticketing will be announced here.</> : 'Dates and ticketing will be announced here.'}
+              </p>
+              <div className="mt-8 flex items-center justify-center gap-3 flex-wrap">
+                <Link to="/program" className="btn btn-primary">See our events <ArrowRight size={16} /></Link>
+              </div>
+            </div>
+          </Reveal>
         ) : transitioning ? (
         <Reveal variant="up">
           <div ref={loaderRef} className="card p-12 sm:p-16 text-center scroll-mt-24 min-w-0 flex flex-col items-center justify-center gap-5" aria-live="polite">

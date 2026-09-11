@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import {
   HeartHandshake,
@@ -22,6 +23,7 @@ import { phoneErrorMessage, dialForNationality } from '../lib/phone'
 import { nationalities, nationalityNames, whatsappLink } from '../lib/constants'
 import { optimizeLogoBase64 } from '../lib/image'
 import RichText from '../lib/RichText'
+import SocialPlatformIcon from '../components/icons/SocialPlatformIcon'
 import { useRealtime } from '../lib/useRealtime'
 
 const SPONSOR_TYPE_OPTIONS = [
@@ -105,6 +107,31 @@ function formatAmountInput(raw: string): string {
   const intDigits = (int || '').replace(/^0+(?=\d)/, '')
   const grouped = intDigits ? intDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : ''
   return dec !== undefined && dec !== '' ? `${grouped}.${dec.slice(0, 2)}` : grouped
+}
+
+// A leading "@" is never part of a handle — strip it so it can't be sent twice.
+function normalizeHandle(handle: string): string {
+  return handle.replace(/^@+/, '').trim()
+}
+
+// Build the real profile URL for a social platform from the entered handle.
+function socialProfileUrl(platform: string, handle: string): string | null {
+  const h = normalizeHandle(handle)
+  if (!h) return null
+  switch (platform.toLowerCase()) {
+    case 'instagram': return `https://instagram.com/${h}`
+    case 'facebook': return `https://facebook.com/${h}`
+    case 'tiktok': return `https://tiktok.com/@${h}`
+    case 'x (twitter)':
+    case 'x':
+    case 'twitter': return `https://x.com/${h}`
+    case 'youtube': return `https://youtube.com/@${h}`
+    case 'linkedin': return `https://linkedin.com/in/${h.replace(/^in\//, '')}`
+    case 'snapchat': return `https://snapchat.com/add/${h}`
+    case 'threads': return `https://threads.net/@${h}`
+    case 'whatsapp': return whatsappLink(h)
+    default: return null
+  }
 }
 
 export default function Sponsor() {
@@ -307,7 +334,7 @@ export default function Sponsor() {
         website: websiteClean || undefined,
         socials: socials
           .filter((s) => s.platform && s.handle.trim())
-          .map((s) => ({ platform: s.platform, handle: s.handle.trim() })),
+          .map((s) => ({ platform: s.platform, handle: normalizeHandle(s.handle) })),
         sponsorType: form.sponsorType,
         country: form.country,
         state: form.state,
@@ -542,19 +569,41 @@ export default function Sponsor() {
                 </div>
 
                 {viewSponsor.socials && viewSponsor.socials.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-1.5">
-                    {viewSponsor.socials.map((s, i) => (
-                      <span key={i} className="tag-chip !py-1 text-[11px]">{s.platform} · @{s.handle}</span>
-                    ))}
+                  <div className="mt-5 pt-4 border-t border-black/5 space-y-2">
+                    <span className="text-xs text-muted uppercase tracking-wide font-semibold">Socials</span>
+                    <div className="flex flex-wrap items-center gap-3 mt-1">
+                      {viewSponsor.socials.map((s, i) => {
+                        const url = socialProfileUrl(s.platform, s.handle)
+                        if (url) {
+                          return (
+                            <a
+                              key={i}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={`${s.platform} · ${normalizeHandle(s.handle) || s.handle}`}
+                              className="w-11 h-11 rounded-xl bg-blush text-rose-deep hover:bg-rose-deep hover:text-white flex items-center justify-center transition-colors"
+                            >
+                              <SocialPlatformIcon platform={s.platform} size={22} />
+                            </a>
+                          )
+                        }
+                        return (
+                          <span key={i} title={`${s.platform} · ${normalizeHandle(s.handle) || s.handle}`} className="w-11 h-11 rounded-xl bg-blush text-rose-deep flex items-center justify-center">
+                            <SocialPlatformIcon platform={s.platform} size={22} />
+                          </span>
+                        )
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
             )}
           </Modal>
 
-          {contactAction && (
+          {contactAction && createPortal(
             <div
-              className="fixed inset-0 z-[85] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+              className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
               onClick={() => setContactAction(null)}
               role="dialog"
               aria-modal="true"
@@ -589,12 +638,13 @@ export default function Sponsor() {
                   Cancel
                 </button>
               </div>
-            </div>
+            </div>,
+            document.body,
           )}
 
-          {previewImage && (
+          {previewImage && createPortal(
             <div
-              className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-6"
+              className="fixed inset-0 z-[85] flex items-center justify-center bg-black/85 p-6"
               onClick={() => setPreviewImage('')}
               role="dialog"
               aria-modal="true"
@@ -615,7 +665,8 @@ export default function Sponsor() {
                 decoding="async"
                 className="max-h-[85vh] max-w-[92vw] object-contain rounded-xl bg-white p-4 shadow-2xl"
               />
-            </div>
+            </div>,
+            document.body,
           )}
 
           {showForm && (
@@ -712,12 +763,21 @@ export default function Sponsor() {
                             {SOCIAL_PLATFORM_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
                           </select>
                           <div className="relative flex-1 min-w-0 w-full">
-                            <AtSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none flex items-center">
+                              {s.platform ? (
+                                <SocialPlatformIcon platform={s.platform} size={15} className="text-rose-dark" />
+                              ) : (
+                                <AtSign size={14} />
+                              )}
+                            </span>
                             <input
                               className="input-field !pl-8 w-full min-w-0"
                               value={s.handle}
-                              placeholder="Your username / handle"
-                              onChange={(e) => setSocials((arr) => arr.map((x, j) => (j === i ? { ...x, handle: e.target.value } : x)))}
+                              placeholder={s.platform.toLowerCase() === 'whatsapp' ? 'e.g. 0816 319 8567 (no @ needed)' : 'Username / handle (no @ needed)'}
+                              onChange={(e) => {
+                                const cleaned = e.target.value.replace(/^@+/, '')
+                                setSocials((arr) => arr.map((x, j) => (j === i ? { ...x, handle: cleaned } : x)))
+                              }}
                             />
                           </div>
                           <button
