@@ -6,6 +6,10 @@ import {
   findRegistration,
   findRegistrationByReference,
   updateRegistration,
+  deleteRegistration,
+  writePendingRegistration,
+  findPendingRegistration,
+  deletePendingRegistration,
   findLiveEvent,
   findEvent,
   type Registration,
@@ -208,6 +212,49 @@ async function deliverTicketFor(reg: Registration): Promise<void> {
   }
 }
 
+// ------------------------------------------------------------------
+// Payment-confirmation plumbing. A registrant's data only ever enters the
+// Diary's `registrations` list once payment is confirmed (verify or webhook).
+// Before that it lives in the staging collection and is dropped on failure.
+// ------------------------------------------------------------------
+
+function stagedIdFromReference(reference: string): string | null {
+  // Our own references look like SBS-<uuid>; Paystack-initiated ones fall back
+  // safely to null so we never guess wrongly about which reg they belong to.
+  return reference.startsWith('SBS-') ? reference.replace(/^SBS-/, '') : null;
+}
+
+/** Mark an already-listed registration as paid (idempotent). */
+async function confirmPendingPaid(reg: Registration, reference: string): Promise<Registration | null> {
+  if (reg.status === 'paid') return reg;
+  return updateRegistration(reg.id, { status: 'paid', paystackReference: reference });
+}
+
+/** Promote a staged attempt into the Diary's list as PAID. */
+async function promoteStagedToPaid(staged: Registration, reference: string): Promise<Registration | null> {
+  try {
+    const paidReg: Registration = {
+      ...staged,
+      status: 'paid',
+      paystackRef: staged.paystackRef || reference,
+      paystackReference: reference,
+    };
+    await writeRegistration(paidReg);
+    await deletePendingRegistration(staged.id);
+    return paidReg;
+  } catch (err: any) {
+    console.error('Failed to promote staged registration:', err.message);
+    return null;
+  }
+}
+
+/** Side effects that run exactly once when a payment flips to paid. */
+function onPaid(confirmed: Registration): void {
+  notifyPaidRegistration(confirmed).catch(() => {});
+  deliverTicketFor(confirmed).catch(() => {});
+  broadcastRealtime('registrations', { id: confirmed.id, status: 'paid' });
+}
+
 function buildRegistrationMsg(opts: {
   fullName: string;
   phone: string;
@@ -311,7 +358,6 @@ router.post('/initialize', async (req: Request, res: Response) => {
     if (!PAYSTACK_SECRET) {
       return res.status(500).json({
         error: 'Paystack is not configured yet. Please set PAYSTACK_SECRET_KEY in your environment.',
-        hint: 'Registration is saved as pending. Contact the studio to complete payment.',
       });
     }
 
@@ -334,6 +380,10 @@ router.post('/initialize', async (req: Request, res: Response) => {
       else photoBase64 = rawPhoto;
     }
 
+    // The registrant's data is NOT written to the Diary's registration list yet.
+    // It goes to a staging collection and is only promoted to `registrations`
+    // once Paystack confirms the charge (below /verify or the webhook) — a
+    // failed or abandoned payment therefore never appears on the studio's list.
     const registrationId = uuid();
     const reg: Registration = {
       id: registrationId,
@@ -363,10 +413,6 @@ router.post('/initialize', async (req: Request, res: Response) => {
       photoUrl,
       createdAt: new Date().toISOString(),
     };
-
-    // Save a pending registration record first
-    await writeRegistration(reg);
-    broadcastRealtime('registrations', { id: reg.id, status: reg.status });
 
     const paystackRes = await fetch(`${PAYSTACK_BASE}/transaction/initialize`, {
       method: 'POST',
@@ -402,8 +448,10 @@ router.post('/initialize', async (req: Request, res: Response) => {
       throw new Error(data.message || 'Paystack initialization failed');
     }
 
-    // Record the paystack reference
-    await updateRegistration(registrationId, {
+    // Stage the attempt (keyed by our own SBS-<id> reference) so /verify, the
+    // webhook, and confirmStagedRegistration can rebuild the record on success.
+    await writePendingRegistration({
+      ...reg,
       paystackRef: data.data.reference,
     });
 
@@ -456,16 +504,24 @@ router.post('/verify', async (req: Request, res: Response) => {
     // The webhook may already have confirmed this payment — never contradict it.
     const paid = status === 'success' || reg?.status === 'paid';
 
-    if (paid && reg && reg.status !== 'paid') {
-      const confirmed = await updateRegistration(reg.id, {
-        status: 'paid',
-        paystackReference: reference,
-      });
-      if (confirmed) {
-        notifyPaidRegistration(confirmed).catch(() => {});
-        deliverTicketFor(confirmed).catch(() => {});
-        broadcastRealtime('registrations', { id: confirmed.id, status: 'paid' });
+    if (paid) {
+      let confirmed: Registration | null = null;
+      if (reg) {
+        // Already listed (e.g. pre-existing pending row) — mark it paid.
+        confirmed = await confirmPendingPaid(reg, reference);
+      } else {
+        // Never hit the list yet — promote the staged attempt now that payment
+        // is confirmed. Skipping this keeps failed payments out of the Diary.
+        const stagedId = stagedIdFromReference(reference);
+        const staged = stagedId ? await findPendingRegistration(stagedId) : null;
+        if (staged) confirmed = await promoteStagedToPaid(staged, reference);
       }
+      if (confirmed) onPaid(confirmed);
+    } else if (status === 'failed' || status === 'abandoned') {
+      // Definitive non-payment — drop the staged attempt so it can never
+      // appear in the studio's registration list.
+      const stagedId = stagedIdFromReference(reference);
+      if (stagedId) await deletePendingRegistration(stagedId);
     }
 
     res.json({
@@ -506,17 +562,39 @@ router.post('/webhook', async (req: Request, res: Response) => {
       const ref = event.data?.reference as string | undefined;
       if (ref) {
         const reg = await findRegistrationByReference(ref);
-        if (reg && reg.status !== 'paid') {
-          const paid = await updateRegistration(reg.id, {
-            status: 'paid',
-            paystackReference: ref,
-          });
-          console.log(`Webhook: registration ${reg.id} marked as paid (ref ${ref})`);
-          if (paid) {
-            notifyPaidRegistration(paid).catch(() => {});
-            deliverTicketFor(paid).catch(() => {});
-            broadcastRealtime('registrations', { id: paid.id, status: 'paid' });
+        if (reg) {
+          if (reg.status !== 'paid') {
+            const paid = await confirmPendingPaid(reg, ref);
+            console.log(`Webhook: registration ${reg.id} marked as paid (ref ${ref})`);
+            if (paid) onPaid(paid);
           }
+        } else {
+          // Payment confirmed before the customer ever reached the callback —
+          // promote the staged attempt straight into the Diary list.
+          const stagedId = stagedIdFromReference(ref);
+          const staged = stagedId ? await findPendingRegistration(stagedId) : null;
+          if (staged) {
+            const paid = await promoteStagedToPaid(staged, ref);
+            if (paid) {
+              console.log(`Webhook: staged registration ${paid.id} promoted to paid (ref ${ref})`);
+              onPaid(paid);
+            }
+          }
+        }
+      }
+    }
+
+    if (event.event === 'charge.failed') {
+      const ref = event.data?.reference as string | undefined;
+      if (ref) {
+        // Remove the attempt entirely — a failed payment must never appear on
+        // the studio's registration list.
+        const stagedId = stagedIdFromReference(ref);
+        if (stagedId) await deletePendingRegistration(stagedId);
+        const reg = await findRegistrationByReference(ref);
+        if (reg && reg.status === 'pending') {
+          await deleteRegistration(reg.id);
+          console.log(`Webhook: dropped failed-payment registration ${reg.id} (ref ${ref})`);
         }
       }
     }

@@ -888,7 +888,8 @@ router.get('/sent-emails', authMiddleware, async (_req: AuthRequest, res: Respon
       total: e.recipients.length,
       sent: e.recipients.filter((r) => r.status === 'sent').length,
       failed: e.recipients.filter((r) => r.status === 'failed').length,
-      recipientEmails: e.recipients.slice(0, 3).map((r) => r.email),
+      // Recipient addresses are intentionally NOT exposed in the list — they
+      // are only returned by /sent-emails/:id when an entry is opened.
       preview: (e.blocks.find((b) => b.text)?.text || '').slice(0, 140),
     }));
     res.json({ sentEmails, total: sentEmails.length });

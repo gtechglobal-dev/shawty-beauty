@@ -73,7 +73,6 @@ interface SentEmailSummary {
   sent: number
   failed: number
   preview: string
-  recipientEmails: string[]
 }
 
 interface SentEmailRecipient {
@@ -1147,14 +1146,6 @@ export default function Diary() {
                     </div>
                     <h4 className="font-semibold leading-snug">{e.subject}</h4>
                     {e.preview && <p className="text-sm text-ink/70 mt-1 line-clamp-2">{e.preview}</p>}
-                    <div className="flex flex-wrap gap-1.5 mt-2.5">
-                      {e.recipientEmails.slice(0, 3).map((em) => (
-                        <span key={em} className="text-[11px] px-2 py-0.5 rounded-full bg-ink/5 text-ink/70">{em}</span>
-                      ))}
-                      {e.total > 3 && (
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-blush text-rose-deep font-medium">+{e.total - 3} more</span>
-                      )}
-                    </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     <button

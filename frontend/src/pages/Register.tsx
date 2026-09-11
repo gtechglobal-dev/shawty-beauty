@@ -318,7 +318,8 @@ export default function Register() {
         throw new Error('Paystack is not configured yet. Please contact the studio or try paying by bank transfer.')
       }
 
-      // 1. Initialize payment on the backend (also saves pending registration)
+      // 1. Initialize payment on the backend. Your details are staged server-side
+      //    and only added to the studio's registration list once payment confirms.
       const { paystack } = await postJson('/api/paystack/initialize', {
         fullName: form.fullName,
         phone: form.phone,

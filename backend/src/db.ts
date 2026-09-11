@@ -195,6 +195,69 @@ export async function deleteRegistration(id: string): Promise<boolean> {
   return result.deletedCount > 0;
 }
 
+// ------------------------------------------------------------------
+// Payment staging collection (`pendingRegistrations`)
+//
+// Online registration data lives here from form submission until Paystack
+// confirms the charge. It is copied into `registrations` (the Diary's list)
+// ONLY once payment actually succeeds, so failed/abandoned attempts never
+// surface in the studio's registration list. Stale attempts are purged by
+// cleanupStalePendingRegistrations().
+// ------------------------------------------------------------------
+
+export async function writePendingRegistration(reg: Registration): Promise<void> {
+  const col = getCollection<Registration>('pendingRegistrations');
+  if (!col) throw new Error('Database not connected');
+  await col.insertOne({
+    ...reg,
+    status: reg.status ?? 'pending',
+  } as any);
+}
+
+export async function findPendingRegistration(id: string): Promise<Registration | null> {
+  const col = getCollection<Registration>('pendingRegistrations');
+  if (!col) return null;
+  const doc = await col.findOne({ id });
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  return rest;
+}
+
+export async function deletePendingRegistration(id: string): Promise<boolean> {
+  const col = getCollection<Registration>('pendingRegistrations');
+  if (!col) return false;
+  const result = await col.deleteOne({ id });
+  return result.deletedCount > 0;
+}
+
+// Purge booking attempts whose payment never settled. Online attempts always
+// carry a Paystack reference, so manual/offline rows (no paystackRef) are left
+// untouched. 48h is far beyond any realistic checkout window — anything left
+// there is a failed or abandoned payment and should never reach the Diary.
+export async function cleanupStalePendingRegistrations(): Promise<{ staged: number; abandoned: number }> {
+  const threshold = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
+  let staged = 0;
+  const pendingCol = getCollection<Registration>('pendingRegistrations');
+  if (pendingCol) {
+    const result = await pendingCol.deleteMany({ createdAt: { $lt: threshold } });
+    staged = result.deletedCount;
+  }
+
+  let abandoned = 0;
+  const col = getCollection<Registration>('registrations');
+  if (col) {
+    const result = await col.deleteMany({
+      status: 'pending',
+      paystackRef: { $exists: true, $ne: '' },
+      createdAt: { $lt: threshold },
+    });
+    abandoned = result.deletedCount;
+  }
+
+  return { staged, abandoned };
+}
+
 // Remove legacy registrations that were created before events carried their
 // own id and so can never be grouped under any event (the "Unassigned" list).
 export async function deleteUnassignedRegistrations(): Promise<number> {

@@ -6,7 +6,7 @@ import { rateLimit } from 'express-rate-limit';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, readFileSync } from 'fs';
-import { connectDB, isDbConnected, ensureSeedEvents, migrateEventStatuses, deleteUnassignedRegistrations } from './db.js';
+import { connectDB, isDbConnected, ensureSeedEvents, migrateEventStatuses, deleteUnassignedRegistrations, cleanupStalePendingRegistrations } from './db.js';
 import authRouter from './routes/auth.js';
 import adminRouter from './routes/admin.js';
 import contactRouter from './routes/contact.js';
@@ -121,6 +121,12 @@ connectDB()
     await migrateEventStatuses();
     const purged = await deleteUnassignedRegistrations();
     if (purged > 0) console.log(`Removed ${purged} legacy unassigned registration(s)`);
+    // Drop payment attempts older than 48h — failed/abandoned checkouts must
+    // never linger on the studio's registration list.
+    const stale = await cleanupStalePendingRegistrations();
+    if (stale.staged > 0 || stale.abandoned > 0) {
+      console.log(`Cleaned up ${stale.staged} staged + ${stale.abandoned} abandoned pending registrations`);
+    }
     const server = app.listen(PORT, () => {
       console.log(`Shawty Beauty Studio API running on http://localhost:${PORT}`);
     });
