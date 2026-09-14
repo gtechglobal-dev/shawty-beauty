@@ -108,8 +108,8 @@ export default memo(function EventsCarousel({ live }: EventsCarouselProps) {
           >
             {slides.map((s, i) => (
               <div key={i} className="w-full shrink-0">
-                <div className={`relative h-52 sm:h-72 md:h-80 w-full ${s.faint ? 'bg-gradient-to-br from-rose-dark via-rose to-gold' : ''}`}>
-                  <img src={s.image} alt={s.title} width="800" height="600" className={`absolute inset-0 w-full h-full object-cover ${s.faint ? 'opacity-100' : ''}`} loading="lazy" decoding="async" />
+                <div className={`relative h-52 sm:h-72 md:h-80 w-full bg-ink ${s.faint ? 'bg-gradient-to-br from-rose-dark via-rose to-gold' : ''}`}>
+                  <img src={s.image} alt={s.title} width="800" height="600" className={`absolute inset-0 w-full h-full object-contain ${s.faint ? 'opacity-100' : ''}`} loading="lazy" decoding="async" />
                   <div className={`absolute inset-0 bg-gradient-to-t ${s.faint ? 'from-ink/85 via-ink/50 to-ink/20' : 'from-ink/70 via-ink/20 to-transparent'}`} />
                   <div className="absolute left-0 right-0 bottom-0 p-5 md:p-8 text-white">
 <span className="inline-flex items-center gap-2 text-xs font-semibold bg-white/15 border border-white/20 backdrop-blur-sm px-3 py-1 rounded-full mb-2">
